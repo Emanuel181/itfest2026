@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Roboto+Slab:wght@300;400;600;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-fixed": "#6ffbbe",
+                        "tertiary-container": "#06bb56",
+                        "outline-variant": "#3c4a42",
+                        "surface-variant": "#353534",
+                        "on-primary-fixed": "#002113",
+                        "surface-container": "#201f1f",
+                        "primary": "#4edea3",
+                        "primary-fixed-dim": "#4edea3",
+                        "on-secondary-fixed-variant": "#474746",
+                        "on-primary-container": "#00422b",
+                        "on-tertiary": "#003915",
+                        "error-container": "#93000a",
+                        "primary-container": "#10b981",
+                        "inverse-on-surface": "#313030",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "background": "#131313",
+                        "on-primary-fixed-variant": "#005236",
+                        "on-secondary-container": "#b7b5b4",
+                        "error": "#ffb4ab",
+                        "tertiary": "#4ae176",
+                        "on-surface-variant": "#bbcabf",
+                        "on-error": "#690005",
+                        "on-primary": "#003824",
+                        "inverse-primary": "#006c49",
+                        "surface-container-highest": "#353534",
+                        "surface-container-high": "#2a2a2a",
+                        "on-secondary-fixed": "#1b1b1c",
+                        "secondary-container": "#474746",
+                        "secondary": "#c8c6c5",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed": "#002109",
+                        "on-secondary": "#303030",
+                        "surface-dim": "#131313",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e5e2e1",
+                        "surface-container-lowest": "#0e0e0e",
+                        "inverse-surface": "#e5e2e1",
+                        "on-tertiary-container": "#00431a",
+                        "surface": "#131313",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "tertiary-fixed": "#6bff8f",
+                        "on-surface": "#e5e2e1",
+                        "surface-container-low": "#1c1b1b",
+                        "outline": "#86948a",
+                        "surface-tint": "#4edea3",
+                        "secondary-fixed": "#e5e2e1",
+                        "tertiary-fixed-dim": "#4ae176"
+                    },
+                    fontFamily: {
+                        "headline": ["Roboto Slab"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Inter', sans-serif;
+        }
+        .code-gradient {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(19, 19, 19, 0) 100%);
+        }
+        .primary-gradient {
+            background: linear-gradient(135deg, #4edea3 0%, #10b981 100%);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #131313;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353534;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #474746;
+        }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b border-outline-variant/10">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#4edea3] tracking-tight font-headline">Luminescent IDE</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-[#c8c6c5] hover:text-[#fafafa] transition-colors duration-200 py-1" href="#">Docs</a>
+<a class="text-[#c8c6c5] hover:text-[#fafafa] transition-colors duration-200 py-1" href="#">Architecture</a>
+<a class="text-[#c8c6c5] hover:text-[#fafafa] transition-colors duration-200 py-1" href="#">Logs</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<input class="bg-[#201f1f] border-none rounded-xl px-4 py-2 text-sm text-on-surface focus:ring-2 focus:ring-primary/30 w-64 outline-none transition-all" placeholder="Search architecture..." type="text"/>
+<span class="material-symbols-outlined absolute right-3 top-2 text-[#c8c6c5] text-xl">search</span>
+</div>
+<button class="bg-[#201f1f] text-[#c8c6c5] px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#353534] transition-colors scale-95 active:scale-90">Share</button>
+<button class="primary-gradient text-[#003824] px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/10 transition-transform scale-95 active:scale-90">Run Agents</button>
+<div class="flex gap-2 ml-2">
+<span class="material-symbols-outlined text-[#c8c6c5] cursor-pointer hover:text-primary transition-colors">notifications</span>
+<span class="material-symbols-outlined text-[#c8c6c5] cursor-pointer hover:text-primary transition-colors">settings</span>
+</div>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVb-e9vFyjAqvKnz21XyUoy41zYPxhSTEe7s9EO3Q_yslm4C78uD4vcH_zEaESou-mW6n8TpUCznLrhNfVkT6F3axNMR6p_N2GcMKHDN2HrvbQ4-3TPrrbbIsIuClsevFuHFhNgbCnHUjxOp-CJTuMUKLhS3KWE-PW9yQmUhP1zNDpB4Q76xavw4M82jaz_XAxkluGdHcLKoPl74CdZbX-JWOd7P1ewCf1aFdlKb6yN_Q9itUGC0GR_NCYxxglELkWimOG_vqW5Q"/>
+</div>
+</header>
+<div class="flex h-screen pt-16">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col p-4 z-40 bg-[#201f1f] w-64 border-r border-outline-variant/10">
+<div class="flex items-center gap-3 mb-8 px-2">
+<div class="w-10 h-10 rounded-xl bg-[#353534] flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<div>
+<h3 class="text-lg font-bold text-[#fafafa] leading-none">Core Engine</h3>
+<p class="text-[10px] text-primary font-medium tracking-widest uppercase mt-1">v2.4.0-stable</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-y-1">
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">lightbulb</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Ideation</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Requirements</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">User Stories</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">event_note</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Planning</span>
+</a>
+<a class="flex items-center gap-3 bg-[#353534] text-[#4edea3] rounded-xl px-4 py-3 border-l-4 border-[#10b981] transition-all translate-x-1" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">code</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Implementation</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Security</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">call_merge</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Merge</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Dashboard</span>
+</a>
+</nav>
+<div class="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col gap-1">
+<button class="mb-4 bg-primary/10 text-primary border border-primary/20 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-primary/20 transition-all">
+                New Branch
+            </button>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-2 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined text-sm">help</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Support</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-2 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined text-sm">settings</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 mr-80 flex-1 p-6 overflow-y-auto bg-surface">
+<div class="max-w-5xl mx-auto space-y-10">
+<header class="flex justify-between items-end">
+<div>
+<h1 class="text-3xl font-headline font-bold text-on-surface">Implementation Canvas</h1>
+<p class="text-secondary mt-2 text-sm max-w-lg">Collaborative multi-agent output for approved user stories. Review and integrate coordinated logic across the stack.</p>
+</div>
+<div class="flex items-center gap-2 text-label-sm font-medium bg-surface-container-high px-4 py-2 rounded-full border border-outline-variant/10">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] uppercase tracking-tighter text-secondary">3 Agents Syncing</span>
+</div>
+</header>
+<!-- Story Group 1: Multi-Agent Collaboration -->
+<section class="space-y-6">
+<div class="flex items-center justify-between border-b border-outline-variant/10 pb-4">
+<div class="flex items-center gap-3">
+<span class="bg-primary-container/20 text-primary-container px-2 py-0.5 rounded text-[10px] font-bold">STORY-102</span>
+<h2 class="text-xl font-headline font-semibold">Real-time Telemetry Processing</h2>
+</div>
+<div class="flex gap-2">
+<span class="flex items-center gap-1 text-[10px] font-bold text-primary/70 bg-primary/5 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-xs">hub</span> ORCHESTRATOR
+                        </span>
+<span class="flex items-center gap-1 text-[10px] font-bold text-tertiary/70 bg-tertiary/5 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-xs">dns</span> BACKEND
+                        </span>
+<span class="flex items-center gap-1 text-[10px] font-bold text-primary-fixed-dim/70 bg-primary-fixed-dim/5 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-xs">web</span> FRONTEND
+                        </span>
+</div>
+</div>
+<!-- Collaborative Implementation Module -->
+<div class="bg-surface-container-low rounded-2xl border border-outline-variant/10 overflow-hidden shadow-2xl">
+<!-- Multi-Agent Tabs -->
+<div class="flex bg-surface-container-high px-2 pt-2 gap-1 border-b border-outline-variant/10">
+<button class="px-4 py-2.5 bg-surface-container-low text-primary text-[11px] font-bold uppercase tracking-widest rounded-t-xl border-x border-t border-outline-variant/10 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">hub</span> Orchestrator Plan
+                        </button>
+<button class="px-4 py-2.5 text-secondary hover:text-on-surface text-[11px] font-bold uppercase tracking-widest rounded-t-xl transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">dns</span> Backend (Node.js)
+                        </button>
+<button class="px-4 py-2.5 text-secondary hover:text-on-surface text-[11px] font-bold uppercase tracking-widest rounded-t-xl transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">web</span> Frontend (React)
+                        </button>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 divide-x divide-outline-variant/10">
+<!-- Left: Orchestrator Overview -->
+<div class="p-6 space-y-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-base">architecture</span>
+</div>
+<h4 class="font-headline font-semibold text-on-surface">Execution Plan</h4>
+</div>
+<div class="space-y-4">
+<div class="p-3 bg-surface-container-highest rounded-xl border-l-4 border-primary">
+<p class="text-[10px] font-bold text-primary uppercase mb-1">Status: Coordinating</p>
+<p class="text-xs text-secondary leading-relaxed">Mapping Telemetry Stream (Backend) to Real-time Dashboard (Frontend).</p>
+</div>
+<ul class="space-y-3">
+<li class="flex items-start gap-3 text-xs text-on-surface">
+<span class="material-symbols-outlined text-primary text-sm mt-0.5">check_circle</span>
+<span>Schema defined in <code class="bg-surface-container px-1 rounded text-primary">telemetry.model.ts</code></span>
+</li>
+<li class="flex items-start gap-3 text-xs text-on-surface">
+<span class="material-symbols-outlined text-primary text-sm mt-0.5">check_circle</span>
+<span>WebSocket handshake optimized for 10k ops/sec.</span>
+</li>
+<li class="flex items-start gap-3 text-xs text-on-surface">
+<span class="material-symbols-outlined text-secondary text-sm mt-0.5">pending</span>
+<span class="text-secondary italic">Awaiting UI state validation for high-frequency updates.</span>
+</li>
+</ul>
+</div>
+<button class="w-full primary-gradient text-[#003824] py-3 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-primary/10 transition-transform active:scale-95">Accept Full Stack</button>
+</div>
+<!-- Middle: Backend Implementation -->
+<div class="col-span-1 lg:col-span-2 p-0 flex flex-col">
+<div class="flex-1 overflow-hidden grid grid-rows-2">
+<!-- Backend Logic -->
+<div class="bg-surface-container-lowest font-mono text-xs leading-relaxed border-b border-outline-variant/10 code-gradient relative p-6">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-sm">dns</span>
+<span class="text-[10px] text-tertiary font-bold uppercase tracking-widest">Backend Agent</span>
+</div>
+<span class="text-[10px] text-secondary/40">controllers/telemetry.stream.ts</span>
+</div>
+<pre class="text-[#c8c6c5]"><span class="text-primary">import</span> { <span class="text-primary-fixed">WebSocketServer</span> } <span class="text-primary">from</span> <span class="text-tertiary-container">'ws'</span>;
+
+<span class="text-primary">export const</span> <span class="text-tertiary">initTelemetryStream</span> = (server: <span class="text-primary-fixed">any</span>) =&gt; {
+  <span class="text-primary">const</span> wss = <span class="text-primary">new</span> <span class="text-primary-fixed">WebSocketServer</span>({ server });
+
+  wss.<span class="text-primary">on</span>(<span class="text-tertiary-container">'connection'</span>, (ws) =&gt; {
+    <span class="text-primary">const</span> sub = <span class="text-primary-fixed">RedisClient</span>.<span class="text-primary">subscribe</span>(<span class="text-tertiary-container">'telemetry_raw'</span>);
+    sub.<span class="text-primary">on</span>(<span class="text-tertiary-container">'message'</span>, (msg) =&gt; {
+      ws.<span class="text-primary">send</span>(<span class="text-primary-fixed">JSON</span>.stringify(<span class="text-primary-fixed">Transform</span>.optimize(msg)));
+    });
+  });
+};</pre>
+</div>
+<!-- Frontend Logic -->
+<div class="bg-surface-container-lowest font-mono text-xs leading-relaxed code-gradient relative p-6">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-fixed-dim text-sm">web</span>
+<span class="text-[10px] text-primary-fixed-dim font-bold uppercase tracking-widest">Frontend Agent</span>
+</div>
+<span class="text-[10px] text-secondary/40">components/TelemetryView.tsx</span>
+</div>
+<pre class="text-[#c8c6c5]"><span class="text-primary">export function</span> <span class="text-tertiary">TelemetryView</span>() {
+  <span class="text-primary">const</span> { data, status } = <span class="text-primary">useStream</span>(<span class="text-tertiary-container">'/api/telemetry'</span>);
+
+  <span class="text-primary">return</span> (
+    <span class="text-primary-fixed">&lt;div</span> <span class="text-primary">className</span>=<span class="text-tertiary-container">"grid grid-cols-4 gap-4"</span><span class="text-primary-fixed">&gt;</span>
+      {data.map(metric =&gt; (
+        <span class="text-primary-fixed">&lt;MetricCard</span> <span class="text-primary">key</span>={metric.id} <span class="text-primary">val</span>={metric.value} <span class="text-primary-fixed">/&gt;</span>
+      ))}
+    <span class="text-primary-fixed">&lt;/div&gt;</span>
+  );
+}</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Story Group 2 -->
+<section class="space-y-6">
+<div class="flex items-center gap-3 border-b border-outline-variant/10 pb-4">
+<span class="bg-primary-container/20 text-primary-container px-2 py-0.5 rounded text-[10px] font-bold">STORY-105</span>
+<h2 class="text-xl font-headline font-semibold">Adaptive Load Balancing</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Card Variant A -->
+<div class="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/5 flex flex-col h-full">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[10px] text-secondary font-mono">load_balancer/weighted.ts</span>
+<span class="bg-surface-container-highest text-secondary text-[10px] px-2 py-1 rounded">V1</span>
+</div>
+<div class="flex-1 space-y-4">
+<h4 class="font-headline text-base font-semibold">Weighted Round-Robin</h4>
+<p class="text-secondary text-sm">A predictable approach using static weights for known service capacities.</p>
+<div class="bg-surface-container-lowest p-3 rounded-xl font-mono text-[11px] text-[#c8c6c5] opacity-80">
+                                const next = (nodes) =&gt; { ... }
+                            </div>
+</div>
+<button class="mt-6 w-full py-2 bg-surface-container-high text-on-surface rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-surface-variant transition-colors">View Details</button>
+</div>
+<!-- Card Variant B -->
+<div class="bg-surface-container-low p-5 rounded-2xl border border-primary/20 flex flex-col h-full relative overflow-hidden shadow-lg shadow-primary/5">
+<div class="absolute -right-12 -top-12 w-24 h-24 bg-primary/10 rounded-full blur-2xl"></div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<span class="text-[10px] text-primary font-mono">load_balancer/p2c.ts</span>
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-2 py-1 rounded">SMART CHOICE</span>
+</div>
+<div class="flex-1 space-y-4 relative z-10">
+<h4 class="font-headline text-base font-semibold">Power of Two Choices (P2C)</h4>
+<p class="text-secondary text-sm">Dynamic balancing based on real-time latency sampling and active connections.</p>
+<div class="bg-surface-container-lowest p-3 rounded-xl font-mono text-[11px] text-primary/70">
+                                const pick = (n1, n2) =&gt; n1.load &lt; n2.load ? n1 : n2;
+                            </div>
+</div>
+<button class="mt-6 w-full py-2 primary-gradient text-[#003824] rounded-xl text-xs font-bold uppercase tracking-widest transition-transform active:scale-95 shadow-lg shadow-primary/10">Accept Smart Option</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Right Panel: Agent Activity Feed -->
+<aside class="fixed right-0 top-16 h-[calc(100vh-64px)] w-80 bg-[#1c1b1b] p-4 flex flex-col border-l border-outline-variant/10">
+<div class="flex items-center justify-between mb-6 px-2">
+<h3 class="text-sm font-bold uppercase tracking-widest text-[#fafafa]">Agent Activity</h3>
+<span class="material-symbols-outlined text-primary text-xl">insights</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-4 pr-2">
+<!-- Log Entry 1 -->
+<div class="bg-surface-container-high/40 p-3 rounded-xl border-l-2 border-primary">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-primary">ORCHESTRATOR AGENT</span>
+<span class="text-[9px] text-secondary/40 font-mono">14:45:12</span>
+</div>
+<p class="text-xs text-on-surface leading-tight">Syncing Backend stream with Frontend view. Verifying WebSocket handshake...</p>
+<div class="mt-2 w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[95%] rounded-full"></div>
+</div>
+</div>
+<!-- Log Entry 2 -->
+<div class="bg-surface-container-high/40 p-3 rounded-xl border-l-2 border-tertiary">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-tertiary">BACKEND AGENT</span>
+<span class="text-[9px] text-secondary/40 font-mono">14:44:05</span>
+</div>
+<p class="text-xs text-on-surface leading-tight">Optimized Redis subscription for Story-102. Latency reduced to <span class="text-tertiary">12ms</span>.</p>
+</div>
+<!-- Log Entry 3 -->
+<div class="bg-surface-container-high/40 p-3 rounded-xl border-l-2 border-primary-fixed-dim">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-primary-fixed-dim">FRONTEND AGENT</span>
+<span class="text-[9px] text-secondary/40 font-mono">14:43:58</span>
+</div>
+<p class="text-xs text-on-surface leading-tight">Rendering engine updated. Implementing React Suspense for telemetry cards.</p>
+</div>
+<!-- Log Entry 4 (Queued) -->
+<div class="bg-surface-container-low p-3 rounded-xl border-l-2 border-secondary opacity-60">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-secondary">SECURITY SCANNER</span>
+<span class="text-[9px] text-secondary/40 font-mono">WAITING</span>
+</div>
+<p class="text-xs text-secondary leading-tight">Awaiting implementation merge to perform automated CVE scan.</p>
+</div>
+</div>
+<div class="mt-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-primary">auto_fix_high</span>
+<span class="text-xs font-bold text-on-surface">AI Command</span>
+</div>
+<div class="relative">
+<textarea class="w-full bg-surface-container-lowest border-none rounded-xl p-3 text-xs text-on-surface resize-none focus:ring-1 focus:ring-primary/20 placeholder:text-secondary/30 outline-none" placeholder="Ask agents to refactor..." rows="2"></textarea>
+<button class="absolute bottom-2 right-2 p-1.5 bg-primary rounded-lg text-background transition-transform active:scale-90">
+<span class="material-symbols-outlined text-lg">arrow_upward</span>
+</button>
+</div>
+</div>
+</aside>
+</div>
+<!-- Mobile Bottom NavBar (Visible only on small screens) -->
+<nav class="md:hidden fixed bottom-0 w-full bg-[#1c1b1b] flex justify-around items-center h-16 px-4 z-50 border-t border-outline-variant/10">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">code</span>
+<span class="text-[9px] font-bold uppercase tracking-tighter">Code</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-secondary" href="#">
+<span class="material-symbols-outlined">insights</span>
+<span class="text-[9px] font-bold uppercase tracking-tighter">Logs</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-secondary" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[9px] font-bold uppercase tracking-tighter">Settings</span>
+</a>
+</nav>
+</body></html>
