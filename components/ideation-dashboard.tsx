@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, useEffect, type ReactNode } from "react"
+import { useTheme } from "next-themes"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -180,6 +181,8 @@ function Icon({ name, className }: { name: string; className?: string }) {
     case "terminal": return <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}><polyline points="4 17 10 11 4 5" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round"/><line x1="12" y1="19" x2="20" y2="19" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></svg>
     case "external-link": return <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><polyline points="15 3 21 3 21 9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/><line x1="10" y1="14" x2="21" y2="3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></svg>
     case "play": return <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}><polygon points="5 3 19 12 5 21 5 3" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round"/></svg>
+    case "sun": return <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}><circle cx="12" cy="12" r="4" stroke="currentColor"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="currentColor" strokeLinecap="round"/></svg>
+    case "moon": return <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round"/></svg>
     default: return null
   }
 }
@@ -199,6 +202,13 @@ function IDEHeader({ title, icon, rightNode }: { title: string; icon: string; ri
 
 // Core App Layout
 export function IdeationDashboard() {
+  const [mounted, setMounted] = useState(false)
+  const { theme, setTheme } = useTheme()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const [currentModule, setCurrentModule] = useState<ModuleKey>("Ideation")
   const [search, setSearch] = useState("")
   const [brief, setBrief] = useState(initialBrief)
@@ -265,7 +275,7 @@ export function IdeationDashboard() {
         
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-2.5">
-            <div className="grid size-7 place-items-center rounded-[8px] bg-gradient-to-br from-primary to-primary/80 shadow-[0_2px_10px_rgba(240,109,61,0.25)] border border-primary/20">
+            <div className="grid size-7 place-items-center rounded-[8px] bg-gradient-to-br from-primary to-primary/80 shadow-[0_2px_10px_rgba(16,185,129,0.25)] border border-primary/20">
               <Icon name="spark" className="text-primary-foreground size-4" />
             </div>
             <span className="font-brand text-[15px] font-semibold tracking-tight text-foreground">
@@ -295,7 +305,17 @@ export function IdeationDashboard() {
           <Badge variant="outline" className="hidden sm:inline-flex rounded-full border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] uppercase font-mono tracking-widest text-primary font-medium">
             v1.2.0 Beta
           </Badge>
-          <Button size="sm" className="h-8 rounded-[8px] bg-primary text-[12px] font-medium text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_3px_rgba(240,109,61,0.2)] hover:bg-primary/95 hover:shadow-[0_2px_8px_rgba(240,109,61,0.3)] transition-all flex items-center gap-2 active:scale-[0.98]">
+          {mounted && (
+            <Button
+              size="icon"
+              variant="outline"
+              className="size-8 rounded-[8px] border-border/40 bg-muted/30 hover:bg-muted text-foreground/80 shadow-inner"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              <Icon name={theme === "dark" ? "sun" : "moon"} className="size-4" />
+            </Button>
+          )}
+          <Button size="sm" className="h-8 rounded-[8px] bg-primary text-[12px] font-medium text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_3px_rgba(16,185,129,0.2)] hover:bg-primary/95 hover:shadow-[0_2px_8px_rgba(16,185,129,0.3)] transition-all flex items-center gap-2 active:scale-[0.98]">
             Deploy Swarm 
             <Icon name="branch" className="size-3.5 opacity-80" />
           </Button>
@@ -306,7 +326,7 @@ export function IdeationDashboard() {
       <div className="flex flex-1 overflow-hidden relative">
         {/* Underlay glow FX */}
         <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] bg-primary/5 rounded-full blur-[100px] pointer-events-none opacity-30 mix-blend-screen" />
-        <div className="absolute top-1/4 right-1/4 w-[40vw] h-[40vw] bg-teal-500/5 rounded-full blur-[100px] pointer-events-none opacity-20 mix-blend-screen" />
+        <div className="absolute top-1/4 right-1/4 w-[40vw] h-[40vw] bg-chart-2/5 rounded-full blur-[100px] pointer-events-none opacity-20 mix-blend-screen" />
 
         {/* LEFT NAV SIDEBAR (256px) - Standard flex structural item */}
         <aside className="w-64 shrink-0 flex-col border-r border-white/5 bg-background/50 backdrop-blur-xl hidden lg:flex relative z-10">
@@ -333,7 +353,7 @@ export function IdeationDashboard() {
                     <span className={cn(
                       "grid size-[22px] shrink-0 place-items-center rounded-[6px] font-mono text-[9.5px] font-semibold transition-all duration-300",
                       active 
-                        ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-[0_1px_5px_rgba(240,109,61,0.3)] border border-primary/20" 
+                        ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-[0_1px_5px_rgba(16,185,129,0.3)] border border-primary/20" 
                         : "bg-muted/40 border border-border/50 text-muted-foreground/70 group-hover:bg-muted group-hover:text-foreground"
                     )}>
                       0{i + 1}
@@ -366,12 +386,12 @@ export function IdeationDashboard() {
                 <div className="no-scrollbar flex-1 overflow-y-auto p-6 md:p-10 lg:p-12 relative w-full h-full">
                   <div className="mx-auto max-w-[700px] flex flex-col gap-6 w-full">
                     {/* Title */}
-                     <Textarea
-                        value={brief.title}
-                        onChange={(e) => setBrief({ ...brief, title: e.target.value })}
-                        className="min-h-0 resize-none border-none bg-transparent p-0 text-[32px] sm:text-[40px] font-heading font-semibold tracking-tight shadow-none outline-none focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground leading-[1.1] rounded-none py-1"
-                        rows={1}
-                      />
+                        <Textarea
+                          value={brief.title}
+                          onChange={(e) => setBrief({ ...brief, title: e.target.value })}
+                          className="min-h-0 resize-none border-none bg-transparent p-0 text-[32px] sm:text-[40px] font-serif font-semibold tracking-tight shadow-none outline-none focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground leading-[1.1] rounded-none py-1"
+                          rows={1}
+                        />
                      {/* Objective */}
                       <div className="group/field relative">
                         <label className="text-[10px] font-mono tracking-[0.15em] uppercase text-primary mb-2 block font-medium opacity-80">
@@ -514,7 +534,7 @@ export function IdeationDashboard() {
                       <div className="font-mono text-[10.5px] font-semibold tracking-widest text-primary/80 bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-[4px] uppercase">
                         {story.id}
                       </div>
-                      <Badge variant="outline" className={cn("text-[9px] uppercase font-mono tracking-wider border-opacity-30 px-1.5 py-0", story.priority === 'high' ? 'text-orange-500 border-orange-500 bg-orange-500/10' : 'text-muted-foreground')}>
+                      <Badge variant="outline" className={cn("text-[9px] uppercase font-mono tracking-wider border-opacity-30 px-1.5 py-0", story.priority === 'high' ? 'text-chart-1 border-chart-1 bg-chart-1/10' : 'text-muted-foreground')}>
                         {story.priority}
                       </Badge>
                     </div>
@@ -670,8 +690,8 @@ export function IdeationDashboard() {
                 </div>
                 
                 {/* Terminal Pane */}
-                <div className="h-48 shrink-0 bg-black/80 flex flex-col text-[11.5px] font-mono shadow-inner overflow-hidden border-t-2 border-border/20 z-10">
-                  <div className="flex h-7 items-center justify-between border-b border-white/10 px-3 bg-black/40">
+                <div className="h-48 shrink-0 bg-secondary flex flex-col text-[11.5px] font-mono shadow-inner overflow-hidden border-t border-border z-10">
+                  <div className="flex h-7 items-center justify-between border-b border-border/40 px-3 bg-secondary/80">
                     <div className="flex items-center gap-2">
                       <Icon name="terminal" className="size-3 text-muted-foreground" />
                       <span className="text-[10px] tracking-widest text-muted-foreground/80 uppercase">Terminal</span>
@@ -679,18 +699,18 @@ export function IdeationDashboard() {
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-1">
                     {terminalHistory.map((line, i) => (
-                      <div key={i} className={cn("whitespace-pre-wrap leading-relaxed", line.type === 'error' ? 'text-red-400' : line.type === 'cmd' ? 'text-gray-300 font-bold' : 'text-emerald-400/90')}>
+                      <div key={i} className={cn("whitespace-pre-wrap leading-relaxed", line.type === 'error' ? 'text-destructive' : line.type === 'cmd' ? 'text-foreground font-bold' : 'text-chart-2/90')}>
                         {line.text}
                       </div>
                     ))}
                     <div className="flex items-center gap-2 mt-1 -ml-0.5">
-                      <span className="text-emerald-500 font-bold">root@ide:~$</span>
+                      <span className="text-chart-2 font-bold">root@ide:~$</span>
                       <input 
                         value={terminalInput}
                         onChange={(e) => setTerminalInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleTerminalSubmit()}
                         autoFocus
-                        className="flex-1 bg-transparent outline-none text-gray-200 placeholder:text-gray-600 focus:ring-0 shadow-none border-none appearance-none"
+                        className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground/60 focus:ring-0 shadow-none border-none appearance-none"
                         spellCheck={false}
                       />
                     </div>
@@ -709,12 +729,12 @@ export function IdeationDashboard() {
                   } />
                   <div className="flex-1 p-2 bg-transparent flex flex-col">
                     {/* Simulated Browser UI */}
-                    <div className="flex-1 bg-white dark:bg-[#0c0c0c] rounded-md shadow-sm border border-border/60 overflow-hidden flex flex-col relative">
+                    <div className="flex-1 bg-background rounded-md shadow-sm border border-border/60 overflow-hidden flex flex-col relative">
                       <div className="h-8 bg-muted/40 border-b border-border/40 flex items-center gap-2 px-3">
                         <div className="flex gap-1.5">
-                          <div className="size-2.5 rounded-full bg-red-400/80" />
-                          <div className="size-2.5 rounded-full bg-amber-400/80" />
-                          <div className="size-2.5 rounded-full bg-emerald-400/80" />
+                          <div className="size-2.5 rounded-full bg-destructive/80" />
+                          <div className="size-2.5 rounded-full bg-chart-4/80" />
+                          <div className="size-2.5 rounded-full bg-chart-2/80" />
                         </div>
                         <div className="flex-1 mx-4 bg-background/50 border border-border/40 rounded-sm h-5 text-center flex items-center justify-center text-[10px] text-muted-foreground font-mono">
                           localhost:3000
@@ -724,7 +744,7 @@ export function IdeationDashboard() {
                         {/* Dummy logic based on file preview */}
                         {workspaceFiles.find(f => f.id === activeFileId)?.name.endsWith('.md') ? (
                           <div className="space-y-4 font-sans text-foreground/80">
-                            <h1 className="text-xl font-bold mb-4">{brief.title}</h1>
+                            <h1 className="text-xl font-serif font-bold mb-4">{brief.title}</h1>
                             <p>{brief.objective}</p>
                             <div className="mt-8 p-4 border border-dashed border-border text-center rounded text-muted-foreground text-xs font-mono">
                               Markdown rendered successfully
@@ -735,7 +755,7 @@ export function IdeationDashboard() {
                             <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg text-primary mb-4">
                               <Icon name="spark" className="size-8" />
                             </div>
-                            <h2 className="text-lg font-bold">Component Mounted</h2>
+                            <h2 className="text-lg font-serif font-bold">Component Mounted</h2>
                             <p className="text-muted-foreground/80 text-[13px] mt-2 max-w-[200px]">Hot reloading is perfectly functioning on Node v20.x.</p>
                           </div>
                         )}
@@ -759,7 +779,7 @@ export function IdeationDashboard() {
             {/* Team */}
             <div className="space-y-4">
               <h4 className="text-[10px] font-mono text-muted-foreground/80 uppercase tracking-widest font-semibold flex items-center gap-2">
-                <div className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                <div className="size-1.5 rounded-full bg-chart-2 shadow-sm" />
                 Active Peers
               </h4>
               <div className="space-y-3.5">
@@ -794,7 +814,7 @@ export function IdeationDashboard() {
                     {/* Timeline Node */}
                     <div className={cn(
                       "absolute left-0 top-1.5 size-2 rounded-full ring-4 ring-background z-10 shadow-sm transition-all duration-300", 
-                      act.state === 'active' ? "bg-primary shadow-[0_0_10px_rgba(240,109,61,0.5)]" : "bg-muted-foreground/40"
+                      act.state === 'active' ? "bg-primary shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-muted-foreground/40"
                     )} />
                     {/* Timeline Line */}
                     <div className="absolute left-[3px] top-3 bottom-[-10px] w-px bg-gradient-to-b from-border/70 to-border/20 -z-0 last:hidden" />
