@@ -50,72 +50,74 @@
 }
 
 :root {
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.205 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.845 0.143 164.978);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.596 0.145 163.225);
-  --chart-4: oklch(0.508 0.118 165.612);
-  --chart-5: oklch(0.432 0.095 166.913);
+  --background: oklch(0.09 0 0);
+  --foreground: oklch(0.91 0.005 95);
+  --card: oklch(0.13 0 0);
+  --card-foreground: oklch(0.91 0.005 95);
+  --popover: oklch(0.14 0 0);
+  --popover-foreground: oklch(0.91 0.005 95);
+  --primary: oklch(0.82 0.15 162);
+  --primary-foreground: oklch(0.16 0.06 162);
+  --secondary: oklch(0.19 0 0);
+  --secondary-foreground: oklch(0.91 0.005 95);
+  --muted: oklch(0.17 0 0);
+  --muted-foreground: oklch(0.60 0.01 95);
+  --accent: oklch(0.75 0.18 142);
+  --accent-foreground: oklch(0.09 0 0);
+  --destructive: oklch(0.80 0.13 15);
+  --destructive-foreground: oklch(0.09 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.82 0.15 162);
+  --chart-1: oklch(0.82 0.15 162);
+  --chart-2: oklch(0.75 0.18 142);
+  --chart-3: oklch(0.80 0.14 155);
+  --chart-4: oklch(0.68 0.13 162);
+  --chart-5: oklch(0.58 0.11 162);
   --radius: 0.875rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --sidebar: oklch(0.13 0 0);
+  --sidebar-foreground: oklch(0.91 0.005 95);
+  --sidebar-primary: oklch(0.82 0.15 162);
+  --sidebar-primary-foreground: oklch(0.16 0.06 162);
+  --sidebar-accent: oklch(0.19 0 0);
+  --sidebar-accent-foreground: oklch(0.82 0.15 162);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.82 0.15 162);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.922 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: oklch(0.09 0 0);
+  --foreground: oklch(0.91 0.005 95);
+  --card: oklch(0.13 0 0);
+  --card-foreground: oklch(0.91 0.005 95);
+  --popover: oklch(0.14 0 0);
+  --popover-foreground: oklch(0.91 0.005 95);
+  --primary: oklch(0.82 0.15 162);
+  --primary-foreground: oklch(0.16 0.06 162);
+  --secondary: oklch(0.19 0 0);
+  --secondary-foreground: oklch(0.91 0.005 95);
+  --muted: oklch(0.17 0 0);
+  --muted-foreground: oklch(0.60 0.01 95);
+  --accent: oklch(0.75 0.18 142);
+  --accent-foreground: oklch(0.09 0 0);
+  --destructive: oklch(0.80 0.13 15);
+  --destructive-foreground: oklch(0.09 0 0);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.845 0.143 164.978);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.596 0.145 163.225);
-  --chart-4: oklch(0.508 0.118 165.612);
-  --chart-5: oklch(0.432 0.095 166.913);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.82 0.15 162);
+  --chart-1: oklch(0.82 0.15 162);
+  --chart-2: oklch(0.75 0.18 142);
+  --chart-3: oklch(0.80 0.14 155);
+  --chart-4: oklch(0.68 0.13 162);
+  --chart-5: oklch(0.58 0.11 162);
+  --sidebar: oklch(0.13 0 0);
+  --sidebar-foreground: oklch(0.91 0.005 95);
+  --sidebar-primary: oklch(0.82 0.15 162);
+  --sidebar-primary-foreground: oklch(0.16 0.06 162);
+  --sidebar-accent: oklch(0.19 0 0);
+  --sidebar-accent-foreground: oklch(0.82 0.15 162);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.82 0.15 162);
 }
 
 @layer base {
@@ -167,3 +169,125 @@
 .ide-scroll::-webkit-scrollbar-track { background: #131313; }
 .ide-scroll::-webkit-scrollbar-thumb { background: #353534; border-radius: 10px; }
 .ide-scroll::-webkit-scrollbar-thumb:hover { background: #474746; }
+
+/* === Agentic Platform Animations === */
+
+/* Flowing gradient line — agent handoff indicator */
+@keyframes flow-down {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 0% 100%; }
+}
+.agent-flow-line {
+  width: 2px;
+  background: linear-gradient(to bottom, transparent 0%, #4edea3 50%, transparent 100%);
+  background-size: 100% 300%;
+  animation: flow-down 1.2s linear infinite;
+}
+
+/* Glow pulse — active pipeline node */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(78, 222, 163, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(78, 222, 163, 0); }
+}
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Terminal cursor blink */
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.terminal-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: #4edea3;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: terminal-blink 1s step-end infinite;
+}
+
+/* Slide up reveal */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+/* Fade in */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Graph edge flow — SVG stroke animation */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -20; }
+}
+.graph-edge-animated {
+  stroke-dasharray: 5 5;
+  animation: dash-flow 0.6s linear infinite;
+}
+
+/* Bar grow — metric bars animate width from 0 */
+@keyframes bar-grow {
+  from { width: 0%; }
+}
+.bar-grow {
+  animation: bar-grow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Ring fill — SVG circle stroke-dashoffset */
+@keyframes ring-fill {
+  from { stroke-dashoffset: var(--ring-full); }
+  to   { stroke-dashoffset: var(--ring-target); }
+}
+.ring-animate {
+  animation: ring-fill 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Node pop — scale bounce on completion */
+@keyframes node-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.node-pop {
+  animation: node-pop 0.35s ease-out;
+}
+
+/* Scan line — subtle horizontal scan over panels */
+@keyframes scan {
+  0%   { top: 0%; }
+  100% { top: 100%; }
+}
+.scan-line::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(78,222,163,0.15), transparent);
+  pointer-events: none;
+  animation: scan 3s linear infinite;
+  top: 0;
+}
+
+/* Planning Poker card animations */
+@keyframes card-flip {
+  0%   { transform: rotateY(90deg) scale(0.95); opacity: 0; }
+  60%  { transform: rotateY(-8deg) scale(1.04); opacity: 1; }
+  100% { transform: rotateY(0deg) scale(1);     opacity: 1; }
+}
+.card-flip { animation: card-flip 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+@keyframes card-waiting {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+.card-waiting { animation: card-waiting 1.8s ease-in-out infinite; }

@@ -44,6 +44,15 @@ export interface UserStory {
   status: StoryStatus;
   variants: ImplementationVariant[];
   chosenVariant?: VariantId;
+  // Jira-style metadata
+  priority?: "critical" | "high" | "medium" | "low";
+  type?: "feature" | "bug" | "tech-debt" | "spike";
+  assignee?: string;
+  sprint?: string;
+  storyPoints?: number;
+  labels?: string[];
+  acceptanceCriteria?: string[];
+  notes?: string;   // human briefing notes sent to the orchestrator
 }
 
 export interface ActivityLog {
