@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
-import { SDLCSidebar } from "@/components/sdlc-sidebar";
 
 import type {
   UserStory,
@@ -133,22 +132,22 @@ function highlightCode(code: string): React.ReactNode[] {
 const PRIORITY_CONFIG = {
   critical: { color: "#ffb4ab", bg: "bg-[#ffb4ab]/10", border: "border-[#ffb4ab]/20", icon: "keyboard_double_arrow_up", label: "Critical" },
   high:     { color: "#ffd080", bg: "bg-[#ffd080]/10", border: "border-[#ffd080]/20", icon: "keyboard_arrow_up",        label: "High"     },
-  medium:   { color: "#4edea3", bg: "bg-primary/10", border: "border-primary/20", icon: "drag_handle",              label: "Medium"   },
-  low:      { color: "var(--muted-foreground)", bg: "bg-muted-foreground/10", border: "border-muted-foreground/20", icon: "keyboard_arrow_down",      label: "Low"      },
+  medium:   { color: "#4edea3", bg: "bg-[#4edea3]/10", border: "border-[#4edea3]/20", icon: "drag_handle",              label: "Medium"   },
+  low:      { color: "#86948a", bg: "bg-[#86948a]/10", border: "border-[#86948a]/20", icon: "keyboard_arrow_down",      label: "Low"      },
 } as const;
 
 const TYPE_CONFIG = {
   feature:    { color: "#4edea3", icon: "star",         label: "Feature"    },
   bug:        { color: "#ffb4ab", icon: "bug_report",   label: "Bug"        },
   "tech-debt":{ color: "#ffd080", icon: "build",        label: "Tech Debt"  },
-  spike:      { color: "var(--muted-foreground)", icon: "science",      label: "Spike"      },
+  spike:      { color: "#c8c6c5", icon: "science",      label: "Spike"      },
 } as const;
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  pending:      { color: "var(--muted-foreground)", bg: "bg-muted-foreground/10", border: "border-muted-foreground/20", label: "To Do"        },
-  implementing: { color: "#4edea3", bg: "bg-primary/10", border: "border-primary/20", label: "In Progress"  },
+  pending:      { color: "#86948a", bg: "bg-[#86948a]/10", border: "border-[#86948a]/20", label: "To Do"        },
+  implementing: { color: "#4edea3", bg: "bg-[#4edea3]/10", border: "border-[#4edea3]/20", label: "In Progress"  },
   evaluating:   { color: "#ffd080", bg: "bg-[#ffd080]/10", border: "border-[#ffd080]/20", label: "In Review"    },
-  done:         { color: "#4ae176", bg: "bg-primary/10", border: "border-primary/20", label: "Done"         },
+  done:         { color: "#4ae176", bg: "bg-[#4ae176]/10", border: "border-[#4ae176]/20", label: "Done"         },
 };
 
 function makeEmptyOutput(role: AgentOutput["role"]): AgentOutput {
@@ -213,7 +212,7 @@ function CodeBlock({
   if (isError) {
     return (
       <div
-        className="font-mono leading-relaxed relative flex flex-col h-[120px] items-center justify-center gap-3 border border-[#ffb4ab]/30 rounded-lg mx-3 my-3 bg-card"
+        className="font-mono leading-relaxed relative flex flex-col h-[120px] items-center justify-center gap-3 border border-[#ffb4ab]/30 rounded-lg mx-3 my-3 bg-[#1c1b1b]"
       >
         <div className="flex items-center gap-2 text-[#ffb4ab]">
           <span className="material-symbols-outlined text-base">error</span>
@@ -238,18 +237,18 @@ function CodeBlock({
         "font-mono leading-relaxed relative transition-all duration-300 rounded-b-lg overflow-hidden group",
         expanded ? "h-[560px]" : "h-[320px]"
       )}
-      style={{ background: "var(--background)" }}
+      style={{ background: "#0e0e0e" }}
     >
       {/* Floating action buttons — appear on hover in top-right corner */}
       {clean && (
         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          {loading && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse mr-1" />}
-          <span className="text-[9px] text-muted-foreground/50/50 font-mono mr-1">{lineCount}L</span>
+          {loading && <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse mr-1" />}
+          <span className="text-[9px] text-[#474746]/50 font-mono mr-1">{lineCount}L</span>
           <button
             onClick={handleCopy}
             className={cn(
-              "flex items-center justify-center w-6 h-6 rounded transition-all bg-card/90 backdrop-blur-sm",
-              copied ? "text-primary" : "text-muted-foreground/50 hover:text-muted-foreground"
+              "flex items-center justify-center w-6 h-6 rounded transition-all bg-[#1c1b1b]/90 backdrop-blur-sm",
+              copied ? "text-[#4edea3]" : "text-[#474746] hover:text-[#c8c6c5]"
             )}
             title={copied ? "Copied!" : "Copy code"}
           >
@@ -267,14 +266,14 @@ function CodeBlock({
               a.click();
               URL.revokeObjectURL(url);
             }}
-            className="flex items-center justify-center w-6 h-6 rounded bg-card/90 backdrop-blur-sm text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            className="flex items-center justify-center w-6 h-6 rounded bg-[#1c1b1b]/90 backdrop-blur-sm text-[#474746] hover:text-[#c8c6c5] transition-colors"
             title="Download as file"
           >
             <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>download</span>
           </button>
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="flex items-center justify-center w-6 h-6 rounded bg-card/90 backdrop-blur-sm text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            className="flex items-center justify-center w-6 h-6 rounded bg-[#1c1b1b]/90 backdrop-blur-sm text-[#474746] hover:text-[#c8c6c5] transition-colors"
             title={expanded ? "Collapse" : "Expand"}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>
@@ -285,10 +284,10 @@ function CodeBlock({
             <button
               onClick={() => setShowDiff((v) => !v)}
               className={cn(
-                "flex items-center justify-center w-6 h-6 rounded transition-all bg-card/90 backdrop-blur-sm",
+                "flex items-center justify-center w-6 h-6 rounded transition-all bg-[#1c1b1b]/90 backdrop-blur-sm",
                 showDiff
-                  ? "text-primary border border-primary/20"
-                  : "text-muted-foreground/50 hover:text-muted-foreground"
+                  ? "text-[#4edea3] border border-[#4edea3]/20"
+                  : "text-[#474746] hover:text-[#c8c6c5]"
               )}
               title="Toggle diff view"
             >
@@ -299,9 +298,9 @@ function CodeBlock({
       )}
 
       {/* Scrollable code area */}
-      <div className="absolute inset-0 overflow-auto ide-scroll" style={{ background: "var(--background)" }}>
+      <div className="absolute inset-0 overflow-auto ide-scroll" style={{ background: "#0e0e0e" }}>
         {loading && !clean ? (
-          <div className="flex items-center gap-2 text-primary animate-pulse text-sm p-4">
+          <div className="flex items-center gap-2 text-[#4edea3] animate-pulse text-sm p-4">
             <span className="material-symbols-outlined text-base">sync</span>Generating…
           </div>
         ) : clean && showDiff && prevCode ? (
@@ -322,8 +321,8 @@ function CodeBlock({
             return (
               <pre className="px-4 py-4 text-xs leading-[1.75] whitespace-pre min-w-max">
                 {diffLines.map((line, i) => (
-                  <div key={i} className={cn("px-1 rounded-sm", line.type === "added" && "bg-primary/10", line.type === "removed" && "bg-[#ffb4ab]/10")}>
-                    <span className={cn("select-none mr-2 font-mono", line.type === "added" ? "text-primary" : line.type === "removed" ? "text-[#ffb4ab]" : "text-muted-foreground/50")}>
+                  <div key={i} className={cn("px-1 rounded-sm", line.type === "added" && "bg-[#4ae176]/10", line.type === "removed" && "bg-[#ffb4ab]/10")}>
+                    <span className={cn("select-none mr-2 font-mono", line.type === "added" ? "text-[#4ae176]" : line.type === "removed" ? "text-[#ffb4ab]" : "text-[#474746]")}>
                       {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
                     </span>
                     <span style={{ color: line.type === "added" ? "#4ae176" : line.type === "removed" ? "#ffb4ab" : "#c8c6c5" }}>{line.text}</span>
@@ -336,8 +335,8 @@ function CodeBlock({
           <div className="flex min-w-max">
             {/* Gutter */}
             <div
-              className="select-none shrink-0 text-right pr-3 pl-3 py-4 text-xs leading-[1.75] border-r border-border sticky left-0"
-              style={{ color: "var(--muted-foreground)", minWidth: "3rem", background: "var(--background)" }}
+              className="select-none shrink-0 text-right pr-3 pl-3 py-4 text-xs leading-[1.75] border-r border-[#3c4a42]/20 sticky left-0"
+              style={{ color: "#474746", minWidth: "3rem", background: "#131313" }}
             >
               {clean.split("\n").map((_, i) => (
                 <div key={i}>{i + 1}</div>
@@ -353,21 +352,21 @@ function CodeBlock({
                   return (
                     <>
                       {highlightCode(completeLines)}
-                      <span style={{ color: "var(--muted-foreground)" }}>{partialLine}</span>
-                      <span className="inline-block w-2 h-3.5 bg-primary animate-pulse ml-1 align-middle" />
+                      <span style={{ color: "#c8c6c5" }}>{partialLine}</span>
+                      <span className="inline-block w-2 h-3.5 bg-[#4edea3] animate-pulse ml-1 align-middle" />
                     </>
                   );
                 })()
               ) : (
                 <>
                   {highlightCode(clean)}
-                  {loading && <span className="inline-block w-2 h-3.5 bg-primary animate-pulse ml-1 align-middle" />}
+                  {loading && <span className="inline-block w-2 h-3.5 bg-[#4edea3] animate-pulse ml-1 align-middle" />}
                 </>
               )}
             </pre>
           </div>
         ) : (
-          <p className="text-muted-foreground/50 text-sm p-4 italic">Waiting for agent…</p>
+          <p className="text-[#474746] text-sm p-4 italic">Waiting for agent…</p>
         )}
         <div ref={bottomRef} />
       </div>
@@ -383,7 +382,7 @@ type SecIssue = { id: string; severity: "high" | "medium" | "low"; title: string
 const SEV_COLOR: Record<string, { bg: string; text: string; border: string }> = {
   high:   { bg: "bg-[#ffb4ab]/10", text: "text-[#ffb4ab]", border: "border-[#ffb4ab]/20" },
   medium: { bg: "bg-[#e5c07b]/10", text: "text-[#e5c07b]", border: "border-[#e5c07b]/20" },
-  low:    { bg: "bg-[#c8c6c5]/10", text: "text-muted-foreground", border: "border-border" },
+  low:    { bg: "bg-[#c8c6c5]/10", text: "text-[#c8c6c5]", border: "border-[#3c4a42]/20" },
 };
 
 function SecuritySection({
@@ -411,7 +410,7 @@ function SecuritySection({
     .sort((a, b) => (sevOrder[a.severity] ?? 2) - (sevOrder[b.severity] ?? 2));
 
   return (
-    <div className="bg-muted flex-1">
+    <div className="bg-[#201f1f] flex-1">
       <div className="p-4">
         {isRunning ? (
           <div className="flex items-center gap-2 text-[13px] text-[#ffb4ab] animate-pulse font-mono">
@@ -424,18 +423,18 @@ function SecuritySection({
             {!hideScore && (
               <div className="flex items-center gap-3">
                 <div className="flex items-baseline gap-1">
-                  <span className={cn("text-2xl font-bold font-serif leading-none", secScore >= 85 ? "text-primary" : "text-[#ffb4ab]")}>
+                  <span className={cn("text-2xl font-bold font-serif leading-none", secScore >= 85 ? "text-[#4edea3]" : "text-[#ffb4ab]")}>
                     {secScore}
                   </span>
-                  <span className="text-xs text-muted-foreground/50 font-mono">%</span>
+                  <span className="text-xs text-[#474746] font-mono">%</span>
                 </div>
-                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div className="flex-1 h-1.5 bg-[#353534] rounded-full overflow-hidden">
                   <div
-                    className={cn("h-full rounded-full bar-grow", secScore >= 85 ? "bg-primary" : "bg-[#ffb4ab]")}
+                    className={cn("h-full rounded-full bar-grow", secScore >= 85 ? "bg-[#4edea3]" : "bg-[#ffb4ab]")}
                     style={{ width: `${secScore}%` }}
                   />
                 </div>
-                <Badge className="bg-primary/10 text-primary border-transparent text-[10px] font-bold shrink-0">
+                <Badge className="bg-[#4edea3]/10 text-[#4edea3] border-transparent text-[10px] font-bold shrink-0">
                   {totalIssues.length} total fixed
                 </Badge>
               </div>
@@ -453,46 +452,46 @@ function SecuritySection({
                       className={cn(
                         "rounded-lg border overflow-hidden transition-all",
                         sev.border,
-                        isOpen ? "bg-background" : "bg-muted hover:bg-secondary"
+                        isOpen ? "bg-[#131313]" : "bg-[#201f1f] hover:bg-[#252525]"
                       )}
                     >
                       <button
                         className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
                         onClick={() => setExpandedIssue(isOpen ? null : issue.id)}
                       >
-                        <span className="material-symbols-outlined text-primary text-sm shrink-0">check_circle</span>
+                        <span className="material-symbols-outlined text-[#4edea3] text-sm shrink-0">check_circle</span>
                         <span className={cn("text-[10px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0", sev.bg, sev.text)}>
                           {issue.severity}
                         </span>
-                        <span className="text-[13px] text-foreground font-medium truncate flex-1 text-left">
+                        <span className="text-[13px] text-[#e5e2e1] font-medium truncate flex-1 text-left">
                           {issue.title}
                         </span>
-                        <span className="material-symbols-outlined text-muted-foreground/50 text-sm shrink-0">
+                        <span className="material-symbols-outlined text-[#474746] text-sm shrink-0">
                           {isOpen ? "expand_less" : "expand_more"}
                         </span>
                       </button>
 
                       {isOpen && (
-                        <div className="px-3 pb-3 space-y-2 border-t border-border">
+                        <div className="px-3 pb-3 space-y-2 border-t border-[#3c4a42]/20">
                           {issue.description && (
                             <div className="pt-2">
-                              <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider mb-1">Found</p>
-                              <p className="text-[13px] text-muted-foreground leading-relaxed">{issue.description}</p>
+                              <p className="text-xs font-bold text-[#474746] uppercase tracking-wider mb-1">Found</p>
+                              <p className="text-[13px] text-[#c8c6c5] leading-relaxed">{issue.description}</p>
                             </div>
                           )}
                           {issue.agentAction && (
                             <div>
-                              <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-wider mb-1">Agent Action</p>
+                              <p className="text-xs font-bold text-[#474746] uppercase tracking-wider mb-1">Agent Action</p>
                               <div className="flex items-start gap-1.5">
-                                <span className="material-symbols-outlined text-primary text-sm mt-px shrink-0">auto_fix_high</span>
-                                <p className="text-[13px] text-muted-foreground leading-relaxed">{issue.agentAction}</p>
+                                <span className="material-symbols-outlined text-[#4ae176] text-sm mt-px shrink-0">auto_fix_high</span>
+                                <p className="text-[13px] text-[#c8c6c5] leading-relaxed">{issue.agentAction}</p>
                               </div>
                             </div>
                           )}
                           {issue.agentResult && (
-                            <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/10 rounded px-2 py-1.5">
-                              <span className="material-symbols-outlined text-primary text-sm shrink-0">verified</span>
-                              <p className="text-[13px] text-primary leading-relaxed">{issue.agentResult}</p>
+                            <div className="flex items-center gap-1.5 bg-[#4edea3]/5 border border-[#4edea3]/10 rounded px-2 py-1.5">
+                              <span className="material-symbols-outlined text-[#4edea3] text-sm shrink-0">verified</span>
+                              <p className="text-[13px] text-[#4edea3] leading-relaxed">{issue.agentResult}</p>
                             </div>
                           )}
                         </div>
@@ -502,14 +501,14 @@ function SecuritySection({
                 })}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-[13px] text-primary">
+              <div className="flex items-center gap-2 text-[13px] text-[#4edea3]">
                 <span className="material-symbols-outlined text-base">verified_user</span>
                 No vulnerabilities detected
               </div>
             )}
           </div>
         ) : (
-          <p className="text-[13px] text-muted-foreground/50">Waiting for security scan…</p>
+          <p className="text-[13px] text-[#474746]">Waiting for security scan…</p>
         )}
       </div>
     </div>
@@ -615,7 +614,7 @@ function ChatPanel({
   };
 
   return (
-    <div className="border-t border-border bg-muted">
+    <div className="border-t border-[#3c4a42]/20 bg-[#201f1f]">
       {/* Chat history */}
       {messages.length > 0 && (
         <ScrollArea className="h-[240px] px-3 py-2">
@@ -629,7 +628,7 @@ function ChatPanel({
               )}
             >
               {msg.role === "agent" && (
-                <span className="material-symbols-outlined text-sm text-primary shrink-0 mt-0.5" style={{ fontSize: "14px" }}>
+                <span className="material-symbols-outlined text-sm text-[#4edea3] shrink-0 mt-0.5" style={{ fontSize: "14px" }}>
                   smart_toy
                 </span>
               )}
@@ -637,14 +636,14 @@ function ChatPanel({
                 className={cn(
                   "rounded-lg px-2.5 py-1.5 max-w-[85%]",
                   msg.role === "user"
-                    ? "bg-primary/15 text-primary"
-                    : "bg-secondary text-muted-foreground"
+                    ? "bg-[#4ae176]/15 text-[#4ae176]"
+                    : "bg-[#2a2a2a] text-[#c8c6c5]"
                 )}
               >
                 {msg.content}
               </span>
               {msg.role === "user" && (
-                <span className="material-symbols-outlined text-sm text-primary shrink-0 mt-0.5" style={{ fontSize: "14px" }}>
+                <span className="material-symbols-outlined text-sm text-[#4ae176] shrink-0 mt-0.5" style={{ fontSize: "14px" }}>
                   person
                 </span>
               )}
@@ -677,9 +676,9 @@ function ChatPanel({
           rows={2}
           style={{ resize: "none" }}
           className={cn(
-            "flex-1 bg-secondary border border-border rounded-lg px-3 py-2",
-            "text-[12px] text-foreground placeholder:text-muted-foreground/50 font-mono",
-            "outline-none focus:border-primary/40 transition-colors",
+            "flex-1 bg-[#2a2a2a] border border-[#3c4a42]/30 rounded-lg px-3 py-2",
+            "text-[12px] text-[#e5e2e1] placeholder:text-[#474746] font-mono",
+            "outline-none focus:border-[#4edea3]/40 transition-colors",
             "leading-relaxed max-h-[80px] overflow-y-auto",
             isBlocked && "opacity-50 cursor-not-allowed"
           )}
@@ -690,13 +689,13 @@ function ChatPanel({
           className={cn(
             "flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors",
             draft.trim() && !isBlocked
-              ? "bg-primary/10 hover:bg-primary/20 text-primary"
-              : "bg-secondary text-muted-foreground/50 cursor-not-allowed"
+              ? "bg-[#4edea3]/10 hover:bg-[#4edea3]/20 text-[#4edea3]"
+              : "bg-[#2a2a2a] text-[#474746] cursor-not-allowed"
           )}
           title="Send modification request"
         >
           {isRerunning ? (
-            <span className="w-3 h-3 border-2 border-primary/30 border-t-[#4edea3] rounded-full animate-spin" />
+            <span className="w-3 h-3 border-2 border-[#4edea3]/30 border-t-[#4edea3] rounded-full animate-spin" />
           ) : (
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>send</span>
           )}
@@ -732,7 +731,7 @@ function PokerCard({ value, revealed, color, animationDelay = 0 }: {
         {revealed && value !== null ? (
           value
         ) : (
-          <span className="material-symbols-outlined" style={{ color: "var(--muted-foreground)", fontSize: "16px" }}>casino</span>
+          <span className="material-symbols-outlined" style={{ color: "#474746", fontSize: "16px" }}>casino</span>
         )}
       </div>
     </div>
@@ -762,25 +761,25 @@ function PokerSessionPanel({ session }: { session: PokerSession }) {
   const isRunning = session.phase !== "idle" && session.phase !== "done";
 
   return (
-    <div className="mt-2 rounded-xl border border-border bg-background overflow-hidden">
+    <div className="mt-2 rounded-xl border border-[#3c4a42]/40 bg-[#131313] overflow-hidden">
       {/* Header — always visible, click to toggle */}
       <button
-        className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-border hover:bg-card transition-colors text-left"
+        className="w-full flex items-center justify-between px-3.5 py-2.5 border-b border-[#3c4a42]/30 hover:bg-[#1a1a1a] transition-colors text-left"
         onClick={() => setExpanded((v) => !v)}
       >
-        <div className="flex items-center gap-2 text-primary">
+        <div className="flex items-center gap-2 text-[#4edea3]">
           <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>casino</span>
           <span className="text-[12px] font-bold uppercase tracking-wider">Planning Poker</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {isRunning && <span className="w-1.5 h-1.5 rounded-full bg-primary glow-pulse" />}
+          {isRunning && <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] glow-pulse" />}
           {session.phase === "done" && session.consensusEstimate !== null && (
-            <span className="text-[11px] font-bold font-mono text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+            <span className="text-[11px] font-bold font-mono text-[#4edea3] bg-[#4edea3]/10 border border-[#4edea3]/20 rounded-full px-2 py-0.5">
               {session.consensusEstimate} pts
             </span>
           )}
-          <span className="text-[11px] text-muted-foreground">{phaseLabel}</span>
-          <span className="material-symbols-outlined text-muted-foreground/50 transition-transform" style={{ fontSize: "16px", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+          <span className="text-[11px] text-[#86948a]">{phaseLabel}</span>
+          <span className="material-symbols-outlined text-[#474746] transition-transform" style={{ fontSize: "16px", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>
             expand_more
           </span>
         </div>
@@ -794,7 +793,7 @@ function PokerSessionPanel({ session }: { session: PokerSession }) {
             {session.agents.map((agent, i) => (
               <div key={agent.role} className="flex flex-col items-center gap-2 min-w-0 max-w-[90px]">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center border border-border shrink-0"
+                  className="w-8 h-8 rounded-full flex items-center justify-center border border-[#3c4a42]/40 shrink-0"
                   style={{ background: `${agent.color}10` }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: "15px", color: agent.color }}>{agent.icon}</span>
@@ -802,7 +801,7 @@ function PokerSessionPanel({ session }: { session: PokerSession }) {
                 <PokerCard value={agent.estimate} revealed={agent.revealed} color={agent.color} animationDelay={i * 180} />
                 <span className="text-[10px] font-medium text-center leading-none" style={{ color: agent.color }}>{agent.label}</span>
                 {agent.revealed && agent.reasoning && (
-                  <p className="text-[10px] text-muted-foreground text-center leading-tight line-clamp-3">{agent.reasoning}</p>
+                  <p className="text-[10px] text-[#86948a] text-center leading-tight line-clamp-3">{agent.reasoning}</p>
                 )}
               </div>
             ))}
@@ -810,23 +809,23 @@ function PokerSessionPanel({ session }: { session: PokerSession }) {
 
           {/* Debate log */}
           {session.logs.length > 0 && (
-            <div className="mx-3 mb-3 rounded-lg bg-background border border-border overflow-hidden">
-              <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-muted-foreground/50" style={{ fontSize: "12px" }}>forum</span>
-                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Debate transcript</span>
+            <div className="mx-3 mb-3 rounded-lg bg-[#0e0e0e] border border-[#3c4a42]/20 overflow-hidden">
+              <div className="px-2.5 py-1.5 border-b border-[#3c4a42]/20 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#474746]" style={{ fontSize: "12px" }}>forum</span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-[#474746]">Debate transcript</span>
               </div>
               <div className={`overflow-y-auto ide-scroll p-2 space-y-2 ${session.phase === "debating" ? "max-h-[220px]" : ""}`}>
                 {session.logs.map((log, i) => (
-                  <div key={i} className="rounded-lg bg-background border border-border overflow-hidden">
+                  <div key={i} className="rounded-lg bg-[#131313] border border-[#3c4a42]/15 overflow-hidden">
                     {/* Agent header row */}
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-border" style={{ background: `${log.color}08` }}>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[#3c4a42]/10" style={{ background: `${log.color}08` }}>
                       <div className="w-1 h-3 rounded-full shrink-0" style={{ background: log.color }} />
                       <span className="text-[10px] font-bold" style={{ color: log.color }}>{log.agent}</span>
-                      <span className="ml-auto text-[9px] font-mono text-muted-foreground/50">{log.timestamp}</span>
+                      <span className="ml-auto text-[9px] font-mono text-[#474746]">{log.timestamp}</span>
                     </div>
                     {/* Message body */}
                     <div className="px-2.5 py-2">
-                      <span className="text-[11px] font-mono text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                      <span className="text-[11px] font-mono text-[#c8c6c5] leading-relaxed whitespace-pre-wrap break-words">
                         {log.text}
                         {i === session.logs.length - 1 && session.phase === "debating" && (
                           <span className="terminal-cursor" />
@@ -842,14 +841,14 @@ function PokerSessionPanel({ session }: { session: PokerSession }) {
 
           {/* Consensus footer */}
           {session.phase === "done" && session.consensusEstimate !== null && (
-            <div className="mx-3 mb-3 flex items-center justify-between rounded-lg bg-primary/8 border border-primary/20 px-4 py-2.5">
+            <div className="mx-3 mb-3 flex items-center justify-between rounded-lg bg-[#4edea3]/8 border border-[#4edea3]/20 px-4 py-2.5">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary" style={{ fontSize: "15px" }}>check_circle</span>
-                <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Consensus</span>
+                <span className="material-symbols-outlined text-[#4ae176]" style={{ fontSize: "15px" }}>check_circle</span>
+                <span className="text-[11px] font-bold text-[#4ae176] uppercase tracking-wider">Consensus</span>
               </div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-[22px] font-bold font-mono text-primary">{session.consensusEstimate}</span>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-[22px] font-bold font-mono text-[#4edea3]">{session.consensusEstimate}</span>
+                <span className="text-[11px] text-[#86948a]">
                   pts · ~{session.consensusEstimate < 2 ? `${session.consensusEstimate * 30}min` : session.consensusEstimate * 30 >= 60 ? `${Math.round(session.consensusEstimate * 30 / 60 * 10) / 10}h` : `${session.consensusEstimate * 30}min`} delivery
                 </span>
               </div>
@@ -895,7 +894,7 @@ function PipelineBar({
   const abbrev = ["Reasoning", "Orchestrator", "Code", "Security", "Evaluated"];
 
   return (
-    <div className="flex justify-center px-6 py-3 bg-card border-b border-border">
+    <div className="flex justify-center px-6 py-3 bg-[#1c1b1b] border-b border-[#3c4a42]/15">
       <div className="flex items-center w-full max-w-[640px]">
         {stages.map((stage, i) => (
           <Fragment key={stage.label}>
@@ -904,16 +903,16 @@ function PipelineBar({
               <div
                 className={cn(
                   "w-2.5 h-2.5 rounded-full border transition-all duration-500",
-                  stage.done    ? "bg-primary border-primary" :
-                  stage.running ? "bg-primary/20 border-primary glow-pulse" :
-                                  "bg-transparent border-muted-foreground/30"
+                  stage.done    ? "bg-[#4ae176] border-[#4ae176]" :
+                  stage.running ? "bg-[#4edea3]/20 border-[#4edea3] glow-pulse" :
+                                  "bg-transparent border-[#474746]"
                 )}
               />
               <span className={cn(
                 "text-[9px] font-bold uppercase tracking-wider leading-none whitespace-nowrap",
-                stage.done    ? "text-primary" :
-                stage.running ? "text-primary" :
-                                "text-muted-foreground/50"
+                stage.done    ? "text-[#4ae176]" :
+                stage.running ? "text-[#4edea3]" :
+                                "text-[#474746]"
               )}>
                 {abbrev[i]}
               </span>
@@ -922,7 +921,7 @@ function PipelineBar({
             {i < stages.length - 1 && (
               <div className={cn(
                 "flex-1 h-px mb-3.5 mx-2 transition-all duration-700",
-                stage.done ? "bg-primary/50" : "bg-border/30"
+                stage.done ? "bg-[#4ae176]/50" : "bg-[#3c4a42]/30"
               )} />
             )}
           </Fragment>
@@ -1052,9 +1051,9 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
   );
 
   const ALL_TABS: { id: SectionTab; label: string; icon: string; color: string }[] = [
-    { id: "orchestrator", label: "Orchestrator", icon: "hub",    color: "text-primary" },
-    { id: "frontend",     label: "Frontend",     icon: "web",    color: "text-primary" },
-    { id: "backend",      label: "Backend",      icon: "dns",    color: "text-primary" },
+    { id: "orchestrator", label: "Orchestrator", icon: "hub",    color: "text-[#4edea3]" },
+    { id: "frontend",     label: "Frontend",     icon: "web",    color: "text-[#6ffbbe]" },
+    { id: "backend",      label: "Backend",      icon: "dns",    color: "text-[#4ae176]" },
     { id: "security",     label: "Security",     icon: "shield", color: "text-[#ffb4ab]" },
   ];
   const TABS = ALL_TABS.filter((t) => t.id !== "frontend" || anyNeedsFrontend);
@@ -1062,7 +1061,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
   return (
     <div className="space-y-0">
       {/* Outer variant tab bar — A / B / C */}
-      <div className="flex items-center gap-0 border-b border-border">
+      <div className="flex items-center gap-0 border-b border-[#3c4a42]/20">
         {(["A", "B", "C"] as VariantId[]).map((v) => {
           const vt = story.variants.find((x) => x.id === v);
           const nf = !!noFrontend[`${story.id}:${v}`];
@@ -1077,19 +1076,19 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
               className={cn(
                 "flex items-center gap-2 px-6 py-3 text-sm font-bold uppercase tracking-widest border-b-2 transition-all -mb-px",
                 isActive
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground/50 hover:text-muted-foreground"
+                  ? "border-[#4edea3] text-[#4edea3]"
+                  : "border-transparent text-[#474746] hover:text-[#c8c6c5]"
               )}
             >
               <span
                 className={cn(
                   "inline-block w-2 h-2 rounded-full shrink-0",
-                  vRunning ? "bg-primary animate-pulse" : vDone ? "bg-primary" : "bg-muted-foreground"
+                  vRunning ? "bg-[#4edea3] animate-pulse" : vDone ? "bg-[#4ae176]" : "bg-[#474746]"
                 )}
               />
               Variant {v}
               {isChosen && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-wider">Selected</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#4edea3]/10 text-[#4edea3] uppercase tracking-wider">Selected</span>
               )}
             </button>
           );
@@ -1110,10 +1109,10 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
           const lastCheckpointFilled = totalSteps > 0 && completedSteps[v] >= totalSteps;
 
           let activeLabel = "";
-          let activeLabelColor = "text-muted-foreground/50";
+          let activeLabelColor = "text-[#474746]";
           if (isRerunning && !anyRunning)                                      { activeLabel = "UPDATING";         activeLabelColor = "text-[#e5c07b]"; }
-          else if (isRunning(variant.orchestrator))                            { activeLabel = "ORCHESTRATING";    activeLabelColor = "text-primary"; }
-          else if (isRunning(variant.backend) || isRunning(variant.frontend))  { activeLabel = "CODING";           activeLabelColor = "text-primary"; }
+          else if (isRunning(variant.orchestrator))                            { activeLabel = "ORCHESTRATING";    activeLabelColor = "text-[#4edea3]"; }
+          else if (isRunning(variant.backend) || isRunning(variant.frontend))  { activeLabel = "CODING";           activeLabelColor = "text-[#4ae176]"; }
           else if (isRunning(variant.security))                                { activeLabel = "SCANNING";         activeLabelColor = "text-[#ffb4ab]"; }
 
           // Parse orchestrator
@@ -1156,8 +1155,8 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
             <Card
               key={v}
               className={cn(
-                "bg-card rounded-2xl border overflow-hidden ring-0 flex flex-col mt-4",
-                story.chosenVariant === v ? "border-primary/40" : "border-border"
+                "bg-[#1c1b1b] rounded-2xl border overflow-hidden ring-0 flex flex-col mt-4",
+                story.chosenVariant === v ? "border-[#4edea3]/40" : "border-[#3c4a42]/20"
               )}
             >
               {/* Pipeline progress bar */}
@@ -1172,7 +1171,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
               />
 
               {/* Inner section tab bar */}
-              <div className="flex items-center gap-0 border-b border-border bg-card">
+              <div className="flex items-center gap-0 border-b border-[#3c4a42]/20 bg-[#161615]">
                 {TABS.map((tab) => {
                   const isActiveInner = activeTab === tab.id;
                   return (
@@ -1183,10 +1182,10 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                         "flex items-center gap-1.5 px-5 py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-all -mb-px",
                         isActiveInner
                           ? cn("border-current", tab.color)
-                          : "border-transparent text-muted-foreground/50 hover:text-muted-foreground"
+                          : "border-transparent text-[#474746] hover:text-[#c8c6c5]"
                       )}
                     >
-                      <span className={cn("material-symbols-outlined text-base", isActiveInner ? tab.color : "text-muted-foreground/50")}>
+                      <span className={cn("material-symbols-outlined text-base", isActiveInner ? tab.color : "text-[#474746]")}>
                         {tab.icon}
                       </span>
                       {tab.label}
@@ -1211,7 +1210,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                         <div className="space-y-0">
                           {/* Status line above timeline */}
                           {statusLine && (
-                            <p className="text-[13px] font-bold text-primary mb-4">{statusLine}</p>
+                            <p className="text-[13px] font-bold text-[#4edea3] mb-4">{statusLine}</p>
                           )}
 
                           {/* Vertical timeline */}
@@ -1239,16 +1238,16 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                         "w-4 h-4 border-2 flex items-center justify-center shrink-0 transition-all duration-700 mt-1",
                                         "rotate-45",
                                         isActiveStep
-                                          ? "border-primary bg-primary/20 glow-pulse"
+                                          ? "border-[#4edea3] bg-[#4edea3]/20 glow-pulse"
                                           : lastCheckpointFilled && isLast
-                                          ? "border-primary bg-primary"
+                                          ? "border-[#4edea3] bg-[#4edea3]"
                                           : isCompleted
-                                          ? "border-primary bg-primary"
-                                          : "border-muted-foreground/30 bg-transparent"
+                                          ? "border-[#4ae176] bg-[#4ae176]"
+                                          : "border-[#474746] bg-transparent"
                                       )}
                                     >
                                       {isActiveStep && (
-                                        <span className="w-1 h-1 bg-primary animate-pulse block" style={{ transform: "none" }} />
+                                        <span className="w-1 h-1 bg-[#4edea3] animate-pulse block" style={{ transform: "none" }} />
                                       )}
                                     </div>
                                     {/* Connector line */}
@@ -1256,7 +1255,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                       <div
                                         className={cn(
                                           "w-px min-h-[24px] flex-1 transition-all duration-700",
-                                          isCompleted ? "bg-primary/50" : "bg-border/40"
+                                          isCompleted ? "bg-[#4ae176]/50" : "bg-[#3c4a42]/40"
                                         )}
                                       />
                                     )}
@@ -1281,7 +1280,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                             }
                                             if (e.key === "Escape") setEditingStep(null);
                                           }}
-                                          className="flex-1 bg-transparent border-0 border-b border-primary/50 text-[13px] text-foreground font-mono outline-none leading-relaxed pb-px focus:border-primary transition-colors"
+                                          className="flex-1 bg-transparent border-0 border-b border-[#4edea3]/50 text-[13px] text-[#e5e2e1] font-mono outline-none leading-relaxed pb-px focus:border-[#4edea3] transition-colors"
                                         />
                                       ) : (
                                         <div className="flex-1 min-w-0">
@@ -1289,20 +1288,20 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                             className={cn(
                                               "text-[13px] leading-relaxed select-none block",
                                               isOverridden ? "text-[#e5c07b]" :
-                                              isActiveStep ? "text-primary" :
-                                              isCompleted ? "text-muted-foreground" : "text-muted-foreground/50"
+                                              isActiveStep ? "text-[#4edea3]" :
+                                              isCompleted ? "text-[#c8c6c5]" : "text-[#474746]"
                                             )}
                                           >
                                             {displayText}
                                             {isActiveStep && (
-                                              <span className="inline-block w-1.5 h-3 bg-primary animate-pulse ml-1 align-middle rounded-sm" />
+                                              <span className="inline-block w-1.5 h-3 bg-[#4edea3] animate-pulse ml-1 align-middle rounded-sm" />
                                             )}
                                           </span>
                                         </div>
                                       )}
                                       {!isEditingThis && (
                                         <span
-                                          className="material-symbols-outlined text-xs text-muted-foreground/50 opacity-0 group-hover:opacity-60 shrink-0 cursor-text transition-opacity mt-0.5"
+                                          className="material-symbols-outlined text-xs text-[#474746] opacity-0 group-hover:opacity-60 shrink-0 cursor-text transition-opacity mt-0.5"
                                           onClick={() => { setEditingStep(key); setEditingVal(displayText); }}
                                         >
                                           edit
@@ -1317,10 +1316,10 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                             {/* "Planning next step…" ghost node when orchestrator still running */}
                             {isRunning(variant.orchestrator) && (
                               <div className="flex gap-3 items-center mt-1">
-                                <div className="w-4 h-4 border-2 border-primary/30 bg-primary/5 rotate-45 shrink-0 mt-1" />
-                                <span className="text-[13px] text-muted-foreground/50 italic font-mono">
+                                <div className="w-4 h-4 border-2 border-[#4edea3]/30 bg-[#4edea3]/5 rotate-45 shrink-0 mt-1" />
+                                <span className="text-[13px] text-[#474746] italic font-mono">
                                   Planning next step…
-                                  <span className="inline-block w-1.5 h-3 bg-primary/40 animate-pulse ml-1 align-middle rounded-sm" />
+                                  <span className="inline-block w-1.5 h-3 bg-[#4edea3]/40 animate-pulse ml-1 align-middle rounded-sm" />
                                 </span>
                               </div>
                             )}
@@ -1329,11 +1328,11 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                       ) : isRunning(variant.orchestrator) ? (
                         /* No steps parsed yet — initial pulse */
                         <div className="flex items-center gap-3 py-2">
-                          <div className="w-4 h-4 border-2 border-primary/40 bg-primary/5 rotate-45 shrink-0" />
-                          <span className="text-[13px] text-primary animate-pulse font-mono">Orchestrating…</span>
+                          <div className="w-4 h-4 border-2 border-[#4edea3]/40 bg-[#4edea3]/5 rotate-45 shrink-0" />
+                          <span className="text-[13px] text-[#4edea3] animate-pulse font-mono">Orchestrating…</span>
                         </div>
                       ) : (
-                        <p className="text-[13px] text-muted-foreground/50">Waiting for orchestrator…</p>
+                        <p className="text-[13px] text-[#474746]">Waiting for orchestrator…</p>
                       )}
 
                       {/* Reasoning card — primary view, always visible when done */}
@@ -1366,39 +1365,39 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                             const isCollapsed = reasoningCollapsed[v] ?? true;
 
                             return (
-                              <div className="mb-4 border border-border rounded-lg overflow-hidden">
+                              <div className="mb-4 border border-[#3c4a42]/20 rounded-lg overflow-hidden">
                                 {/* Header row — clickable to collapse/expand */}
                                 <button
                                   onClick={() => setReasoningCollapsed((p) => ({ ...p, [v]: !p[v] }))}
-                                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-muted hover:bg-secondary transition-colors text-left"
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 bg-[#201f1f] hover:bg-[#252424] transition-colors text-left"
                                 >
-                                  <span className="material-symbols-outlined text-sm text-primary">psychology</span>
-                                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex-1">Reasoning</span>
+                                  <span className="material-symbols-outlined text-sm text-[#4edea3]">psychology</span>
+                                  <span className="text-xs font-bold uppercase tracking-wider text-[#c8c6c5] flex-1">Reasoning</span>
                                   {isEdited && <span className="text-[10px] font-bold text-[#e5c07b] uppercase tracking-wider">edited</span>}
                                   {needsFrontendLine === "no" && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-muted-foreground/20 text-muted-foreground/50 uppercase tracking-wider">No Frontend</span>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#474746]/20 text-[#474746] uppercase tracking-wider">No Frontend</span>
                                   )}
-                                  <span className="material-symbols-outlined text-sm text-muted-foreground/50">
+                                  <span className="material-symbols-outlined text-sm text-[#474746]">
                                     {isCollapsed ? "expand_more" : "expand_less"}
                                   </span>
                                 </button>
 
                                 {!isCollapsed && (isReasoningRunning ? (
-                                  <div className="flex items-center gap-2 p-3 text-[13px] text-primary animate-pulse font-mono">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                  <div className="flex items-center gap-2 p-3 text-[13px] text-[#4edea3] animate-pulse font-mono">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse" />
                                     Analyzing story…
                                   </div>
                                 ) : rawReasoning ? (
-                                  <div className="border-t border-border">
+                                  <div className="border-t border-[#3c4a42]/20">
                                     {editedReasoning === null ? (
                                       <div className="p-3 space-y-2">
                                         {analysis && (
-                                          <p className="text-[12px] text-muted-foreground/70 leading-relaxed italic mb-2">{analysis}</p>
+                                          <p className="text-[12px] text-[#c8c6c5]/70 leading-relaxed italic mb-2">{analysis}</p>
                                         )}
                                         <div className="grid grid-cols-3 gap-1.5">
                                           {[
-                                            { label: "Backend",  color: "text-primary", bg: "bg-primary/5",  border: "border-primary/15", tasks: backendTasks },
-                                            { label: "Frontend", color: "text-primary", bg: "bg-primary/5",  border: "border-[#6ffbbe]/15", tasks: frontendTasks },
+                                            { label: "Backend",  color: "text-[#4ae176]", bg: "bg-[#4ae176]/5",  border: "border-[#4ae176]/15", tasks: backendTasks },
+                                            { label: "Frontend", color: "text-[#6ffbbe]", bg: "bg-[#6ffbbe]/5",  border: "border-[#6ffbbe]/15", tasks: frontendTasks },
                                             { label: "Security", color: "text-[#ffb4ab]", bg: "bg-[#ffb4ab]/5",  border: "border-[#ffb4ab]/15", tasks: securityTasks },
                                           ].map((sec) => {
                                             const sKey = `${v}:${sec.label}`;
@@ -1408,19 +1407,19 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                               <div key={sec.label} className={cn("rounded border p-2 space-y-1", sec.bg, sec.border)}>
                                                 <div className="flex items-center gap-1">
                                                   <span className={cn("text-[10px] font-bold uppercase tracking-wider", sec.color)}>{sec.label}</span>
-                                                  <span className="ml-auto text-[9px] text-muted-foreground/50 font-mono">{sec.tasks.length}</span>
+                                                  <span className="ml-auto text-[9px] text-[#474746] font-mono">{sec.tasks.length}</span>
                                                 </div>
                                                 {sec.tasks.length === 0 ? (
-                                                  <p className="text-[11px] text-muted-foreground/50 italic">No {sec.label.toLowerCase()} tasks identified</p>
+                                                  <p className="text-[11px] text-[#474746] italic">No {sec.label.toLowerCase()} tasks identified</p>
                                                 ) : (
                                                   <>
                                                     {visibleTasks.map((task, ti) => (
-                                                      <p key={ti} className="text-[11px] text-muted-foreground leading-relaxed" title={task}>{task}</p>
+                                                      <p key={ti} className="text-[11px] text-[#c8c6c5] leading-relaxed" title={task}>{task}</p>
                                                     ))}
                                                     {sec.tasks.length > 2 && (
                                                       <button
                                                         onClick={() => setExpandedSections((p) => ({ ...p, [sKey]: !p[sKey] }))}
-                                                        className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors w-full text-left"
+                                                        className="text-[10px] text-[#474746] hover:text-[#c8c6c5] transition-colors w-full text-left"
                                                       >
                                                         {sExpanded ? "Show less" : `+${sec.tasks.length - 2} more`}
                                                       </button>
@@ -1434,14 +1433,14 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                         <div className="flex items-center gap-2 pt-1">
                                           <button
                                             onClick={() => setReasoningEdit((p) => ({ ...p, [v]: rawReasoning }))}
-                                            className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors flex items-center gap-1"
+                                            className="text-[11px] text-[#474746] hover:text-[#c8c6c5] transition-colors flex items-center gap-1"
                                           >
                                             <span className="material-symbols-outlined text-sm">edit</span>
                                             Edit
                                           </button>
                                           <button
                                             onClick={() => onRerunOrchestrator(v, rawReasoning)}
-                                            className="text-[11px] text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1 ml-auto"
+                                            className="text-[11px] text-[#474746] hover:text-[#4edea3] transition-colors flex items-center gap-1 ml-auto"
                                           >
                                             <span className="material-symbols-outlined text-sm">refresh</span>
                                             Regenerate
@@ -1455,12 +1454,12 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                           value={displayReasoning}
                                           onChange={(e) => setReasoningEdit((p) => ({ ...p, [v]: e.target.value }))}
                                           rows={8}
-                                          className="w-full bg-background px-3 py-2 text-[12px] text-muted-foreground font-mono leading-[1.7] outline-none resize-none border-0 border-b border-border"
+                                          className="w-full bg-[#0e0e0e] px-3 py-2 text-[12px] text-[#c8c6c5] font-mono leading-[1.7] outline-none resize-none border-0 border-b border-[#3c4a42]/20"
                                         />
-                                        <div className="flex items-center gap-2 justify-between px-3 py-2 bg-muted">
+                                        <div className="flex items-center gap-2 justify-between px-3 py-2 bg-[#201f1f]">
                                           <button
                                             onClick={() => setReasoningEdit((p) => ({ ...p, [v]: null }))}
-                                            className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                                            className="text-xs text-[#474746] hover:text-[#c8c6c5] transition-colors"
                                           >
                                             {isEdited ? "Reset" : "Cancel"}
                                           </button>
@@ -1469,7 +1468,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                               setReasoningEdit((p) => ({ ...p, [v]: null }));
                                               onRerunOrchestrator(v, displayReasoning);
                                             }}
-                                            className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                                            className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-[#4edea3]/10 hover:bg-[#4edea3]/20 text-[#4edea3] transition-colors"
                                           >
                                             <span className="material-symbols-outlined text-sm">refresh</span>
                                             Regenerate tasks
@@ -1491,16 +1490,16 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                 {activeTab === "frontend" && (
                   noFront ? (
                     <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
-                      <span className="material-symbols-outlined text-4xl text-muted-foreground/50">web_off</span>
-                      <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">Not required</p>
-                      <p className="text-[13px] text-muted-foreground/50 max-w-[200px]">This story has no frontend requirements</p>
+                      <span className="material-symbols-outlined text-4xl text-[#474746]">web_off</span>
+                      <p className="text-xs font-bold text-[#474746] uppercase tracking-widest">Not required</p>
+                      <p className="text-[13px] text-[#474746] max-w-[200px]">This story has no frontend requirements</p>
                     </div>
                   ) : (
                     <div className="flex flex-col flex-1 overflow-hidden">
                       <CodeBlock
                         label="Frontend Agent"
                         icon="web"
-                        color="text-primary"
+                        color="text-[#6ffbbe]"
                         filename={`components/StoryView_v${v}.tsx`}
                         code={variant.frontend.content}
                         loading={isRunning(variant.frontend)}
@@ -1517,7 +1516,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                     <CodeBlock
                       label="Backend Agent"
                       icon="dns"
-                      color="text-primary"
+                      color="text-[#4ae176]"
                       filename={`controllers/stream_v${v.toLowerCase()}.ts`}
                       code={variant.backend.content}
                       loading={isRunning(variant.backend)}
@@ -1532,7 +1531,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                   <div className="flex flex-col flex-1 overflow-y-auto">
                     {/* Severity filter chips */}
                     {isDone(variant.security) && secIssues.length > 0 && (
-                      <div className="flex items-center gap-1.5 px-4 py-2 bg-card border-b border-border">
+                      <div className="flex items-center gap-1.5 px-4 py-2 bg-[#1c1b1b] border-b border-[#3c4a42]/20">
                         {(["all", "high", "medium", "low"] as const).map((f) => {
                           const isActive = secFilter[v] === f;
                           const counts = f === "all" ? secIssues.length : secIssues.filter((i) => i.severity === f).length;
@@ -1545,9 +1544,9 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                 isActive
                                   ? f === "high"   ? "bg-[#ffb4ab]/20 border-[#ffb4ab]/40 text-[#ffb4ab]"
                                   : f === "medium" ? "bg-[#e5c07b]/20 border-[#e5c07b]/40 text-[#e5c07b]"
-                                  : f === "low"    ? "bg-[#c8c6c5]/20 border-[#c8c6c5]/40 text-muted-foreground"
-                                  :                  "bg-primary/20 border-primary/40 text-primary"
-                                  : "border-border text-muted-foreground/50 hover:text-muted-foreground"
+                                  : f === "low"    ? "bg-[#c8c6c5]/20 border-[#c8c6c5]/40 text-[#c8c6c5]"
+                                  :                  "bg-[#4edea3]/20 border-[#4edea3]/40 text-[#4edea3]"
+                                  : "border-[#3c4a42]/30 text-[#474746] hover:text-[#c8c6c5]"
                               )}
                             >
                               {f} {counts > 0 && <span className="ml-0.5 opacity-70">({counts})</span>}
@@ -1557,10 +1556,10 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                       </div>
                     )}
                     {/* Backend issues sub-section */}
-                    <div className={cn(!noFront && "border-b border-border")}>
-                      <div className="flex items-center gap-2 px-4 py-3 bg-muted sticky top-0 z-10">
-                        <span className="material-symbols-outlined text-sm text-primary">dns</span>
-                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Backend Security</span>
+                    <div className={cn(!noFront && "border-b border-[#3c4a42]/20")}>
+                      <div className="flex items-center gap-2 px-4 py-3 bg-[#201f1f] sticky top-0 z-10">
+                        <span className="material-symbols-outlined text-sm text-[#4ae176]">dns</span>
+                        <span className="text-xs font-bold uppercase tracking-widest text-[#c8c6c5]">Backend Security</span>
                         {(() => {
                           const backIssues = secIssues.filter((i) => i.source === "backend");
                           return backIssues.length > 0 ? (
@@ -1568,7 +1567,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                               {backIssues.length} fixed
                             </span>
                           ) : isDone(variant.security) ? (
-                            <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">Clean</span>
+                            <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-[#4edea3]/10 text-[#4edea3]">Clean</span>
                           ) : null;
                         })()}
                       </div>
@@ -1586,9 +1585,9 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                     {/* Frontend issues sub-section — hidden when frontend not required */}
                     {!noFront && (
                       <div>
-                        <div className="flex items-center gap-2 px-4 py-3 bg-muted sticky top-0 z-10">
-                          <span className="material-symbols-outlined text-sm text-primary">web</span>
-                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Frontend Security</span>
+                        <div className="flex items-center gap-2 px-4 py-3 bg-[#201f1f] sticky top-0 z-10">
+                          <span className="material-symbols-outlined text-sm text-[#6ffbbe]">web</span>
+                          <span className="text-xs font-bold uppercase tracking-widest text-[#c8c6c5]">Frontend Security</span>
                           {(() => {
                             const frontIssues = secIssues.filter((i) => i.source === "frontend");
                             return frontIssues.length > 0 ? (
@@ -1596,7 +1595,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
                                 {frontIssues.length} fixed
                               </span>
                             ) : isDone(variant.security) ? (
-                              <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">Clean</span>
+                              <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded bg-[#4edea3]/10 text-[#4edea3]">Clean</span>
                             ) : null;
                           })()}
                         </div>
@@ -1626,8 +1625,8 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
 
               {/* Chosen footer */}
               {story.chosenVariant === v && (
-                <div className="bg-primary/5 border-t border-primary/20 px-4 py-2 shrink-0">
-                  <span className="text-primary text-xs font-bold">✓ Selected for merge</span>
+                <div className="bg-[#4edea3]/5 border-t border-[#4edea3]/20 px-4 py-2 shrink-0">
+                  <span className="text-[#4edea3] text-xs font-bold">✓ Selected for merge</span>
                 </div>
               )}
             </Card>
@@ -1657,11 +1656,11 @@ function VariantCard({
 
   // Active agent label
   let activeLabel = "IDLE";
-  let activeLabelColor = "text-muted-foreground/50";
-  if (isRunning(variant.orchestrator)) { activeLabel = "ORCHESTRATOR RUNNING"; activeLabelColor = "text-primary"; }
-  else if (isRunning(variant.backend) || isRunning(variant.frontend)) { activeLabel = "AGENTS RUNNING"; activeLabelColor = "text-primary"; }
+  let activeLabelColor = "text-[#474746]";
+  if (isRunning(variant.orchestrator)) { activeLabel = "ORCHESTRATOR RUNNING"; activeLabelColor = "text-[#4edea3]"; }
+  else if (isRunning(variant.backend) || isRunning(variant.frontend)) { activeLabel = "AGENTS RUNNING"; activeLabelColor = "text-[#4ae176]"; }
   else if (isRunning(variant.security)) { activeLabel = "SECURITY SCANNING"; activeLabelColor = "text-[#ffb4ab]"; }
-  else if (allDoneVariant) { activeLabel = "DONE"; activeLabelColor = "text-primary"; }
+  else if (allDoneVariant) { activeLabel = "DONE"; activeLabelColor = "text-[#4ae176]"; }
 
   // Orchestrator plan parsing
   const orchContent = variant.orchestrator.content.replace(/\*\*/g, "").replace(/\r/g, "");
@@ -1700,13 +1699,13 @@ function VariantCard({
   return (
     <Card
       className={cn(
-        "bg-card rounded-2xl border overflow-hidden ring-0 flex flex-col",
-        isChosen ? "border-primary/40" : "border-border"
+        "bg-[#1c1b1b] rounded-2xl border overflow-hidden ring-0 flex flex-col",
+        isChosen ? "border-[#4edea3]/40" : "border-[#3c4a42]/20"
       )}
     >
       {/* Card header bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-secondary border-b border-border shrink-0">
-        <span className="font-mono font-bold text-[10px] uppercase tracking-widest text-foreground">
+      <div className="flex items-center justify-between px-4 py-3 bg-[#2a2a2a] border-b border-[#3c4a42]/20 shrink-0">
+        <span className="font-mono font-bold text-[10px] uppercase tracking-widest text-[#e5e2e1]">
           VARIANT {variant.id}
         </span>
         <span className={cn("text-[9px] font-bold uppercase tracking-widest", activeLabelColor)}>
@@ -1715,25 +1714,25 @@ function VariantCard({
         <span
           className={cn(
             "inline-block w-2 h-2 rounded-full",
-            anyRunning ? "bg-primary animate-pulse" : allDoneVariant ? "bg-primary" : "bg-muted-foreground"
+            anyRunning ? "bg-[#4edea3] animate-pulse" : allDoneVariant ? "bg-[#4ae176]" : "bg-[#474746]"
           )}
         />
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Orchestrator section */}
-        <div className="bg-muted p-4 border-b border-border">
+        <div className="bg-[#201f1f] p-4 border-b border-[#3c4a42]/20">
           <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-sm text-primary">hub</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Orchestrator</span>
+            <span className="material-symbols-outlined text-sm text-[#4edea3]">hub</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#c8c6c5]">Orchestrator</span>
             <span
               className={cn(
                 "ml-auto text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider",
                 isRunning(variant.orchestrator)
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-[#4edea3]/10 text-[#4edea3]"
                   : isDone(variant.orchestrator)
-                  ? "bg-primary/10 text-primary"
-                  : "bg-secondary text-muted-foreground/50"
+                  ? "bg-[#4ae176]/10 text-[#4ae176]"
+                  : "bg-[#353534] text-[#474746]"
               )}
             >
               {isRunning(variant.orchestrator) ? "Running" : isDone(variant.orchestrator) ? "Done" : "Idle"}
@@ -1741,19 +1740,19 @@ function VariantCard({
           </div>
 
           {isRunning(variant.orchestrator) ? (
-            <div className="text-[10px] text-muted-foreground font-mono leading-relaxed line-clamp-4 relative">
+            <div className="text-[10px] text-[#c8c6c5] font-mono leading-relaxed line-clamp-4 relative">
               {variant.orchestrator.content || (
-                <span className="text-primary animate-pulse">Orchestrating…</span>
+                <span className="text-[#4edea3] animate-pulse">Orchestrating…</span>
               )}
               {variant.orchestrator.content && (
-                <span className="inline-block w-1.5 h-2.5 bg-primary animate-pulse ml-0.5 align-middle" />
+                <span className="inline-block w-1.5 h-2.5 bg-[#4edea3] animate-pulse ml-0.5 align-middle" />
               )}
-              <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-muted to-transparent pointer-events-none" />
+              <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-[#201f1f] to-transparent pointer-events-none" />
             </div>
           ) : isDone(variant.orchestrator) ? (
             <div className="space-y-2">
               {statusLine && (
-                <p className="text-[10px] font-bold text-primary truncate">{statusLine}</p>
+                <p className="text-[10px] font-bold text-[#4edea3] truncate">{statusLine}</p>
               )}
               <ul className="space-y-1">
                 {allSteps.slice(0, 4).map((step, i) => {
@@ -1763,12 +1762,12 @@ function VariantCard({
                       <span
                         className={cn(
                           "material-symbols-outlined text-xs mt-px shrink-0",
-                          allComplete ? "text-primary" : "text-muted-foreground/50"
+                          allComplete ? "text-[#4edea3]" : "text-[#474746]"
                         )}
                       >
                         {allComplete ? "check_circle" : "pending"}
                       </span>
-                      <span className={cn("leading-relaxed", allComplete ? "text-muted-foreground" : "text-muted-foreground/50 italic")}>
+                      <span className={cn("leading-relaxed", allComplete ? "text-[#c8c6c5]" : "text-[#474746] italic")}>
                         {step}
                       </span>
                     </li>
@@ -1777,30 +1776,30 @@ function VariantCard({
               </ul>
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground/50">Waiting for orchestrator…</p>
+            <p className="text-[10px] text-[#474746]">Waiting for orchestrator…</p>
           )}
         </div>
 
         {/* Agent handoff line: orchestrator→backend */}
         {isDone(variant.orchestrator) && (isRunning(variant.backend) || isRunning(variant.frontend)) && (
           <div className="agent-flow-line h-6 flex items-center justify-center shrink-0">
-            <div className="w-0.5 h-full bg-gradient-to-b from-primary/40 to-primary/20" />
+            <div className="w-0.5 h-full bg-gradient-to-b from-[#4edea3]/40 to-[#4ae176]/20" />
           </div>
         )}
 
         {/* Backend section */}
-        <div className="border-b border-border">
-          <div className="flex items-center gap-2 px-4 py-2 bg-muted">
-            <span className="material-symbols-outlined text-sm text-primary">dns</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Backend Agent</span>
+        <div className="border-b border-[#3c4a42]/20">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#201f1f]">
+            <span className="material-symbols-outlined text-sm text-[#4ae176]">dns</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#c8c6c5]">Backend Agent</span>
             <span
               className={cn(
                 "ml-auto text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider",
                 isRunning(variant.backend)
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-[#4ae176]/10 text-[#4ae176]"
                   : isDone(variant.backend)
-                  ? "bg-primary/10 text-primary"
-                  : "bg-secondary text-muted-foreground/50"
+                  ? "bg-[#4ae176]/10 text-[#4ae176]"
+                  : "bg-[#353534] text-[#474746]"
               )}
             >
               {isRunning(variant.backend) ? "Running" : isDone(variant.backend) ? "Done" : "Idle"}
@@ -1809,7 +1808,7 @@ function VariantCard({
           <CodeBlock
             label="Backend Agent"
             icon="dns"
-            color="text-primary"
+            color="text-[#4ae176]"
             filename={`controllers/stream_v${variant.id.toLowerCase()}.ts`}
             code={variant.backend.content}
             loading={isRunning(variant.backend)}
@@ -1819,23 +1818,23 @@ function VariantCard({
         {/* Agent handoff line: backend+frontend → security */}
         {isDone(variant.backend) && isDone(variant.frontend) && (isRunning(variant.security) || isDone(variant.security)) && (
           <div className="agent-flow-line h-6 flex items-center justify-center shrink-0">
-            <div className="w-0.5 h-full bg-gradient-to-b from-primary/30 to-destructive/20" />
+            <div className="w-0.5 h-full bg-gradient-to-b from-[#4ae176]/30 to-[#ffb4ab]/20" />
           </div>
         )}
 
         {/* Frontend section */}
-        <div className="border-b border-border">
-          <div className="flex items-center gap-2 px-4 py-2 bg-muted">
-            <span className="material-symbols-outlined text-sm text-primary">web</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Frontend Agent</span>
+        <div className="border-b border-[#3c4a42]/20">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#201f1f]">
+            <span className="material-symbols-outlined text-sm text-[#6ffbbe]">web</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#c8c6c5]">Frontend Agent</span>
             <span
               className={cn(
                 "ml-auto text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider",
                 isRunning(variant.frontend)
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-[#6ffbbe]/10 text-[#6ffbbe]"
                   : isDone(variant.frontend)
-                  ? "bg-primary/10 text-primary"
-                  : "bg-secondary text-muted-foreground/50"
+                  ? "bg-[#6ffbbe]/10 text-[#6ffbbe]"
+                  : "bg-[#353534] text-[#474746]"
               )}
             >
               {isRunning(variant.frontend) ? "Running" : isDone(variant.frontend) ? "Done" : "Idle"}
@@ -1844,7 +1843,7 @@ function VariantCard({
           <CodeBlock
             label="Frontend Agent"
             icon="web"
-            color="text-primary"
+            color="text-[#6ffbbe]"
             filename={`components/StoryView_v${variant.id}.tsx`}
             code={variant.frontend.content}
             loading={isRunning(variant.frontend)}
@@ -1861,8 +1860,8 @@ function VariantCard({
 
         {/* Card footer — chosen variant */}
         {isChosen && (
-          <div className="bg-primary/5 border-t border-primary/20 px-4 py-2 shrink-0">
-            <span className="text-primary text-xs font-bold">✓ Selected for merge</span>
+          <div className="bg-[#4edea3]/5 border-t border-[#4edea3]/20 px-4 py-2 shrink-0">
+            <span className="text-[#4edea3] text-xs font-bold">✓ Selected for merge</span>
           </div>
         )}
       </div>
@@ -1931,24 +1930,24 @@ function GlobalEvaluatorPanel({
   } catch { /* keep defaults */ }
 
   return (
-    <Card className="bg-card rounded-2xl border border-primary/20 ring-0 slide-up overflow-hidden">
+    <Card className="bg-[#1c1b1b] rounded-2xl border border-[#4edea3]/20 ring-0 slide-up overflow-hidden">
       <CardContent className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-[#4edea3]/10 flex items-center justify-center text-[#4edea3] shrink-0">
             <span className="material-symbols-outlined">balance</span>
           </div>
           <div>
-            <h3 className="font-bold text-foreground font-serif">Global Evaluator</h3>
-            <p className="text-[11px] text-muted-foreground">AI-powered variant comparison</p>
+            <h3 className="font-bold text-[#e5e2e1] font-serif">Global Evaluator</h3>
+            <p className="text-[11px] text-[#c8c6c5]">AI-powered variant comparison</p>
           </div>
           <button
             onClick={() => setCompareMode((v) => !v)}
             className={cn(
               "ml-auto flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all",
               compareMode
-                ? "bg-primary/20 border-primary/40 text-primary"
-                : "bg-secondary border-border text-muted-foreground/50 hover:text-muted-foreground"
+                ? "bg-[#4edea3]/20 border-[#4edea3]/40 text-[#4edea3]"
+                : "bg-[#353534] border-[#3c4a42]/30 text-[#474746] hover:text-[#c8c6c5]"
             )}
           >
             <span className="material-symbols-outlined text-sm">compare</span>
@@ -1971,20 +1970,20 @@ function GlobalEvaluatorPanel({
                 className={cn(
                   "rounded-2xl border flex flex-col gap-0 ring-0 overflow-hidden transition-all",
                   chosen === v
-                    ? "border-primary/60 bg-primary/5"
+                    ? "border-[#4edea3]/60 bg-[#4edea3]/5"
                     : ev.recommended
-                    ? "border-primary/20 bg-muted"
-                    : "border-border bg-muted"
+                    ? "border-[#4edea3]/20 bg-[#201f1f]"
+                    : "border-[#3c4a42]/20 bg-[#201f1f]"
                 )}
               >
                 <CardContent className="p-4 flex flex-col gap-4">
                   {/* Label + score + recommended */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-foreground font-serif">Variant {v}</span>
-                    <span className="text-primary font-bold text-sm font-mono">{ev.complexityScore}/10</span>
+                    <span className="text-sm font-bold text-[#e5e2e1] font-serif">Variant {v}</span>
+                    <span className="text-[#4edea3] font-bold text-sm font-mono">{ev.complexityScore}/10</span>
                   </div>
                   {ev.recommended && (
-                    <Badge className="bg-primary/20 text-primary border-0 text-xs font-bold w-fit">
+                    <Badge className="bg-[#4edea3]/20 text-[#4edea3] border-0 text-xs font-bold w-fit">
                       Recommended
                     </Badge>
                   )}
@@ -1992,16 +1991,16 @@ function GlobalEvaluatorPanel({
                   {/* Animated metric bars */}
                   <div className="space-y-2">
                     {[
-                      { label: "Complexity", value: complexity, color: "bg-primary" },
-                      { label: "Security",   value: security,   color: "bg-primary" },
-                      { label: "Performance",value: perf,       color: "bg-primary" },
+                      { label: "Complexity", value: complexity, color: "bg-[#4edea3]" },
+                      { label: "Security",   value: security,   color: "bg-[#4ae176]" },
+                      { label: "Performance",value: perf,       color: "bg-[#6ffbbe]" },
                     ].map((metric) => (
                       <div key={metric.label} className="space-y-1">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground uppercase tracking-wider">{metric.label}</span>
-                          <span className="text-xs font-mono text-foreground">{metric.value}%</span>
+                          <span className="text-xs text-[#c8c6c5] uppercase tracking-wider">{metric.label}</span>
+                          <span className="text-xs font-mono text-[#e5e2e1]">{metric.value}%</span>
                         </div>
-                        <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                        <div className="h-1 bg-[#353534] rounded-full overflow-hidden">
                           <div
                             className={cn("h-full rounded-full bar-grow", metric.color)}
                             style={{ width: `${metric.value}%` }}
@@ -2014,10 +2013,10 @@ function GlobalEvaluatorPanel({
                   {/* Pros */}
                   {ev.pros.length > 0 && (
                     <div className="space-y-1.5">
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider">Pros</p>
+                      <p className="text-xs font-bold text-[#4ae176] uppercase tracking-wider">Pros</p>
                       {ev.pros.slice(0, 3).map((p, i) => (
-                        <div key={i} className="flex items-start gap-1.5 text-[13px] text-foreground">
-                          <span className="material-symbols-outlined text-primary text-sm mt-px shrink-0">add_circle</span>
+                        <div key={i} className="flex items-start gap-1.5 text-[13px] text-[#e5e2e1]">
+                          <span className="material-symbols-outlined text-[#4edea3] text-sm mt-px shrink-0">add_circle</span>
                           <span className="leading-relaxed">{p}</span>
                         </div>
                       ))}
@@ -2029,7 +2028,7 @@ function GlobalEvaluatorPanel({
                     <div className="space-y-1.5">
                       <p className="text-xs font-bold text-[#ffb4ab] uppercase tracking-wider">Cons</p>
                       {ev.cons.slice(0, 2).map((c, i) => (
-                        <div key={i} className="flex items-start gap-1.5 text-[13px] text-muted-foreground">
+                        <div key={i} className="flex items-start gap-1.5 text-[13px] text-[#c8c6c5]">
                           <span className="material-symbols-outlined text-[#ffb4ab] text-sm mt-px shrink-0">remove_circle</span>
                           <span className="leading-relaxed">{c}</span>
                         </div>
@@ -2044,8 +2043,8 @@ function GlobalEvaluatorPanel({
                     className={cn(
                       "mt-auto py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all h-auto",
                       chosen === v
-                        ? "primary-gradient text-[#003824] shadow-lg shadow-primary/10 border-transparent"
-                        : "bg-secondary text-foreground hover:bg-secondary border-border"
+                        ? "primary-gradient text-[#003824] shadow-lg shadow-[#4edea3]/10 border-transparent"
+                        : "bg-[#353534] text-[#e5e2e1] hover:bg-[#474746] border-[#3c4a42]/20"
                     )}
                   >
                     {chosen === v ? "Selected" : `Choose Variant ${v}`}
@@ -2060,8 +2059,8 @@ function GlobalEvaluatorPanel({
         {compareMode && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm text-primary">code</span>
-              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Backend Code Comparison</span>
+              <span className="material-symbols-outlined text-sm text-[#4edea3]">code</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#c8c6c5]">Backend Code Comparison</span>
             </div>
             <div className="grid grid-cols-3 gap-3">
               {(["A", "B", "C"] as VariantId[]).map((v) => {
@@ -2069,12 +2068,12 @@ function GlobalEvaluatorPanel({
                 return (
                   <div key={v} className="space-y-1">
                     <div className="flex items-center gap-2 px-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Variant {v}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[#4edea3]">Variant {v}</span>
                     </div>
                     <CodeBlock
                       label={`Variant ${v}`}
                       icon="dns"
-                      color="text-primary"
+                      color="text-[#4ae176]"
                       filename={`stream_v${v.toLowerCase()}.ts`}
                       code={variant?.backend.content ?? ""}
                       loading={false}
@@ -2088,12 +2087,12 @@ function GlobalEvaluatorPanel({
       </CardContent>
 
       {/* Evaluator chat */}
-      <div className="border-t border-border">
+      <div className="border-t border-[#3c4a42]/20">
         {/* Chat header */}
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-muted">
-          <span className="material-symbols-outlined text-sm text-primary" style={{ fontSize: "14px" }}>chat</span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ask the Evaluator</span>
-          {evalChatRunning && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-1" />}
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-[#201f1f]">
+          <span className="material-symbols-outlined text-sm text-[#4edea3]" style={{ fontSize: "14px" }}>chat</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#c8c6c5]">Ask the Evaluator</span>
+          {evalChatRunning && <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse ml-1" />}
         </div>
 
         {/* Chat history */}
@@ -2109,20 +2108,20 @@ function GlobalEvaluatorPanel({
                   )}
                 >
                   {msg.role === "agent" && (
-                    <span className="material-symbols-outlined text-primary shrink-0 mt-0.5" style={{ fontSize: "14px" }}>smart_toy</span>
+                    <span className="material-symbols-outlined text-[#4edea3] shrink-0 mt-0.5" style={{ fontSize: "14px" }}>smart_toy</span>
                   )}
                   <span
                     className={cn(
                       "rounded-lg px-3 py-2 max-w-[85%] text-[13px]",
                       msg.role === "user"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-secondary text-muted-foreground"
+                        ? "bg-[#4edea3]/10 text-[#4edea3]"
+                        : "bg-[#2a2a2a] text-[#c8c6c5]"
                     )}
                   >
                     {msg.content}
                   </span>
                   {msg.role === "user" && (
-                    <span className="material-symbols-outlined text-muted-foreground/50 shrink-0 mt-0.5" style={{ fontSize: "14px" }}>person</span>
+                    <span className="material-symbols-outlined text-[#474746] shrink-0 mt-0.5" style={{ fontSize: "14px" }}>person</span>
                   )}
                 </div>
               ))}
@@ -2144,9 +2143,9 @@ function GlobalEvaluatorPanel({
             rows={2}
             style={{ resize: "none" }}
             className={cn(
-              "flex-1 bg-secondary border border-border rounded-lg px-3 py-2",
-              "text-[12px] text-foreground placeholder:text-muted-foreground/50 font-mono",
-              "outline-none focus:border-primary/40 transition-colors leading-relaxed",
+              "flex-1 bg-[#2a2a2a] border border-[#3c4a42]/30 rounded-lg px-3 py-2",
+              "text-[12px] text-[#e5e2e1] placeholder:text-[#474746] font-mono",
+              "outline-none focus:border-[#4edea3]/40 transition-colors leading-relaxed",
               evalChatRunning && "opacity-50 cursor-not-allowed"
             )}
           />
@@ -2156,13 +2155,13 @@ function GlobalEvaluatorPanel({
             className={cn(
               "flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors",
               evalDraft.trim() && !evalChatRunning
-                ? "bg-primary/10 hover:bg-primary/20 text-primary"
-                : "bg-secondary text-muted-foreground/50 cursor-not-allowed"
+                ? "bg-[#4edea3]/10 hover:bg-[#4edea3]/20 text-[#4edea3]"
+                : "bg-[#2a2a2a] text-[#474746] cursor-not-allowed"
             )}
             title="Ask evaluator"
           >
             {evalChatRunning
-              ? <span className="w-3 h-3 border-2 border-primary/30 border-t-[#4edea3] rounded-full animate-spin" />
+              ? <span className="w-3 h-3 border-2 border-[#4edea3]/30 border-t-[#4edea3] rounded-full animate-spin" />
               : <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>send</span>
             }
           </button>
@@ -2173,12 +2172,61 @@ function GlobalEvaluatorPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar — SDLC Pipeline (Implementation > Agent Pipeline active)
+// Sidebar — Pipeline Stepper
 // ---------------------------------------------------------------------------
 function Sidebar() {
+  const steps = [
+    { label: "Ideation",        icon: "lightbulb",        href: "#"                },
+    { label: "Requirements",    icon: "assignment",       href: "#"                },
+    { label: "User Stories",    icon: "group",            href: "#"                },
+    { label: "Planning",        icon: "event_note",       href: "#"                },
+    { label: "Analysis",        icon: "code",             href: "/analysis"        },
+    { label: "Implementation",  icon: "construction",     href: "/implementation"  },
+    { label: "Merge",           icon: "call_merge",       href: "#"                },
+    { label: "Dashboard",       icon: "dashboard",        href: "#"                },
+  ];
+  const activeIdx = 5; // Implementation
+
   return (
-    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-background/50 backdrop-blur-xl border-r border-border z-40 flex flex-col">
-      <SDLCSidebar activeExternalId="agent-pipeline" />
+    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#201f1f] border-r border-[#3c4a42]/20 z-40 flex flex-col py-6 px-4">
+      <div className="flex flex-col flex-1">
+        {steps.map((step, idx) => {
+          const isActive = idx === activeIdx;
+          return (
+            <div key={step.label} className="flex flex-col">
+              <a href={step.href} className="flex items-center gap-3">
+                {/* Circle node */}
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm shrink-0 transition-all",
+                    isActive
+                      ? "border-[#4edea3] bg-[#4edea3]/10 text-[#4edea3] glow-pulse"
+                      : "border-[#474746] bg-transparent text-[#474746]"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-sm">{step.icon}</span>
+                </div>
+                {/* Label */}
+                <span
+                  className={cn(
+                    "text-xs uppercase tracking-widest font-bold transition-colors",
+                    isActive ? "text-[#4edea3]" : "text-[#474746]"
+                  )}
+                >
+                  {step.label}
+                </span>
+              </a>
+
+              {/* Connector line */}
+              {idx < steps.length - 1 && (
+                <div className="w-0.5 h-6 mx-auto bg-[#3c4a42]/40 my-0.5" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom label */}
     </aside>
   );
 }
@@ -2292,7 +2340,7 @@ function ImplementationPageInner() {
         prev.map((s) => (s.id === storyId ? { ...s, status: "implementing", variants: initVariants } : s))
       );
 
-      addLog({ agent: "ORCHESTRATOR AGENT", agentColor: "text-primary", message: `Orchestrating 3 parallel variants for ${storyId}…`, timestamp: now(), type: "orchestrator", progress: 5 });
+      addLog({ agent: "ORCHESTRATOR AGENT", agentColor: "text-[#4edea3]", message: `Orchestrating 3 parallel variants for ${storyId}…`, timestamp: now(), type: "orchestrator", progress: 5 });
 
       const base = { storyId, storyTitle: story.title, storyDescription: story.description };
 
@@ -2302,7 +2350,7 @@ function ImplementationPageInner() {
           const variantOffset = { A: 0, B: 120, C: 240 }[v] ?? 0;
           await sleep(variantOffset);
 
-          addLog({ agent: `ORCHESTRATOR (V${v})`, agentColor: "text-primary", message: `Analyzing story for Variant ${v}…`, timestamp: now(), type: "orchestrator", progress: 10 });
+          addLog({ agent: `ORCHESTRATOR (V${v})`, agentColor: "text-[#4edea3]", message: `Analyzing story for Variant ${v}…`, timestamp: now(), type: "orchestrator", progress: 10 });
 
           // Step 1: reasoning — analyze story, extract implementation points
           const reasoningResult = await callAgentStream(
@@ -2320,7 +2368,7 @@ function ImplementationPageInner() {
             patchVariant(storyId, v, "frontend", { status: "done", content: "", timestamp: now() }, false);
           }
 
-          addLog({ agent: `ORCHESTRATOR (V${v})`, agentColor: "text-primary", message: `Planning implementation for Variant ${v}…`, timestamp: now(), type: "orchestrator", progress: 15 });
+          addLog({ agent: `ORCHESTRATOR (V${v})`, agentColor: "text-[#4edea3]", message: `Planning implementation for Variant ${v}…`, timestamp: now(), type: "orchestrator", progress: 15 });
 
           // Step 2: orchestrator — uses reasoning as context (+ poker context + briefing notes if available)
           const pokerCtx = pokerSessions[storyId]?.phase === "done" ? pokerSessions[storyId].pokerContext : null;
@@ -2338,15 +2386,15 @@ function ImplementationPageInner() {
           // Brief pause so the last timeline node is visible before transitioning to done
           await sleep(600);
           patchVariant(storyId, v, "orchestrator", { status: "done", content: orchResult, timestamp: now() }, false);
-          addLog({ agent: `ORCHESTRATOR (V${v})`, agentColor: "text-primary", message: `Plan ready for V${v}. Dispatching Backend & Frontend agents.`, timestamp: now(), type: "orchestrator" });
+          addLog({ agent: `ORCHESTRATOR (V${v})`, agentColor: "text-[#4edea3]", message: `Plan ready for V${v}. Dispatching Backend & Frontend agents.`, timestamp: now(), type: "orchestrator" });
 
           // Pause before backend/frontend start — lets the "done" orchestrator state breathe
           await sleep(400);
 
           if (needsFrontend) {
-            addLog({ agent: `FRONTEND AGENT (V${v})`, agentColor: "text-primary", message: `Building UI component for Variant ${v}…`, timestamp: now(), type: "frontend", progress: 40 });
+            addLog({ agent: `FRONTEND AGENT (V${v})`, agentColor: "text-[#6ffbbe]", message: `Building UI component for Variant ${v}…`, timestamp: now(), type: "frontend", progress: 40 });
           }
-          addLog({ agent: `BACKEND AGENT (V${v})`,  agentColor: "text-primary", message: `Implementing server-side logic for Variant ${v}…`, timestamp: now(), type: "backend",  progress: 40 });
+          addLog({ agent: `BACKEND AGENT (V${v})`,  agentColor: "text-[#4ae176]", message: `Implementing server-side logic for Variant ${v}…`, timestamp: now(), type: "backend",  progress: 40 });
 
           // Mark backend/frontend as running before the stream starts
           patchVariant(storyId, v, "backend",  { status: "running", content: "" }, false);
@@ -2373,9 +2421,9 @@ function ImplementationPageInner() {
             patchVariant(storyId, v, "frontend", { status: "done", content: frontResult, timestamp: now() }, false);
           }
 
-          addLog({ agent: `BACKEND AGENT (V${v})`, agentColor: "text-primary", message: `Backend done for V${v}. Handing off to Security.`, timestamp: now(), type: "backend" });
+          addLog({ agent: `BACKEND AGENT (V${v})`, agentColor: "text-[#4ae176]", message: `Backend done for V${v}. Handing off to Security.`, timestamp: now(), type: "backend" });
           if (needsFrontend) {
-            addLog({ agent: `FRONTEND AGENT (V${v})`, agentColor: "text-primary", message: `Frontend done for V${v}. Handing off to Security.`, timestamp: now(), type: "frontend" });
+            addLog({ agent: `FRONTEND AGENT (V${v})`, agentColor: "text-[#6ffbbe]", message: `Frontend done for V${v}. Handing off to Security.`, timestamp: now(), type: "frontend" });
           }
 
           // Pause before security — makes the handoff feel intentional
@@ -2410,7 +2458,7 @@ function ImplementationPageInner() {
 
       // Pause before evaluator so all three "done" states render smoothly
       await sleep(800);
-      addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-muted-foreground", message: `All 3 variants complete for ${storyId}. Running evaluation…`, timestamp: now(), type: "evaluator", progress: 95 });
+      addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-[#c8c6c5]", message: `All 3 variants complete for ${storyId}. Running evaluation…`, timestamp: now(), type: "evaluator", progress: 95 });
 
       setStories((prev) => {
         const storyNow = prev.find((s) => s.id === storyId);
@@ -2423,7 +2471,7 @@ function ImplementationPageInner() {
           () => {}
         ).then((evalResult) => {
           setEvalContent((p) => ({ ...p, [storyId]: evalResult }));
-          addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-muted-foreground", message: `Evaluation ready. Choose your variant for ${storyId}.`, timestamp: now(), type: "evaluator" });
+          addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-[#c8c6c5]", message: `Evaluation ready. Choose your variant for ${storyId}.`, timestamp: now(), type: "evaluator" });
           setStories((p2) => p2.map((s) => (s.id === storyId ? { ...s, status: "evaluating" } : s)));
           setShowEvaluator((p) => ({ ...p, [storyId]: true }));
           setRunningStories((p) => ({ ...p, [storyId]: false }));
@@ -2443,7 +2491,7 @@ function ImplementationPageInner() {
     setStories((prev) =>
       prev.map((s) => (s.id === storyId ? { ...s, chosenVariant: v, status: "done" } : s))
     );
-    addLog({ agent: "ORCHESTRATOR AGENT", agentColor: "text-primary", message: `Variant ${v} selected for ${storyId}. Ready to merge.`, timestamp: now(), type: "orchestrator" });
+    addLog({ agent: "ORCHESTRATOR AGENT", agentColor: "text-[#4edea3]", message: `Variant ${v} selected for ${storyId}. Ready to merge.`, timestamp: now(), type: "orchestrator" });
   }, [addLog]);
 
   // Re-run just one agent (backend or frontend) + security for a specific variant
@@ -2880,15 +2928,8 @@ function ImplementationPageInner() {
   }, [stories]);
 
   const handleConfirmMerge = useCallback(() => {
-    // Store chosen variants in localStorage for the merge stage to pick up
-    try {
-      const raw = localStorage.getItem("itfest_state");
-      const parsed = raw ? JSON.parse(raw) : {};
-      parsed.chosenVariants = stories.map((s) => ({ storyId: s.id, variantId: s.chosenVariant }));
-      localStorage.setItem("itfest_state", JSON.stringify(parsed));
-    } catch { /* best effort */ }
-    // Navigate back to main dashboard — it will open at the Merge stage
-    router.push("/");
+    const param = stories.map((s) => `${s.id}:${s.chosenVariant}`).join(",");
+    router.push(`/merge?stories=${encodeURIComponent(param)}`);
   }, [stories, router]);
 
   const selectedStory = stories.find((s) => s.id === selectedStoryId) ?? stories[0];
@@ -2911,8 +2952,8 @@ function ImplementationPageInner() {
         }
         .bar-grow { animation: barGrow 0.8s ease-out forwards; }
         @keyframes glowPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
-          50% { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(78,222,163,0.4); }
+          50% { box-shadow: 0 0 0 6px rgba(78,222,163,0); }
         }
         .glow-pulse { animation: glowPulse 2s ease-in-out infinite; }
         @keyframes slideUp {
@@ -2929,11 +2970,11 @@ function ImplementationPageInner() {
       `}</style>
 
       {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
-      <header className="fixed top-0 w-full z-50 h-16 flex items-center justify-between px-6 bg-background border-b border-border">
+      <header className="fixed top-0 w-full z-50 h-16 flex items-center justify-between px-6 bg-[#131313] border-b border-[#3c4a42]/20">
         {/* Left */}
         <div className="flex items-center gap-3">
-          <span className="text-xl font-bold text-primary tracking-tight font-serif">SDLCAgent</span>
-          <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary/10 text-primary">
+          <span className="text-xl font-bold text-[#4edea3] tracking-tight font-serif">Luminescent IDE</span>
+          <span className="text-xs font-bold px-2 py-1 rounded-full bg-[#4edea3]/10 text-[#4edea3]">
             {selectedStoryId}
           </span>
         </div>
@@ -2942,22 +2983,22 @@ function ImplementationPageInner() {
         <div className="flex items-center gap-4">
           <button
             onClick={clearSession}
-            className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-1 rounded border border-border hover:border-border"
+            className="text-[10px] font-bold uppercase tracking-widest text-[#474746] hover:text-[#c8c6c5] transition-colors px-2 py-1 rounded border border-[#3c4a42]/20 hover:border-[#3c4a42]/40"
             title="Clear session and reset all state"
           >
             Clear session
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Progress</span>
-            <div className="w-32 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <span className="text-xs text-[#c8c6c5] uppercase tracking-wider">Progress</span>
+            <div className="w-32 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
               <div
                 className="h-full primary-gradient rounded-full transition-all duration-700"
                 style={{ width: `${totalProgress}%` }}
               />
             </div>
-            <span className="text-xs font-mono text-primary">{totalProgress}%</span>
+            <span className="text-xs font-mono text-[#4edea3]">{totalProgress}%</span>
           </div>
-          <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-primary text-xs font-bold">
+          <div className="w-8 h-8 rounded-full bg-[#353534] border border-[#3c4a42]/30 flex items-center justify-center text-[#4edea3] text-xs font-bold">
             E
           </div>
         </div>
@@ -2974,7 +3015,7 @@ function ImplementationPageInner() {
         <Sidebar />
 
         {/* ── MAIN CONTENT ──────────────────────────────────────────────── */}
-        <main className="ml-64 flex-1 bg-background">
+        <main className="ml-64 flex-1 bg-[#131313]">
         <ScrollArea className="h-[calc(100vh-64px)]">
           <div className="max-w-5xl mx-auto p-6">
 
@@ -2982,7 +3023,7 @@ function ImplementationPageInner() {
               <div className="flex items-center gap-2 mb-5">
                 <a
                   href="/analysis"
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-1 rounded border border-border hover:border-border shrink-0"
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#474746] hover:text-[#c8c6c5] transition-colors px-2 py-1 rounded border border-[#3c4a42]/20 hover:border-[#3c4a42]/40 shrink-0"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>arrow_back</span>
                   Backlog
@@ -2998,8 +3039,8 @@ function ImplementationPageInner() {
                         className={cn(
                           "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold font-mono transition-all border",
                           isActive
-                            ? "bg-primary/10 border-primary/30 text-primary"
-                            : "bg-card border-border text-muted-foreground hover:border-border hover:text-muted-foreground"
+                            ? "bg-[#4edea3]/10 border-[#4edea3]/30 text-[#4edea3]"
+                            : "bg-[#1c1b1b] border-[#3c4a42]/25 text-[#86948a] hover:border-[#3c4a42]/50 hover:text-[#c8c6c5]"
                         )}
                       >
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusCfg.color }} />
@@ -3019,22 +3060,22 @@ function ImplementationPageInner() {
                   const statusCfg = STATUS_CONFIG[selectedStory.status];
                   const isRunning = !!runningStories[selectedStory.id];
                   return (
-                    <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                    <div className="bg-[#1c1b1b] rounded-2xl border border-[#3c4a42]/25 overflow-hidden">
                       {/* Top strip: type + id breadcrumb */}
-                      <div className="flex items-center gap-2 px-5 pt-4 pb-2 border-b border-border">
+                      <div className="flex items-center gap-2 px-5 pt-4 pb-2 border-b border-[#3c4a42]/15">
                         {type && (
                           <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: type.color }}>
                             <span className="material-symbols-outlined" style={{ fontSize: "12px" }}>{type.icon}</span>
                             {type.label}
                           </div>
                         )}
-                        <span className="text-muted-foreground/50 text-[10px]">/</span>
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground">{selectedStory.id}</span>
+                        <span className="text-[#474746] text-[10px]">/</span>
+                        <span className="text-[10px] font-mono font-bold text-[#86948a]">{selectedStory.id}</span>
                         <div className="flex-1" />
                         {/* Running indicator */}
                         {isRunning && (
-                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary uppercase tracking-wider">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#4edea3] uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] animate-pulse" />
                             Agents running
                           </div>
                         )}
@@ -3043,7 +3084,7 @@ function ImplementationPageInner() {
                       {/* Main body */}
                       <div className="px-5 py-4 space-y-4">
                         {/* Title */}
-                        <h2 className="text-xl font-bold font-serif text-foreground leading-snug">{selectedStory.title}</h2>
+                        <h2 className="text-xl font-bold font-serif text-[#e5e2e1] leading-snug">{selectedStory.title}</h2>
 
                         {/* Meta row */}
                         <div className="flex flex-wrap items-center gap-3">
@@ -3061,16 +3102,16 @@ function ImplementationPageInner() {
                           )}
                           {/* Assignee — set by poker */}
                           {storyAssignees[selectedStory.id] ? (
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
-                              <div className="w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#86948a] font-medium">
+                              <div className="w-5 h-5 rounded-full bg-[#4edea3]/10 border border-[#4edea3]/20 flex items-center justify-center shrink-0">
                                 <span className="material-symbols-outlined" style={{ fontSize: "11px", color: "#4edea3" }}>smart_toy</span>
                               </div>
                               {storyAssignees[selectedStory.id]}
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50 font-medium">
-                              <div className="w-5 h-5 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined" style={{ fontSize: "11px", color: "var(--muted-foreground)" }}>smart_toy</span>
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#474746] font-medium">
+                              <div className="w-5 h-5 rounded-full bg-[#2a2a2a] border border-[#3c4a42]/20 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined" style={{ fontSize: "11px", color: "#474746" }}>smart_toy</span>
                               </div>
                               Unassigned
                             </div>
@@ -3080,14 +3121,14 @@ function ImplementationPageInner() {
                             const est = pokerSessions[selectedStory.id]?.consensusEstimate ?? null;
                             if (est != null) {
                               return (
-                                <div className="flex items-center gap-1 text-[10px] font-bold font-mono text-primary px-2 py-1 rounded-lg border border-primary/20 bg-primary/8">
+                                <div className="flex items-center gap-1 text-[10px] font-bold font-mono text-[#4edea3] px-2 py-1 rounded-lg border border-[#4edea3]/20 bg-[#4edea3]/8">
                                   <span className="material-symbols-outlined" style={{ fontSize: "11px" }}>casino</span>
                                   {est} pts · ~{est * 30 >= 60 ? `${Math.round(est * 30 / 60 * 10) / 10}h` : `${est * 30}min`} delivery
                                 </div>
                               );
                             }
                             return (
-                              <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/50 px-2 py-1 rounded-lg border border-border bg-secondary">
+                              <div className="flex items-center gap-1 text-[10px] font-mono text-[#474746] px-2 py-1 rounded-lg border border-[#3c4a42]/20 bg-[#2a2a2a]">
                                 <span className="material-symbols-outlined" style={{ fontSize: "11px" }}>lock</span>
                                 Effort TBD
                               </div>
@@ -3095,7 +3136,7 @@ function ImplementationPageInner() {
                           })()}
                           {/* Labels */}
                           {selectedStory.labels?.map((lbl) => (
-                            <span key={lbl} className="text-[9px] font-mono text-muted-foreground bg-secondary border border-border rounded px-1.5 py-0.5">
+                            <span key={lbl} className="text-[9px] font-mono text-[#86948a] bg-[#2a2a2a] border border-[#3c4a42]/30 rounded px-1.5 py-0.5">
                               {lbl}
                             </span>
                           ))}
@@ -3103,17 +3144,17 @@ function ImplementationPageInner() {
 
                         {/* Description */}
                         <div className="space-y-1">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Description</p>
-                          <p className="text-[13px] text-muted-foreground/80 leading-relaxed">{selectedStory.description}</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#474746]">Description</p>
+                          <p className="text-[13px] text-[#c8c6c5]/80 leading-relaxed">{selectedStory.description}</p>
                         </div>
 
                         {/* Acceptance Criteria */}
                         {selectedStory.acceptanceCriteria && selectedStory.acceptanceCriteria.length > 0 && (
                           <div className="space-y-1.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Acceptance Criteria</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#474746]">Acceptance Criteria</p>
                             <ul className="space-y-1">
                               {selectedStory.acceptanceCriteria.map((ac, i) => (
-                                <li key={i} className="flex items-start gap-2 text-[12px] text-muted-foreground/70">
+                                <li key={i} className="flex items-start gap-2 text-[12px] text-[#c8c6c5]/70">
                                   <span className="material-symbols-outlined shrink-0 mt-0.5" style={{ fontSize: "13px", color: "#4ae176" }}>check_circle</span>
                                   {ac}
                                 </li>
@@ -3137,11 +3178,11 @@ function ImplementationPageInner() {
                     return (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 px-1">
-                          <div className="flex-1 h-px bg-border/30" />
-                          <span className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">
+                          <div className="flex-1 h-px bg-[#3c4a42]/30" />
+                          <span className="text-[10px] text-[#474746] uppercase tracking-wider">
                             {pokerRunning ? "Poker in progress…" : "Complete poker to unlock"}
                           </span>
-                          <div className="flex-1 h-px bg-border/30" />
+                          <div className="flex-1 h-px bg-[#3c4a42]/30" />
                         </div>
                         <Button
                           disabled
@@ -3158,7 +3199,7 @@ function ImplementationPageInner() {
                     <Button
                       onClick={() => stories.filter((s) => s.status === "pending" && !runningStories[s.id]).forEach((s) => runImplementation(s.id))}
                       disabled={anyRunning || pendingCount === 0}
-                      className="w-full primary-gradient text-[#003824] py-4 rounded-2xl text-sm font-bold uppercase tracking-widest disabled:opacity-60 shadow-lg shadow-primary/10 border-transparent h-auto flex items-center justify-center gap-2"
+                      className="w-full primary-gradient text-[#003824] py-4 rounded-2xl text-sm font-bold uppercase tracking-widest disabled:opacity-60 shadow-lg shadow-[#4edea3]/10 border-transparent h-auto flex items-center justify-center gap-2"
                     >
                       {anyRunning ? (
                         <>
@@ -3196,13 +3237,13 @@ function ImplementationPageInner() {
 
                 {/* Empty state */}
                 {selectedStory.variants.length === 0 && selectedStory.status === "pending" && (
-                  <Card className="bg-card rounded-2xl border border-border ring-0">
+                  <Card className="bg-[#1c1b1b] rounded-2xl border border-[#3c4a42]/20 ring-0">
                     <CardContent className="p-12 flex flex-col items-center gap-3 text-center">
-                      <div className="w-14 h-14 rounded-2xl bg-secondary border border-border flex items-center justify-center mb-1">
-                        <span className="material-symbols-outlined text-3xl text-muted-foreground/50">code_blocks</span>
+                      <div className="w-14 h-14 rounded-2xl bg-[#2a2a2a] border border-[#3c4a42]/30 flex items-center justify-center mb-1">
+                        <span className="material-symbols-outlined text-3xl text-[#474746]">code_blocks</span>
                       </div>
-                      <p className="text-[13px] font-semibold text-muted-foreground">No analysis yet for this story</p>
-                      <p className="text-[11px] text-muted-foreground/50 max-w-xs leading-relaxed">
+                      <p className="text-[13px] font-semibold text-[#c8c6c5]">No analysis yet for this story</p>
+                      <p className="text-[11px] text-[#474746] max-w-xs leading-relaxed">
                         {allDonePoker
                           ? "Click Start Implementing to dispatch agents across all stories in parallel."
                           : "Run Estimation Poker first to let agents align on effort, then start implementing."}
@@ -3228,15 +3269,15 @@ function ImplementationPageInner() {
                     return vt.orchestrator.status === "done" && vt.backend.status === "done" &&
                       (nf || vt.frontend.status === "done") && vt.security.status === "done";
                   }) && (
-                  <Card className="bg-card rounded-2xl border border-primary/20 ring-0 slide-up">
+                  <Card className="bg-[#1c1b1b] rounded-2xl border border-[#4edea3]/20 ring-0 slide-up">
                     <CardContent className="p-6 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-primary">balance</span>
+                        <div className="w-10 h-10 rounded-xl bg-[#4edea3]/10 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[#4edea3]">balance</span>
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-foreground">Analysis complete</p>
-                          <p className="text-xs text-muted-foreground">Run AI evaluation to compare candidates</p>
+                          <p className="text-sm font-bold text-[#e5e2e1]">Analysis complete</p>
+                          <p className="text-xs text-[#c8c6c5]">Run AI evaluation to compare candidates</p>
                         </div>
                       </div>
                       <Button
@@ -3254,33 +3295,33 @@ function ImplementationPageInner() {
           {/* Sticky merge banner */}
           {allDone && (
             <div className="sticky bottom-6 z-30 mt-8">
-              <Card className="bg-card border border-primary/30 rounded-2xl shadow-[0_0_40px_-10px_rgba(16,185,129,0.2)] ring-0 slide-up">
+              <Card className="bg-[#1c1b1b] border border-[#4edea3]/30 rounded-2xl shadow-[0_0_40px_-10px_rgba(78,222,163,0.2)] ring-0 slide-up">
                 <CardContent className="p-5 flex items-center justify-between gap-6">
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">check_circle</span>
-                      <span className="text-sm font-bold text-foreground">All variants selected</span>
+                      <span className="material-symbols-outlined text-[#4edea3]">check_circle</span>
+                      <span className="text-sm font-bold text-[#e5e2e1]">All variants selected</span>
                     </div>
-                    <div className="h-4 w-px bg-border/40" />
+                    <div className="h-4 w-px bg-[#3c4a42]/40" />
                     <div className="flex items-center gap-2 flex-wrap">
                       {stories.map((s) => (
                         <span
                           key={s.id}
-                          className="flex items-center gap-1.5 text-[11px] font-mono bg-secondary px-3 py-1 rounded-lg border border-border"
+                          className="flex items-center gap-1.5 text-[11px] font-mono bg-[#2a2a2a] px-3 py-1 rounded-lg border border-[#3c4a42]/30"
                         >
-                          <span className="text-primary font-bold">{s.id}</span>
-                          <span className="text-muted-foreground/50">→</span>
-                          <span className="text-primary font-bold">Variant {s.chosenVariant}</span>
+                          <span className="text-[#4edea3] font-bold">{s.id}</span>
+                          <span className="text-[#474746]">→</span>
+                          <span className="text-[#4ae176] font-bold">Variant {s.chosenVariant}</span>
                         </span>
                       ))}
                     </div>
                   </div>
                   <Button
                     onClick={handleConfirmMerge}
-                    className="primary-gradient text-[#003824] px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-primary/20 whitespace-nowrap flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform border-transparent h-auto"
+                    className="primary-gradient text-[#003824] px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-[#4edea3]/20 whitespace-nowrap flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform border-transparent h-auto"
                   >
                     <span className="material-symbols-outlined text-base">call_merge</span>
-                    Continue to Merge
+                    Confirm &amp; Merge
                   </Button>
                 </CardContent>
               </Card>
@@ -3301,19 +3342,19 @@ function ImplementationPageInner() {
             open={drawerStoryId !== null}
             onOpenChange={(open) => { if (!open) setDrawerStoryId(null); }}
           >
-            <DrawerContent className="bg-background border-l border-border flex flex-col p-0 overflow-hidden !max-w-none" style={{ width: "min(960px, 95vw)" }}>
-              <DrawerHeader className="flex items-center justify-between px-8 py-5 border-b border-border shrink-0">
+            <DrawerContent className="bg-[#131313] border-l border-[#3c4a42]/40 flex flex-col p-0 overflow-hidden !max-w-none" style={{ width: "min(960px, 95vw)" }}>
+              <DrawerHeader className="flex items-center justify-between px-8 py-5 border-b border-[#3c4a42]/30 shrink-0">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-primary" style={{ fontSize: "28px" }}>casino</span>
+                  <span className="material-symbols-outlined text-[#4edea3]" style={{ fontSize: "28px" }}>casino</span>
                   <div>
-                    <DrawerTitle style={{ fontSize: "20px", fontWeight: 700, color: "var(--foreground)", lineHeight: 1 }}>Planning Poker</DrawerTitle>
+                    <DrawerTitle style={{ fontSize: "20px", fontWeight: 700, color: "#e5e2e1", lineHeight: 1 }}>Planning Poker</DrawerTitle>
                     {drawerStory && (
-                      <p style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--muted-foreground)", marginTop: "4px" }}>{drawerStory.id} · {drawerStory.title}</p>
+                      <p style={{ fontSize: "14px", fontFamily: "monospace", color: "#474746", marginTop: "4px" }}>{drawerStory.id} · {drawerStory.title}</p>
                     )}
                   </div>
                 </div>
-                <DrawerClose className="w-8 h-8 rounded-lg flex items-center justify-center bg-secondary border border-border hover:bg-secondary transition-colors">
-                  <span className="material-symbols-outlined text-muted-foreground" style={{ fontSize: "18px" }}>close</span>
+                <DrawerClose className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2a2a2a] border border-[#3c4a42]/30 hover:bg-[#333] transition-colors">
+                  <span className="material-symbols-outlined text-[#86948a]" style={{ fontSize: "18px" }}>close</span>
                 </DrawerClose>
               </DrawerHeader>
 
@@ -3323,14 +3364,14 @@ function ImplementationPageInner() {
                     {/* Agent cards — 3 columns */}
                     <div className="grid grid-cols-3 gap-5">
                       {drawerSession.agents.map((agent, i) => (
-                        <div key={agent.role} className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-card border border-border">
+                        <div key={agent.role} className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-[#1a1a1a] border border-[#3c4a42]/25">
                           <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 shrink-0" style={{ background: `${agent.color}12`, borderColor: `${agent.color}30` }}>
                             <span className="material-symbols-outlined" style={{ fontSize: "32px", color: agent.color }}>{agent.icon}</span>
                           </div>
                           <PokerCard value={agent.estimate} revealed={agent.revealed} color={agent.color} animationDelay={i * 180} />
                           <span style={{ fontSize: "17px", fontWeight: 700, color: agent.color, textAlign: "center" }}>{agent.label}</span>
                           {agent.revealed && agent.reasoning && (
-                            <p style={{ fontSize: "15px", color: "var(--muted-foreground)", textAlign: "center", lineHeight: 1.6 }}>{agent.reasoning}</p>
+                            <p style={{ fontSize: "15px", color: "#86948a", textAlign: "center", lineHeight: 1.6 }}>{agent.reasoning}</p>
                           )}
                         </div>
                       ))}
@@ -3338,22 +3379,22 @@ function ImplementationPageInner() {
 
                     {/* Debate transcript */}
                     {drawerSession.logs.length > 0 && (
-                      <div className="rounded-xl bg-background border border-border overflow-hidden">
-                        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-                          <span className="material-symbols-outlined text-muted-foreground/50" style={{ fontSize: "18px" }}>forum</span>
-                          <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground)" }}>Debate transcript</span>
-                          <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--muted-foreground)" }}>{drawerSession.logs.length} turns</span>
+                      <div className="rounded-xl bg-[#0e0e0e] border border-[#3c4a42]/20 overflow-hidden">
+                        <div className="px-5 py-4 border-b border-[#3c4a42]/20 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[#474746]" style={{ fontSize: "18px" }}>forum</span>
+                          <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#474746" }}>Debate transcript</span>
+                          <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "#474746" }}>{drawerSession.logs.length} turns</span>
                         </div>
                         <div className="p-5 space-y-4">
                           {drawerSession.logs.map((log, i) => (
-                            <div key={i} className="rounded-xl bg-background border border-border overflow-hidden">
-                              <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border" style={{ background: `${log.color}08` }}>
+                            <div key={i} className="rounded-xl bg-[#131313] border border-[#3c4a42]/15 overflow-hidden">
+                              <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#3c4a42]/10" style={{ background: `${log.color}08` }}>
                                 <div className="w-2 h-6 rounded-full shrink-0" style={{ background: log.color }} />
                                 <span style={{ fontSize: "17px", fontWeight: 700, color: log.color }}>{log.agent}</span>
-                                <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--muted-foreground)" }}>{log.timestamp}</span>
+                                <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "#474746" }}>{log.timestamp}</span>
                               </div>
                               <div className="px-5 py-5">
-                                <span style={{ fontSize: "15px", fontFamily: "monospace", color: "var(--muted-foreground)", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}>
+                                <span style={{ fontSize: "15px", fontFamily: "monospace", color: "#c8c6c5", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}>
                                   {log.text}
                                   {i === drawerSession.logs.length - 1 && drawerSession.phase === "debating" && (
                                     <span className="terminal-cursor" />
@@ -3368,19 +3409,19 @@ function ImplementationPageInner() {
 
                     {/* Consensus */}
                     {drawerSession.phase === "done" && drawerSession.consensusEstimate !== null && (
-                      <div className="flex items-center justify-between rounded-xl bg-primary/8 border border-primary/25 px-8 py-6">
+                      <div className="flex items-center justify-between rounded-xl bg-[#4edea3]/8 border border-[#4edea3]/25 px-8 py-6">
                         <div className="flex items-center gap-4">
-                          <span className="material-symbols-outlined text-primary" style={{ fontSize: "32px" }}>check_circle</span>
+                          <span className="material-symbols-outlined text-[#4ae176]" style={{ fontSize: "32px" }}>check_circle</span>
                           <div>
                             <p style={{ fontSize: "18px", fontWeight: 700, color: "#4ae176", textTransform: "uppercase", letterSpacing: "0.05em" }}>Consensus reached</p>
-                            <p style={{ fontSize: "15px", color: "var(--muted-foreground)", marginTop: "4px" }}>All agents have agreed on an estimate</p>
+                            <p style={{ fontSize: "15px", color: "#86948a", marginTop: "4px" }}>All agents have agreed on an estimate</p>
                           </div>
                         </div>
                         <div className="flex items-baseline gap-3">
                           <span style={{ fontSize: "64px", fontWeight: 700, fontFamily: "monospace", color: "#4edea3", lineHeight: 1 }}>{drawerSession.consensusEstimate}</span>
                           <div className="flex flex-col">
                             <span style={{ fontSize: "18px", fontWeight: 700, color: "#4edea3" }}>pts</span>
-                            <span style={{ fontSize: "15px", color: "var(--muted-foreground)" }}>
+                            <span style={{ fontSize: "15px", color: "#86948a" }}>
                               ~{drawerSession.consensusEstimate * 30 >= 60
                                 ? `${Math.round(drawerSession.consensusEstimate * 30 / 60 * 10) / 10}h`
                                 : `${drawerSession.consensusEstimate * 30}min`} delivery
@@ -3392,8 +3433,8 @@ function ImplementationPageInner() {
 
                     {/* In-progress state */}
                     {drawerSession.phase !== "done" && (
-                      <div className="flex items-center gap-3 px-6 py-5 rounded-xl bg-primary/5 border border-primary/15">
-                        <span className="w-3 h-3 rounded-full bg-primary glow-pulse shrink-0" />
+                      <div className="flex items-center gap-3 px-6 py-5 rounded-xl bg-[#4edea3]/5 border border-[#4edea3]/15">
+                        <span className="w-3 h-3 rounded-full bg-[#4edea3] glow-pulse shrink-0" />
                         <span style={{ fontSize: "16px", color: "#4edea3", fontWeight: 500, textTransform: "capitalize" }}>{drawerSession.phase}…</span>
                       </div>
                     )}

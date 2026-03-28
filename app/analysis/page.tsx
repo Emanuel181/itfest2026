@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
-import { SDLCSidebar } from "@/components/sdlc-sidebar";
 
 import type {
   UserStory,
@@ -55,8 +54,8 @@ async function callAgentStream(
 }
 
 // ---------------------------------------------------------------------------
-// Empty default — stories are loaded from localStorage (populated by the
-// ideation pipeline).  No mock data ships in production builds.
+// No mock data — stories are loaded from localStorage (populated by the
+// ideation pipeline).
 // ---------------------------------------------------------------------------
 
 const PRIORITY_CONFIG = {
@@ -147,15 +146,15 @@ function PokerCard({ value, revealed, color, animationDelay = 0 }: {
         )}
         style={{
           animationDelay: revealed ? `${animationDelay}ms` : undefined,
-          borderColor: revealed ? color : "var(--border)",
-          background: revealed ? `${color}15` : "var(--muted)",
-          color: revealed ? color : "var(--muted-foreground)",
+          borderColor: revealed ? color : "#3c4a42",
+          background: revealed ? `${color}15` : "#201f1f",
+          color: revealed ? color : "#474746",
         }}
       >
         {revealed && value !== null ? (
           value
         ) : (
-          <span className="material-symbols-outlined" style={{ color: "var(--muted-foreground)", fontSize: "16px" }}>casino</span>
+          <span className="material-symbols-outlined" style={{ color: "#474746", fontSize: "16px" }}>casino</span>
         )}
       </div>
     </div>
@@ -163,12 +162,56 @@ function PokerCard({ value, revealed, color, animationDelay = 0 }: {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar — SDLC Pipeline (Analysis > Planning Poker active)
+// ---------------------------------------------------------------------------
+// Sidebar — Pipeline Stepper (Analysis active)
 // ---------------------------------------------------------------------------
 function Sidebar() {
+  const steps = [
+    { label: "Ideation",        icon: "lightbulb",        href: "#"                },
+    { label: "Requirements",    icon: "assignment",       href: "#"                },
+    { label: "User Stories",    icon: "group",            href: "#"                },
+    { label: "Planning",        icon: "event_note",       href: "#"                },
+    { label: "Analysis",        icon: "code",             href: "/analysis"        },
+    { label: "Implementation",  icon: "construction",     href: "/implementation"  },
+    { label: "Merge",           icon: "call_merge",       href: "#"                },
+    { label: "Dashboard",       icon: "dashboard",        href: "#"                },
+  ];
+  const activeIdx = 4; // Analysis
+
   return (
-    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-background/50 backdrop-blur-xl border-r border-border z-40 flex flex-col">
-      <SDLCSidebar activeExternalId="product-backlog" />
+    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#201f1f] border-r border-[#3c4a42]/20 z-40 flex flex-col py-6 px-4">
+      <div className="flex flex-col flex-1">
+        {steps.map((step, idx) => {
+          const isActive = idx === activeIdx;
+          return (
+            <div key={step.label} className="flex flex-col">
+              <a href={step.href} className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm shrink-0 transition-all",
+                    isActive
+                      ? "border-[#4edea3] bg-[#4edea3]/10 text-[#4edea3] glow-pulse"
+                      : "border-[#474746] bg-transparent text-[#474746]"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-sm">{step.icon}</span>
+                </div>
+                <span
+                  className={cn(
+                    "text-xs uppercase tracking-widest font-bold transition-colors",
+                    isActive ? "text-[#4edea3]" : "text-[#474746]"
+                  )}
+                >
+                  {step.label}
+                </span>
+              </a>
+              {idx < steps.length - 1 && (
+                <div className="w-0.5 h-6 mx-auto bg-[#3c4a42]/40 my-0.5" />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </aside>
   );
 }
@@ -392,78 +435,75 @@ export default function AnalysisPage() {
       <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       <style>{`
         .material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; font-family:'Material Symbols Outlined'; }
-        @keyframes glowPulse { 0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.4)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0)} }
+        @keyframes glowPulse { 0%,100%{box-shadow:0 0 0 0 rgba(78,222,163,0.4)}50%{box-shadow:0 0 0 6px rgba(78,222,163,0)} }
         .glow-pulse { animation: glowPulse 2s ease-in-out infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        .terminal-cursor { display:inline-block;width:8px;height:14px;background:var(--primary);margin-left:2px;vertical-align:middle;animation:blink 1s step-end infinite; }
+        .terminal-cursor { display:inline-block;width:8px;height:14px;background:#4edea3;margin-left:2px;vertical-align:middle;animation:blink 1s step-end infinite; }
         @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(400%)} }
-        .mission-scan::after { content:'';position:absolute;inset-x-0;height:1px;background:linear-gradient(90deg,transparent,color-mix(in oklab, var(--primary) 20%, transparent),transparent);animation:scanline 3s linear infinite; }
+        .mission-scan::after { content:'';position:absolute;inset-x-0;height:1px;background:linear-gradient(90deg,transparent,#4edea320,transparent);animation:scanline 3s linear infinite; }
         @keyframes agentPing { 0%{transform:scale(1);opacity:1} 70%{transform:scale(2.2);opacity:0} 100%{transform:scale(1);opacity:0} }
         .agent-ping::before { content:'';position:absolute;inset:0;border-radius:9999px;background:currentColor;animation:agentPing 2s ease-out infinite; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .fade-in-up { animation: fadeIn 0.3s ease-out forwards; }
-        .ide-scroll::-webkit-scrollbar{width:4px} .ide-scroll::-webkit-scrollbar-track{background:transparent} .ide-scroll::-webkit-scrollbar-thumb{background:var(--secondary);border-radius:2px}
+        .ide-scroll::-webkit-scrollbar{width:4px} .ide-scroll::-webkit-scrollbar-track{background:transparent} .ide-scroll::-webkit-scrollbar-thumb{background:#353534;border-radius:2px}
       `}</style>
 
       {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
-      <header className="fixed top-0 w-full z-50 h-16 flex items-center justify-between px-6 bg-background border-b border-border">
+      <header className="fixed top-0 w-full z-50 h-16 flex items-center justify-between px-6 bg-[#131313] border-b border-[#3c4a42]/20">
         <div className="flex items-center gap-3">
-          <span className="text-xl font-bold text-primary tracking-tight font-serif">SDLCAgent</span>
+          <span className="text-xl font-bold text-[#4edea3] tracking-tight font-serif">Luminescent IDE</span>
+          <span className="text-[10px] font-mono text-[#474746] bg-[#1c1b1b] border border-[#3c4a42]/30 rounded px-2 py-0.5">
+            Sprint 1 · {stories.length} missions
+          </span>
         </div>
         <div className="flex items-center gap-4">
-          {allDonePoker && (
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary">
-              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings:"'FILL' 1" }}>check_circle</span>
-              All agents briefed
-            </span>
-          )}
-          <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-primary text-xs font-bold">E</div>
+          <div className="w-8 h-8 rounded-full bg-[#353534] border border-[#3c4a42]/30 flex items-center justify-center text-[#4edea3] text-xs font-bold">E</div>
         </div>
       </header>
 
       <div className="flex h-screen pt-16">
         <Sidebar />
 
-        <main className="ml-64 flex-1 bg-background overflow-hidden">
+        <main className="ml-64 flex-1 bg-[#131313] overflow-hidden">
           <ScrollArea className="h-[calc(100vh-64px)] ide-scroll">
             <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
 
               {/* ── SPRINT COMMAND HEADER ─────────────────────────────────── */}
-              <div className="relative rounded-2xl bg-card border border-border overflow-hidden p-5 mission-scan">
+              <div className="relative rounded-2xl bg-[#1c1b1b] border border-[#3c4a42]/25 overflow-hidden p-5 mission-scan">
                 {/* Ambient gradient */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.04)_0%,transparent_60%)] pointer-events-none" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(78,222,163,0.04)_0%,transparent_60%)] pointer-events-none" />
                 <div className="relative z-10">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-1">Product Backlog</p>
-                      <h1 className="text-2xl font-bold font-serif text-foreground leading-tight">Sprint Backlog</h1>
-                      <p className="text-[12px] text-muted-foreground mt-1">Estimate user stories with AI agents before implementing.</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#4edea3] mb-1">Agent Mission Board</p>
+                      <h1 className="text-2xl font-bold font-serif text-[#e5e2e1] leading-tight">Sprint Backlog</h1>
+                      <p className="text-[12px] text-[#86948a] mt-1">Estimate user stories with AI agents before implementing.</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* ── AGENT ROSTER ─────────────────────────────────────────── */}
-              <div className="rounded-2xl bg-card border border-border p-4">
+              <div className="rounded-2xl bg-[#1c1b1b] border border-[#3c4a42]/20 p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings:"'FILL' 1" }}>groups</span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Agentic Team — On Standby</span>
+                  <span className="material-symbols-outlined text-[#4edea3] text-sm" style={{ fontVariationSettings:"'FILL' 1" }}>groups</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#86948a]">Agentic Team — On Standby</span>
                   <div className="ml-auto flex items-center gap-1.5">
-                    <span className="relative w-1.5 h-1.5 rounded-full bg-primary agent-ping" style={{ color: "var(--primary)" }} />
-                    <span className="text-[9px] font-mono text-primary">5 agents ready</span>
+                    <span className="relative w-1.5 h-1.5 rounded-full bg-[#4edea3] agent-ping" style={{ color: "#4edea3" }} />
+                    <span className="text-[9px] font-mono text-[#4edea3]">5 agents ready</span>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   {AGENT_ROSTER.map((agent) => (
-                    <div key={agent.label} className="flex-1 flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-background border border-border group hover:border-primary/20 transition-all">
+                    <div key={agent.label} className="flex-1 flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-[#131313] border border-[#3c4a42]/20 group hover:border-[#4edea3]/20 transition-all">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center border" style={{ background: `${agent.color}10`, borderColor: `${agent.color}25` }}>
                         <span className="material-symbols-outlined" style={{ fontSize: "16px", color: agent.color, fontVariationSettings: "'FILL' 1" }}>{agent.icon}</span>
                       </div>
-                      <span className="text-[10px] font-bold text-muted-foreground">{agent.label}</span>
-                      <span className="text-[8px] text-muted-foreground/50 text-center leading-tight hidden group-hover:block">{agent.role}</span>
+                      <span className="text-[10px] font-bold text-[#c8c6c5]">{agent.label}</span>
+                      <span className="text-[8px] text-[#474746] text-center leading-tight hidden group-hover:block">{agent.role}</span>
                       <div className="flex items-center gap-0.5 mt-0.5">
-                        <span className="w-1 h-1 rounded-full bg-primary" />
-                        <span className="text-[8px] font-mono text-primary">idle</span>
+                        <span className="w-1 h-1 rounded-full bg-[#4ae176]" />
+                        <span className="text-[8px] font-mono text-[#4ae176]">idle</span>
                       </div>
                     </div>
                   ))}
@@ -482,13 +522,13 @@ export default function AnalysisPage() {
                   className={cn(
                     "w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-[11px] font-bold uppercase tracking-[0.15em] border transition-all",
                     anyPokerActive
-                      ? "bg-primary/5 border-primary/20 text-primary cursor-wait"
-                      : "bg-primary/8 border-primary/25 text-primary hover:bg-primary/14 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(16,185,129,0.08)]"
+                      ? "bg-[#4edea3]/5 border-[#4edea3]/20 text-[#4edea3] cursor-wait"
+                      : "bg-[#4edea3]/8 border-[#4edea3]/25 text-[#4edea3] hover:bg-[#4edea3]/14 hover:border-[#4edea3]/40 hover:shadow-[0_0_20px_rgba(78,222,163,0.08)]"
                   )}
                 >
                   {anyPokerActive ? (
                     <>
-                      <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      <span className="w-3.5 h-3.5 border-2 border-[#4edea3]/30 border-t-[#4edea3] rounded-full animate-spin" />
                       Briefing agents…
                     </>
                   ) : (
@@ -504,9 +544,9 @@ export default function AnalysisPage() {
               {/* ── MISSION CARDS ────────────────────────────────────────── */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 px-1">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">Mission Queue</span>
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-[9px] font-mono text-muted-foreground/50">{stories.length} missions</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#474746]">Mission Queue</span>
+                  <div className="flex-1 h-px bg-[#3c4a42]/20" />
+                  <span className="text-[9px] font-mono text-[#474746]">{stories.length} missions</span>
                 </div>
 
                 {stories.map((story, storyIdx) => {
@@ -524,17 +564,17 @@ export default function AnalysisPage() {
                       className={cn(
                         "fade-in-up relative rounded-2xl border overflow-hidden transition-all",
                         pokerDone
-                          ? "bg-card border-primary/20 shadow-[0_0_0_1px_rgba(16,185,129,0.05)]"
+                          ? "bg-[#1c1b1b] border-[#4edea3]/20 shadow-[0_0_0_1px_rgba(78,222,163,0.05)]"
                           : pokerActive
-                          ? "bg-card border-primary/15"
-                          : "bg-card border-border"
+                          ? "bg-[#1c1b1b] border-[#4edea3]/15"
+                          : "bg-[#1c1b1b] border-[#3c4a42]/20"
                       )}
                       style={{ animationDelay: `${storyIdx * 60}ms` }}
                     >
                       {/* Left accent bar */}
                       <div
                         className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl"
-                        style={{ background: pokerDone ? "#4ae176" : pokerActive ? "#4edea3" : prio?.color ?? "var(--border)" }}
+                        style={{ background: pokerDone ? "#4ae176" : pokerActive ? "#4edea3" : prio?.color ?? "#3c4a42" }}
                       />
 
                       <div className="pl-4 pr-4 pt-4 pb-3 space-y-3">
@@ -542,17 +582,17 @@ export default function AnalysisPage() {
                         {/* ── Row 1: mission id + type + priority + effort ── */}
                         <div className="flex items-center gap-2 flex-wrap">
                           {/* Mission number */}
-                          <span className="text-[9px] font-bold font-mono uppercase tracking-[0.2em] text-muted-foreground/50">
+                          <span className="text-[9px] font-bold font-mono uppercase tracking-[0.2em] text-[#474746]">
                             #{String(storyIdx + 1).padStart(2, "0")}
                           </span>
-                          <div className="w-px h-3 bg-border" />
+                          <div className="w-px h-3 bg-[#3c4a42]/40" />
                           {/* Story ID */}
-                          <span className="text-[9px] font-bold font-mono uppercase tracking-widest" style={{ color: prio?.color ?? "var(--muted-foreground)" }}>
+                          <span className="text-[9px] font-bold font-mono uppercase tracking-widest" style={{ color: prio?.color ?? "#86948a" }}>
                             {story.id}
                           </span>
                           {/* Type chip */}
                           {type && (
-                            <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary border border-border text-[9px] font-bold uppercase tracking-wider" style={{ color: type.color }}>
+                            <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-[#2a2a2a] border border-[#3c4a42]/25 text-[9px] font-bold uppercase tracking-wider" style={{ color: type.color }}>
                               <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>{type.icon}</span>
                               {type.label}
                             </div>
@@ -567,49 +607,49 @@ export default function AnalysisPage() {
                           <div className="flex-1" />
                           {/* Effort estimate */}
                           {estimate != null ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/25">
-                              <span className="material-symbols-outlined text-primary" style={{ fontSize: "10px", fontVariationSettings:"'FILL' 1" }}>bolt</span>
-                              <span className="text-[10px] font-bold font-mono text-primary">{estimate} pts</span>
-                              <span className="text-[9px] text-muted-foreground">
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#4edea3]/10 border border-[#4edea3]/25">
+                              <span className="material-symbols-outlined text-[#4edea3]" style={{ fontSize: "10px", fontVariationSettings:"'FILL' 1" }}>bolt</span>
+                              <span className="text-[10px] font-bold font-mono text-[#4edea3]">{estimate} pts</span>
+                              <span className="text-[9px] text-[#86948a]">
                                 · ~{estimate * 30 >= 60 ? `${Math.round(estimate * 30 / 60 * 10) / 10}h` : `${estimate * 30}min`}
                               </span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary border border-border">
-                              <span className="material-symbols-outlined text-muted-foreground/50" style={{ fontSize: "10px" }}>schedule</span>
-                              <span className="text-[9px] font-mono text-muted-foreground/50">TBD</span>
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#2a2a2a] border border-[#3c4a42]/20">
+                              <span className="material-symbols-outlined text-[#474746]" style={{ fontSize: "10px" }}>schedule</span>
+                              <span className="text-[9px] font-mono text-[#474746]">TBD</span>
                             </div>
                           )}
                         </div>
 
                         {/* ── Row 2: title ── */}
-                        <p className="text-[14px] font-semibold font-serif leading-snug text-foreground">
+                        <p className="text-[14px] font-semibold font-serif leading-snug text-[#e5e2e1]">
                           {story.title}
                         </p>
 
                         {/* ── Row 3: description ── */}
-                        <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">{story.description}</p>
+                        <p className="text-[11px] text-[#86948a] leading-relaxed line-clamp-2">{story.description}</p>
 
                         {/* ── Row 4: acceptance criteria count + labels ── */}
                         <div className="flex items-center gap-2 flex-wrap">
                           {story.acceptanceCriteria && story.acceptanceCriteria.length > 0 && (
-                            <div className="flex items-center gap-1 text-[9px] text-muted-foreground/50 bg-background border border-border rounded-md px-1.5 py-0.5">
+                            <div className="flex items-center gap-1 text-[9px] text-[#474746] bg-[#131313] border border-[#3c4a42]/20 rounded-md px-1.5 py-0.5">
                               <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>checklist</span>
                               {story.acceptanceCriteria.length} criteria
                             </div>
                           )}
                           {story.labels?.map((lbl) => (
-                            <span key={lbl} className="text-[9px] font-mono text-muted-foreground bg-secondary border border-border rounded px-1.5 py-0.5">
+                            <span key={lbl} className="text-[9px] font-mono text-[#86948a] bg-[#2a2a2a] border border-[#3c4a42]/25 rounded px-1.5 py-0.5">
                               {lbl}
                             </span>
                           ))}
                         </div>
 
                         {/* ── Row 5: agent team + status ── */}
-                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-border">
+                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-[#3c4a42]/15">
                           {/* Agent team avatars */}
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] uppercase tracking-widest text-muted-foreground/50 mr-1">Team</span>
+                            <span className="text-[9px] uppercase tracking-widest text-[#474746] mr-1">Team</span>
                             {AGENT_ROSTER.slice(0, 4).map((agent) => (
                               <div
                                 key={agent.label}
@@ -620,18 +660,18 @@ export default function AnalysisPage() {
                                 <span className="material-symbols-outlined" style={{ fontSize: "11px", color: agent.color, fontVariationSettings: "'FILL' 1" }}>{agent.icon}</span>
                               </div>
                             ))}
-                            <span className="text-[9px] font-mono text-muted-foreground/50 ml-0.5">+1</span>
+                            <span className="text-[9px] font-mono text-[#474746] ml-0.5">+1</span>
                           </div>
 
                           {/* Lead agent */}
                           {storyAssignees[story.id] ? (
-                            <div className="flex items-center gap-1 text-[9px] text-primary">
+                            <div className="flex items-center gap-1 text-[9px] text-[#4edea3]">
                               <span className="material-symbols-outlined" style={{ fontSize: "11px", fontVariationSettings:"'FILL' 1" }}>smart_toy</span>
                               <span className="font-bold">{storyAssignees[story.id]}</span>
-                              <span className="text-muted-foreground/50">leads</span>
+                              <span className="text-[#474746]">leads</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 text-[9px] text-muted-foreground/50">
+                            <div className="flex items-center gap-1 text-[9px] text-[#474746]">
                               <span className="material-symbols-outlined" style={{ fontSize: "11px" }}>smart_toy</span>
                               Awaiting briefing
                             </div>
@@ -640,11 +680,11 @@ export default function AnalysisPage() {
                           {/* Status pill */}
                           <div className={cn(
                             "flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border",
-                            pokerDone   ? "bg-primary/10 border-primary/25 text-primary" :
-                            pokerActive ? "bg-primary/10 border-primary/25 text-primary" :
-                                          "bg-secondary border-border text-muted-foreground/50"
+                            pokerDone   ? "bg-[#4ae176]/10 border-[#4ae176]/25 text-[#4ae176]" :
+                            pokerActive ? "bg-[#4edea3]/10 border-[#4edea3]/25 text-[#4edea3]" :
+                                          "bg-[#2a2a2a] border-[#3c4a42]/25 text-[#474746]"
                           )}>
-                            {pokerActive && <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />}
+                            {pokerActive && <span className="w-1 h-1 rounded-full bg-[#4edea3] animate-pulse" />}
                             {pokerDone   && <span className="material-symbols-outlined" style={{ fontSize: "9px", fontVariationSettings:"'FILL' 1" }}>check_circle</span>}
                             {pokerDone ? "Briefed" : pokerActive ? "Briefing…" : "Queued"}
                           </div>
@@ -652,17 +692,17 @@ export default function AnalysisPage() {
                       </div>
 
                       {/* ── Briefing notes ── */}
-                      <div className="px-4 pb-3 pt-2 border-t border-border">
+                      <div className="px-4 pb-3 pt-2 border-t border-[#3c4a42]/15">
                         <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className="material-symbols-outlined text-muted-foreground/50" style={{ fontSize: "11px" }}>edit_note</span>
-                          <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground/50">Briefing notes — sent to orchestrator</span>
+                          <span className="material-symbols-outlined text-[#474746]" style={{ fontSize: "11px" }}>edit_note</span>
+                          <span className="text-[9px] uppercase tracking-[0.15em] text-[#474746]">Briefing notes — sent to orchestrator</span>
                         </div>
                         <textarea
                           value={story.notes ?? ""}
                           onChange={(e) => setStories((prev) => prev.map((s) => s.id === story.id ? { ...s, notes: e.target.value } : s))}
                           placeholder="Add context, constraints, or technical requirements for the agent team…"
                           rows={2}
-                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-[11px] text-muted-foreground placeholder:text-muted-foreground/50 font-mono outline-none focus:border-primary/30 transition-colors resize-none leading-relaxed ide-scroll"
+                          className="w-full bg-[#131313] border border-[#3c4a42]/25 rounded-lg px-3 py-2 text-[11px] text-[#c8c6c5] placeholder:text-[#474746] font-mono outline-none focus:border-[#4edea3]/30 transition-colors resize-none leading-relaxed ide-scroll"
                         />
                       </div>
 
@@ -674,7 +714,7 @@ export default function AnalysisPage() {
                             "w-full flex items-center gap-2 px-4 py-2.5 border-t transition-colors group/poker text-left",
                             pokerDone
                               ? "border-[#4ae176]/15 bg-[#4ae176]/5 hover:bg-[#4ae176]/10"
-                              : "border-primary/10 bg-primary/3 hover:bg-primary/8"
+                              : "border-[#4edea3]/10 bg-[#4edea3]/3 hover:bg-[#4edea3]/8"
                           )}
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: "13px", color: pokerDone ? "#4ae176" : "#4edea3", fontVariationSettings: "'FILL' 1" }}>casino</span>
@@ -684,8 +724,8 @@ export default function AnalysisPage() {
                           {pokerDone && estimate != null && (
                             <span className="text-[10px] font-mono" style={{ color: "#4ae176" }}>· {estimate} story points</span>
                           )}
-                          {pokerActive && <span className="w-1.5 h-1.5 rounded-full bg-primary glow-pulse ml-1" />}
-                          <span className="ml-auto text-[9px] text-muted-foreground/50 group-hover/poker:text-primary transition-colors flex items-center gap-1">
+                          {pokerActive && <span className="w-1.5 h-1.5 rounded-full bg-[#4edea3] glow-pulse ml-1" />}
+                          <span className="ml-auto text-[9px] text-[#474746] group-hover/poker:text-[#4edea3] transition-colors flex items-center gap-1">
                             View details
                             <span className="material-symbols-outlined" style={{ fontSize: "12px" }}>chevron_right</span>
                           </span>
@@ -699,14 +739,14 @@ export default function AnalysisPage() {
               {/* ── DISPATCH CTA ──────────────────────────────────────────── */}
               <div className="pt-2 pb-4">
                 {!allDonePoker ? (
-                  <div className="rounded-2xl border border-border bg-card p-5 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-secondary border border-border flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-muted-foreground/50" style={{ fontSize: "20px" }}>lock</span>
+                  <div className="rounded-2xl border border-[#3c4a42]/20 bg-[#1c1b1b] p-5 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#2a2a2a] border border-[#3c4a42]/30 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[#474746]" style={{ fontSize: "20px" }}>lock</span>
                     </div>
                     <div className="flex-1">
-                      <p className="text-[12px] font-bold text-muted-foreground">Briefing required before implementation</p>
-                      <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                        {anyPokerActive ? "Agent briefing in progress…" : `${stories.length - storiesDone} mission${stories.length - storiesDone !== 1 ? "s" : ""} still need estimation`}
+                      <p className="text-[12px] font-bold text-[#c8c6c5]">Briefing required before implementation</p>
+                      <p className="text-[10px] text-[#474746] mt-0.5">
+                        {anyPokerActive ? "Agent briefing in progress…" : `${stories.length - storiesDone} stor${stories.length - storiesDone !== 1 ? "ies" : "y"} still need estimation`}
                       </p>
                     </div>
                     <Button
@@ -717,23 +757,23 @@ export default function AnalysisPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="relative rounded-2xl border border-primary/25 bg-card overflow-hidden">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.04)_0%,transparent_70%)] pointer-events-none" />
+                  <div className="relative rounded-2xl border border-[#4edea3]/25 bg-[#1c1b1b] overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(78,222,163,0.04)_0%,transparent_70%)] pointer-events-none" />
                     <div className="relative z-10 p-5 flex items-center justify-between gap-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-primary" style={{ fontSize: "20px", fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
+                        <div className="w-10 h-10 rounded-xl bg-[#4edea3]/10 border border-[#4edea3]/20 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[#4edea3]" style={{ fontSize: "20px", fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                         </div>
                         <div>
-                          <p className="text-[13px] font-bold text-foreground">All stories estimated — ready to implement</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                          <p className="text-[13px] font-bold text-[#e5e2e1]">All stories estimated — ready to implement</p>
+                          <p className="text-[10px] text-[#86948a] mt-0.5">
                             {stories.length} stories · {totalPoints} pts total · {AGENT_ROSTER.length} agents on standby
                           </p>
                         </div>
                       </div>
                       <Button
                         onClick={() => router.push(`/implementation?story=${encodeURIComponent(stories[0].id)}&autorun=1`)}
-                        className="primary-gradient text-[#003824] px-6 py-3 rounded-xl text-[12px] font-bold uppercase tracking-widest shadow-lg shadow-primary/15 h-auto border-transparent flex items-center gap-2 shrink-0 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                        className="primary-gradient text-[#003824] px-6 py-3 rounded-xl text-[12px] font-bold uppercase tracking-widest shadow-lg shadow-[#4edea3]/15 h-auto border-transparent flex items-center gap-2 shrink-0 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: "16px", fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
                         Start Implementing
@@ -758,19 +798,19 @@ export default function AnalysisPage() {
             open={drawerStoryId !== null}
             onOpenChange={(open) => { if (!open) setDrawerStoryId(null); }}
           >
-            <DrawerContent className="bg-background border-l border-border flex flex-col p-0 overflow-hidden !max-w-none" style={{ width: "min(960px, 95vw)" }}>
-              <DrawerHeader className="flex items-center justify-between px-8 py-5 border-b border-border shrink-0">
+            <DrawerContent className="bg-[#131313] border-l border-[#3c4a42]/40 flex flex-col p-0 overflow-hidden !max-w-none" style={{ width: "min(960px, 95vw)" }}>
+              <DrawerHeader className="flex items-center justify-between px-8 py-5 border-b border-[#3c4a42]/30 shrink-0">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-primary" style={{ fontSize: "28px" }}>casino</span>
+                  <span className="material-symbols-outlined text-[#4edea3]" style={{ fontSize: "28px" }}>casino</span>
                   <div>
-                    <DrawerTitle style={{ fontSize: "20px", fontWeight: 700, color: "var(--foreground)", lineHeight: 1 }}>Planning Poker</DrawerTitle>
+                    <DrawerTitle style={{ fontSize: "20px", fontWeight: 700, color: "#e5e2e1", lineHeight: 1 }}>Planning Poker</DrawerTitle>
                     {drawerStory && (
-                      <p style={{ fontSize: "14px", fontFamily: "monospace", color: "var(--muted-foreground)", marginTop: "4px" }}>{drawerStory.id} · {drawerStory.title}</p>
+                      <p style={{ fontSize: "14px", fontFamily: "monospace", color: "#474746", marginTop: "4px" }}>{drawerStory.id} · {drawerStory.title}</p>
                     )}
                   </div>
                 </div>
-                <DrawerClose className="w-8 h-8 rounded-lg flex items-center justify-center bg-secondary border border-border hover:bg-secondary/80 transition-colors">
-                  <span className="material-symbols-outlined text-muted-foreground" style={{ fontSize: "18px" }}>close</span>
+                <DrawerClose className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#2a2a2a] border border-[#3c4a42]/30 hover:bg-[#333] transition-colors">
+                  <span className="material-symbols-outlined text-[#86948a]" style={{ fontSize: "18px" }}>close</span>
                 </DrawerClose>
               </DrawerHeader>
 
@@ -780,14 +820,14 @@ export default function AnalysisPage() {
                     {/* Agent cards — 3 columns */}
                     <div className="grid grid-cols-3 gap-5">
                       {drawerSession.agents.map((agent, i) => (
-                        <div key={agent.role} className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-card border border-border">
+                        <div key={agent.role} className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-[#1a1a1a] border border-[#3c4a42]/25">
                           <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 shrink-0" style={{ background: `${agent.color}12`, borderColor: `${agent.color}30` }}>
                             <span className="material-symbols-outlined" style={{ fontSize: "32px", color: agent.color }}>{agent.icon}</span>
                           </div>
                           <PokerCard value={agent.estimate} revealed={agent.revealed} color={agent.color} animationDelay={i * 180} />
                           <span style={{ fontSize: "17px", fontWeight: 700, color: agent.color, textAlign: "center" }}>{agent.label}</span>
                           {agent.revealed && agent.reasoning && (
-                            <p style={{ fontSize: "15px", color: "var(--muted-foreground)", textAlign: "center", lineHeight: 1.6 }}>{agent.reasoning}</p>
+                            <p style={{ fontSize: "15px", color: "#86948a", textAlign: "center", lineHeight: 1.6 }}>{agent.reasoning}</p>
                           )}
                         </div>
                       ))}
@@ -795,22 +835,22 @@ export default function AnalysisPage() {
 
                     {/* Debate transcript */}
                     {drawerSession.logs.length > 0 && (
-                      <div className="rounded-xl bg-background border border-border overflow-hidden">
-                        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-                          <span className="material-symbols-outlined text-muted-foreground/50" style={{ fontSize: "18px" }}>forum</span>
-                          <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-foreground)" }}>Debate transcript</span>
-                          <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--muted-foreground)" }}>{drawerSession.logs.length} turns</span>
+                      <div className="rounded-xl bg-[#0e0e0e] border border-[#3c4a42]/20 overflow-hidden">
+                        <div className="px-5 py-4 border-b border-[#3c4a42]/20 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[#474746]" style={{ fontSize: "18px" }}>forum</span>
+                          <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#474746" }}>Debate transcript</span>
+                          <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "#474746" }}>{drawerSession.logs.length} turns</span>
                         </div>
                         <div className="p-5 space-y-4">
                           {drawerSession.logs.map((log, i) => (
-                            <div key={i} className="rounded-xl bg-card border border-border overflow-hidden">
-                              <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border" style={{ background: `${log.color}08` }}>
+                            <div key={i} className="rounded-xl bg-[#131313] border border-[#3c4a42]/15 overflow-hidden">
+                              <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#3c4a42]/10" style={{ background: `${log.color}08` }}>
                                 <div className="w-2 h-6 rounded-full shrink-0" style={{ background: log.color }} />
                                 <span style={{ fontSize: "17px", fontWeight: 700, color: log.color }}>{log.agent}</span>
-                                <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "var(--muted-foreground)" }}>{log.timestamp}</span>
+                                <span className="ml-auto" style={{ fontSize: "13px", fontFamily: "monospace", color: "#474746" }}>{log.timestamp}</span>
                               </div>
                               <div className="px-5 py-5">
-                                <span style={{ fontSize: "15px", fontFamily: "monospace", color: "var(--muted-foreground)", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}>
+                                <span style={{ fontSize: "15px", fontFamily: "monospace", color: "#c8c6c5", lineHeight: 1.7, whiteSpace: "pre-wrap", wordBreak: "break-word", display: "block" }}>
                                   {log.text}
                                   {i === drawerSession.logs.length - 1 && drawerSession.phase === "debating" && (
                                     <span className="terminal-cursor" />
@@ -825,19 +865,19 @@ export default function AnalysisPage() {
 
                     {/* Consensus */}
                     {drawerSession.phase === "done" && drawerSession.consensusEstimate !== null && (
-                      <div className="flex items-center justify-between rounded-xl bg-primary/8 border border-primary/25 px-8 py-6">
+                      <div className="flex items-center justify-between rounded-xl bg-[#4edea3]/8 border border-[#4edea3]/25 px-8 py-6">
                         <div className="flex items-center gap-4">
-                          <span className="material-symbols-outlined text-primary" style={{ fontSize: "32px" }}>check_circle</span>
+                          <span className="material-symbols-outlined text-[#4ae176]" style={{ fontSize: "32px" }}>check_circle</span>
                           <div>
                             <p style={{ fontSize: "18px", fontWeight: 700, color: "#4ae176", textTransform: "uppercase", letterSpacing: "0.05em" }}>Consensus reached</p>
-                            <p style={{ fontSize: "15px", color: "var(--muted-foreground)", marginTop: "4px" }}>All agents have agreed on an estimate</p>
+                            <p style={{ fontSize: "15px", color: "#86948a", marginTop: "4px" }}>All agents have agreed on an estimate</p>
                           </div>
                         </div>
                         <div className="flex items-baseline gap-3">
-                          <span style={{ fontSize: "64px", fontWeight: 700, fontFamily: "monospace", color: "var(--primary)", lineHeight: 1 }}>{drawerSession.consensusEstimate}</span>
+                          <span style={{ fontSize: "64px", fontWeight: 700, fontFamily: "monospace", color: "#4edea3", lineHeight: 1 }}>{drawerSession.consensusEstimate}</span>
                           <div className="flex flex-col">
-                            <span style={{ fontSize: "18px", fontWeight: 700, color: "var(--primary)" }}>pts</span>
-                            <span style={{ fontSize: "15px", color: "var(--muted-foreground)" }}>
+                            <span style={{ fontSize: "18px", fontWeight: 700, color: "#4edea3" }}>pts</span>
+                            <span style={{ fontSize: "15px", color: "#86948a" }}>
                               ~{drawerSession.consensusEstimate * 30 >= 60
                                 ? `${Math.round(drawerSession.consensusEstimate * 30 / 60 * 10) / 10}h`
                                 : `${drawerSession.consensusEstimate * 30}min`} delivery
@@ -849,9 +889,9 @@ export default function AnalysisPage() {
 
                     {/* In-progress state */}
                     {drawerSession.phase !== "done" && (
-                      <div className="flex items-center gap-3 px-6 py-5 rounded-xl bg-primary/5 border border-primary/15">
-                        <span className="w-3 h-3 rounded-full bg-primary glow-pulse shrink-0" />
-                        <span style={{ fontSize: "16px", color: "var(--primary)", fontWeight: 500, textTransform: "capitalize" }}>{drawerSession.phase}…</span>
+                      <div className="flex items-center gap-3 px-6 py-5 rounded-xl bg-[#4edea3]/5 border border-[#4edea3]/15">
+                        <span className="w-3 h-3 rounded-full bg-[#4edea3] glow-pulse shrink-0" />
+                        <span style={{ fontSize: "16px", color: "#4edea3", fontWeight: 500, textTransform: "capitalize" }}>{drawerSession.phase}…</span>
                       </div>
                     )}
                   </>
