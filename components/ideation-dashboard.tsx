@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useTheme } from "next-themes"
 import { ReactFlow, Controls, Background } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -87,6 +87,9 @@ type SchemaRelation = {
   to: string
   field: string
 }
+
+type SlashAction = "refactor" | "comment" | "scaffold"
+type TerminalSlashAction = "fix" | "explain" | "command"
 
 const stages: StageKey[] = [
   "Conversation",
@@ -366,6 +369,53 @@ function buildAiReply(message: string) {
   return `Am preluat direcția "${toSentenceLabel(normalized, "Flow Update")}" și o împing în următorul artefact logic.`
 }
 
+function createAiEditedContent(file: WorkspaceFile, action: SlashAction, instruction: string) {
+  const normalizedInstruction = instruction.trim() || "tighten the implementation"
+
+  if (file.name.endsWith(".md")) {
+    return `${file.content}\n## AI Edit\n- Action: ${action}\n- Prompt: ${normalizedInstruction}\n- Result: mock update applied directly from the slash popup.\n`
+  }
+
+  const header =
+    action === "comment"
+      ? `// AI note: ${normalizedInstruction}`
+      : action === "scaffold"
+        ? `// AI scaffold: ${normalizedInstruction}`
+        : `// AI refactor: ${normalizedInstruction}`
+
+  const snippet =
+    action === "comment"
+      ? `${header}\n`
+      : action === "scaffold"
+        ? `${header}\nexport const aiEditedBlock = {\n  status: "draft-applied",\n  prompt: ${JSON.stringify(normalizedInstruction)},\n}\n`
+        : `${header}\nexport function applyAiInstruction() {\n  return ${JSON.stringify(normalizedInstruction)}\n}\n`
+
+  return `${snippet}\n${file.content}`
+}
+
+function createTerminalAiResponse(action: TerminalSlashAction, instruction: string) {
+  const normalizedInstruction = instruction.trim() || "inspect the current terminal flow"
+
+  if (action === "explain") {
+    return {
+      command: "",
+      output: `AI explanation:\n- Context: ${normalizedInstruction}\n- Suggestion: ruleaza comanda cea mai mică posibilă și validează output-ul înainte de preview.`,
+    }
+  }
+
+  if (action === "fix") {
+    return {
+      command: "npm run dev",
+      output: `AI fix suggestion:\n- Interpretez cererea ca "${normalizedInstruction}".\n- Recomand să pornești serverul local cu \`npm run dev\` și apoi să verifici preview-ul.`,
+    }
+  }
+
+  return {
+    command: "npm run dev",
+    output: `AI command generated for: ${normalizedInstruction}`,
+  }
+}
+
 function parseSchemaDiagram(schema: string) {
   const modelRegex = /model\s+(\w+)\s*\{([\s\S]*?)\}/g
   const scalarTypes = new Set(["String", "Int", "Boolean", "DateTime", "Float", "Decimal", "Json", "Bytes", "BigInt"])
@@ -504,6 +554,12 @@ function Icon({ name, className }: { name: string; className?: string }) {
           <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" />
         </svg>
       )
+    case "close":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <path d="m7 7 10 10M17 7 7 17" stroke="currentColor" strokeLinecap="round" />
+        </svg>
+      )
     case "cpu":
       return (
         <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
@@ -599,6 +655,8 @@ function IDEHeader({ title, icon, rightNode }: { title: string; icon: string; ri
 }
 
 export function IdeationDashboard() {
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
+  const terminalInputRef = useRef<HTMLInputElement | null>(null)
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
 
@@ -619,6 +677,12 @@ export function IdeationDashboard() {
   const [autoSave, setAutoSave] = useState(true)
   const [appGenerated, setAppGenerated] = useState(false)
   const [previewOpened, setPreviewOpened] = useState(false)
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false)
+  const [slashAction, setSlashAction] = useState<SlashAction>("refactor")
+  const [slashPrompt, setSlashPrompt] = useState("")
+  const [terminalSlashMenuOpen, setTerminalSlashMenuOpen] = useState(false)
+  const [terminalSlashAction, setTerminalSlashAction] = useState<TerminalSlashAction>("command")
+  const [terminalSlashPrompt, setTerminalSlashPrompt] = useState("")
 
   const [terminalHistory, setTerminalHistory] = useState<{type: string, text: string}[]>([
     { type: "system", text: "Luminescent OS v1.2.0 initialized." },
@@ -719,6 +783,132 @@ export function IdeationDashboard() {
     if (detail) {
       addActivity(`Moved to ${stage}`, detail)
     }
+  }
+
+  function updateActiveFileContent(nextContent: string) {
+    setWorkspaceFiles((current) =>
+      current.map((file) =>
+        file.id === activeFile?.id ? { ...file, content: nextContent } : file
+      )
+    )
+  }
+
+  function openSlashMenu(nextAction: SlashAction = "refactor") {
+    setSlashAction(nextAction)
+    setSlashPrompt("")
+    setSlashMenuOpen(true)
+  }
+
+  function closeSlashMenu() {
+    setSlashMenuOpen(false)
+    setSlashPrompt("")
+    window.setTimeout(() => {
+      editorRef.current?.focus()
+    }, 0)
+  }
+
+  function openTerminalSlashMenu(nextAction: TerminalSlashAction = "command") {
+    setTerminalSlashAction(nextAction)
+    setTerminalSlashPrompt("")
+    setTerminalSlashMenuOpen(true)
+  }
+
+  function closeTerminalSlashMenu() {
+    setTerminalSlashMenuOpen(false)
+    setTerminalSlashPrompt("")
+    window.setTimeout(() => {
+      terminalInputRef.current?.focus()
+    }, 0)
+  }
+
+  function applySlashCommand() {
+    if (!activeFile) return
+
+    const nextContent = createAiEditedContent(activeFile, slashAction, slashPrompt)
+    updateActiveFileContent(nextContent)
+    setTerminalHistory((current) => [
+      ...current,
+      {
+        type: "out",
+        text: `AI edit applied on ${activeFile.name} with /${slashAction}${slashPrompt.trim() ? ` -> ${slashPrompt.trim()}` : ""}`,
+      },
+    ])
+    addActivity("AI inline edit", `${activeFile.name} a fost actualizat din slash command.`)
+    closeSlashMenu()
+  }
+
+  function applyTerminalSlashCommand() {
+    const aiResult = createTerminalAiResponse(terminalSlashAction, terminalSlashPrompt)
+
+    setTerminalHistory((current) => [
+      ...current,
+      {
+        type: "out",
+        text: aiResult.output,
+      },
+    ])
+
+    if (aiResult.command) {
+      setTerminalInput(aiResult.command)
+    }
+
+    addActivity("AI terminal assist", `Terminalul a primit o sugestie pentru /${terminalSlashAction}.`)
+    closeTerminalSlashMenu()
+  }
+
+  function handleEditorKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Escape" && slashMenuOpen) {
+      event.preventDefault()
+      closeSlashMenu()
+      return
+    }
+
+    if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+      return
+    }
+
+    const target = event.currentTarget
+    const selectionCollapsed = target.selectionStart === target.selectionEnd
+    const previousCharacter = target.value.slice(Math.max(0, target.selectionStart - 1), target.selectionStart)
+    const nextCharacter = target.value.slice(target.selectionStart, target.selectionStart + 1)
+    const isCommandContext = selectionCollapsed && (!previousCharacter || /[\s([{=:,]/.test(previousCharacter)) && nextCharacter !== "/"
+
+    if (!isCommandContext) {
+      return
+    }
+
+    event.preventDefault()
+    openSlashMenu()
+  }
+
+  function handleTerminalKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape" && terminalSlashMenuOpen) {
+      event.preventDefault()
+      closeTerminalSlashMenu()
+      return
+    }
+
+    if (event.key === "Enter" && !terminalSlashMenuOpen) {
+      handleTerminalSubmit()
+      return
+    }
+
+    if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+      return
+    }
+
+    const target = event.currentTarget
+    const selectionCollapsed = target.selectionStart === target.selectionEnd
+    const previousCharacter = target.value.slice(Math.max(0, (target.selectionStart ?? 0) - 1), target.selectionStart ?? 0)
+    const nextCharacter = target.value.slice(target.selectionStart ?? 0, (target.selectionStart ?? 0) + 1)
+    const isCommandContext = selectionCollapsed && (!previousCharacter || /\s/.test(previousCharacter)) && nextCharacter !== "/"
+
+    if (!isCommandContext) {
+      return
+    }
+
+    event.preventDefault()
+    openTerminalSlashMenu()
   }
 
   function sendMessage() {
@@ -1502,15 +1692,71 @@ export function IdeationDashboard() {
                     </div>
                     
                     <div className="flex-1 relative">
+                      {slashMenuOpen ? (
+                        <div className="absolute right-4 top-4 z-20 w-[320px] rounded-2xl border border-primary/20 bg-background/95 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+                          <div className="mb-2 flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-primary">AI Slash Edit</div>
+                              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                                Scrie o instrucțiune scurtă pentru agentul AI direct în cod.
+                              </p>
+                            </div>
+                            <Button size="icon-xs" variant="ghost" onClick={closeSlashMenu} className="shrink-0">
+                              <Icon name="close" className="size-3" />
+                            </Button>
+                          </div>
+
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            {([
+                              { id: "refactor", label: "Refactor" },
+                              { id: "comment", label: "Comment" },
+                              { id: "scaffold", label: "Scaffold" },
+                            ] as const).map((option) => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => setSlashAction(option.id)}
+                                className={cn(
+                                  "rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest transition-colors",
+                                  slashAction === option.id
+                                    ? "border-primary/30 bg-primary/12 text-primary"
+                                    : "border-border/50 bg-background/70 text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                /{option.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <Input
+                            value={slashPrompt}
+                            onChange={(event) => setSlashPrompt(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault()
+                                applySlashCommand()
+                              }
+                            }}
+                            placeholder="Ex: extract logic in helper + add loading state"
+                            className="h-10 rounded-xl border-border/50 bg-background/70 text-[12px]"
+                            autoFocus
+                          />
+
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <span className="text-[10px] text-muted-foreground">
+                              Enter aplică mock editarea AI pe fișierul activ.
+                            </span>
+                            <Button size="sm" onClick={applySlashCommand} className="h-8 px-3 text-[11px]">
+                              Apply AI edit
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
                        <Textarea
+                        ref={editorRef}
                         value={activeFile?.content ?? ""}
-                        onChange={(event) =>
-                          setWorkspaceFiles((current) =>
-                            current.map((file) =>
-                              file.id === activeFile?.id ? { ...file, content: event.target.value } : file
-                            )
-                          )
-                        }
+                        onChange={(event) => updateActiveFileContent(event.target.value)}
+                        onKeyDown={handleEditorKeyDown}
                         className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 font-mono text-[13px] leading-[1.6] text-foreground/90 shadow-none focus-visible:ring-0"
                         spellCheck={false}
                       />
@@ -1523,18 +1769,69 @@ export function IdeationDashboard() {
                         <button className="px-3 h-full border-b-[2px] border-b-transparent text-muted-foreground uppercase text-[10px] tracking-widest hover:text-foreground">Output</button>
                         <button className="px-3 h-full border-b-[2px] border-b-primary text-foreground font-bold uppercase text-[10px] tracking-widest bg-background/50">Terminal</button>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-3 space-y-1 w-full bg-background/20 font-medium">
+                      <div className="relative flex-1 overflow-y-auto p-3 space-y-1 w-full bg-background/20 font-medium">
                         {terminalHistory.map((line, i) => (
                           <div key={i} className={cn("whitespace-pre-wrap leading-relaxed", line.type === 'error' ? 'text-destructive' : line.type === 'cmd' ? 'text-foreground font-bold' : 'text-chart-2/90')}>
                             {line.text}
                           </div>
                         ))}
+                        {terminalSlashMenuOpen ? (
+                          <div className="absolute bottom-11 left-3 z-20 w-[280px] rounded-xl border border-border/60 bg-background/96 p-2 shadow-[0_10px_30px_rgba(0,0,0,0.24)] backdrop-blur-md">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-primary">AI Terminal</div>
+                              <div className="flex items-center gap-1">
+                                {([
+                                  { id: "command", label: "Cmd" },
+                                  { id: "fix", label: "Fix" },
+                                  { id: "explain", label: "Explain" },
+                                ] as const).map((option) => (
+                                  <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => setTerminalSlashAction(option.id)}
+                                    className={cn(
+                                      "rounded-md border px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wide transition-colors",
+                                      terminalSlashAction === option.id
+                                        ? "border-primary/30 bg-primary/12 text-primary"
+                                        : "border-border/50 bg-background/60 text-muted-foreground hover:text-foreground"
+                                    )}
+                                  >
+                                    /{option.label}
+                                  </button>
+                                ))}
+                                <Button size="icon-xs" variant="ghost" onClick={closeTerminalSlashMenu} className="size-5 shrink-0">
+                                  <Icon name="close" className="size-3" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={terminalSlashPrompt}
+                                onChange={(event) => setTerminalSlashPrompt(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault()
+                                    applyTerminalSlashCommand()
+                                  }
+                                }}
+                                placeholder="Ex: start local preview"
+                                className="h-8 rounded-lg border-border/50 bg-background/70 px-3 text-[11px]"
+                                autoFocus
+                              />
+                              <Button size="sm" onClick={applyTerminalSlashCommand} className="h-8 px-2.5 text-[10px]">
+                                Apply
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="flex items-center gap-2 mt-1 -ml-0.5">
                           <span className="text-chart-2 font-bold shrink-0">root@ide:~$</span>
                           <input 
+                            ref={terminalInputRef}
                             value={terminalInput}
                             onChange={(e) => setTerminalInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleTerminalSubmit()}
+                            onKeyDown={handleTerminalKeyDown}
                             className="flex-1 min-w-0 bg-transparent outline-none text-foreground placeholder:text-muted-foreground/60 focus:ring-0 shadow-none border-none appearance-none"
                             spellCheck={false}
                           />
