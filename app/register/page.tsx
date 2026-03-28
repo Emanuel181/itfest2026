@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useTheme } from "next-themes"
 import { supabase } from "@/lib/supabase"
 
 export default function RegisterPage() {
+  const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -23,12 +25,16 @@ export default function RegisterPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
       setError(error.message)
       setLoading(false)
+    } else if (data.session) {
+      // Email confirmation disabled — logged in immediately
+      router.push("/")
     } else {
+      // Email confirmation enabled — show check email screen
       setSuccess(true)
     }
   }
