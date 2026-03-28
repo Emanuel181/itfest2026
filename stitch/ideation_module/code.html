@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Roboto+Slab:wght@700;800&amp;family=Space+Grotesk:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-fixed": "#6ffbbe",
+              "tertiary-container": "#06bb56",
+              "outline-variant": "#3c4a42",
+              "surface-variant": "#353534",
+              "on-primary-fixed": "#002113",
+              "surface-container": "#201f1f",
+              "primary": "#4edea3",
+              "primary-fixed-dim": "#4edea3",
+              "on-secondary-fixed-variant": "#474746",
+              "on-primary-container": "#00422b",
+              "on-tertiary": "#003915",
+              "error-container": "#93000a",
+              "primary-container": "#10b981",
+              "inverse-on-surface": "#313030",
+              "on-tertiary-fixed-variant": "#005321",
+              "background": "#131313",
+              "on-primary-fixed-variant": "#005236",
+              "on-secondary-container": "#b7b5b4",
+              "error": "#ffb4ab",
+              "tertiary": "#4ae176",
+              "on-surface-variant": "#bbcabf",
+              "on-error": "#690005",
+              "on-primary": "#003824",
+              "inverse-primary": "#006c49",
+              "surface-container-highest": "#353534",
+              "surface-container-high": "#2a2a2a",
+              "on-secondary-fixed": "#1b1b1c",
+              "secondary-container": "#474746",
+              "secondary": "#c8c6c5",
+              "surface-bright": "#3a3939",
+              "on-tertiary-fixed": "#002109",
+              "on-secondary": "#303030",
+              "surface-dim": "#131313",
+              "on-error-container": "#ffdad6",
+              "on-background": "#e5e2e1",
+              "surface-container-lowest": "#0e0e0e",
+              "inverse-surface": "#e5e2e1",
+              "on-tertiary-container": "#00431a",
+              "surface": "#131313",
+              "secondary-fixed-dim": "#c8c6c5",
+              "tertiary-fixed": "#6bff8f",
+              "on-surface": "#e5e2e1",
+              "surface-container-low": "#1c1b1b",
+              "outline": "#86948a",
+              "surface-tint": "#4edea3",
+              "secondary-fixed": "#e5e2e1",
+              "tertiary-fixed-dim": "#4ae176"
+            },
+            fontFamily: {
+              "headline": ["Roboto Slab"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "brand": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-panel {
+        background: rgba(28, 27, 27, 0.7);
+        backdrop-filter: blur(12px);
+      }
+      body {
+        background-color: #131313;
+        color: #e5e2e1;
+        font-family: 'Inter', sans-serif;
+      }
+      h1, h2, h3 {
+        font-family: 'Roboto Slab', serif;
+      }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#4edea3] tracking-tight">Luminescent IDE</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-[#c8c6c5] hover:text-[#fafafa] text-sm font-semibold transition-colors" href="#">Docs</a>
+<a class="text-[#c8c6c5] hover:text-[#fafafa] text-sm font-semibold transition-colors" href="#">Architecture</a>
+<a class="text-[#c8c6c5] hover:text-[#fafafa] text-sm font-semibold transition-colors" href="#">Logs</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative bg-[#201f1f] rounded-xl px-3 py-1.5 flex items-center gap-2 w-64">
+<span class="material-symbols-outlined text-secondary text-sm">search</span>
+<input class="bg-transparent border-none text-sm focus:ring-0 text-on-surface placeholder:text-outline w-full" placeholder="Search architecture..." type="text"/>
+</div>
+<button class="bg-[#201f1f] text-secondary px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#353534] transition-all active:scale-95">Share</button>
+<button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-all active:scale-95">Run Agents</button>
+<div class="flex items-center gap-3 ml-2">
+<span class="material-symbols-outlined text-secondary hover:text-primary cursor-pointer">notifications</span>
+<span class="material-symbols-outlined text-secondary hover:text-primary cursor-pointer">settings</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User Profile" data-alt="Close up professional portrait of a software architect in a dark tech environment with emerald ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5hTbRk8MkExCLqx85zNArYR_OSAVFx61Jwmy_6WOzycKjArwVVvFTGhHjV0pb_J14StjyS2MGacZ5Dp7DYmoHaQzk9qDb24WoWh0wcvY5Jgr6sdrDhMNFQYpNI0C78vc5b6VeGK9jxUdOaEGv6R2rS0HC0cYfLIJXGDY3w_MN5sQqoakZCpFoVKSQ8OaR2fKyZ0OKWDzROm3-NmYggnRR_ryuJ12qkWtECnXnlK0DB-dVqh_x6cs6ZePfOu0vxqoGSveh-EuZgg"/>
+</div>
+</div>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col p-4 z-40 bg-[#201f1f] w-64">
+<div class="mb-8 px-4">
+<div class="flex items-center gap-3 mb-1">
+<div class="w-6 h-6 bg-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px] text-on-primary-container" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<h2 class="text-lg font-bold text-[#fafafa]">Core Engine</h2>
+</div>
+<p class="text-[10px] text-primary font-mono uppercase tracking-widest opacity-70">v2.4.0-stable</p>
+</div>
+<nav class="flex-1 flex flex-col gap-y-2">
+<!-- Active Tab: Ideation -->
+<a class="flex items-center gap-3 bg-[#353534] text-[#4edea3] rounded-xl px-4 py-3 border-l-4 border-[#10b981] translate-x-1 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">lightbulb</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Ideation</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Requirements</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">User Stories</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">event_note</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Planning</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">code</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Implementation</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">security</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Security</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">call_merge</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Merge</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-3 hover:bg-[#353534]/50 rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Dashboard</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-2 pt-4">
+<button class="w-full bg-[#353534] text-primary border border-primary/20 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-primary/10 transition-colors mb-4">
+                New Branch
+            </button>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-2 hover:text-[#fafafa] transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">help</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Support</span>
+</a>
+<a class="flex items-center gap-3 text-[#c8c6c5] px-4 py-2 hover:text-[#fafafa] transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">settings</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 mt-16 p-6 h-[calc(100vh-64px)] flex gap-6 overflow-hidden">
+<!-- Left: AI Chat Panel -->
+<section class="flex-1 flex flex-col bg-surface-container rounded-2xl border border-white/5 overflow-hidden">
+<div class="p-4 border-b border-outline-variant/10 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary">psychology</span>
+<h3 class="text-sm font-semibold text-on-surface">Architectural Assistant</h3>
+</div>
+<div class="flex gap-2">
+<span class="px-2 py-1 rounded bg-tertiary/10 text-tertiary text-[10px] font-bold uppercase tracking-tighter">AI Active</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<!-- AI Message -->
+<div class="flex gap-4">
+<div class="w-8 h-8 rounded-lg bg-tertiary-container flex-shrink-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<div class="flex-1 space-y-2">
+<p class="text-sm text-on-surface leading-relaxed">
+                            Hello! I've analyzed your initial repository structure. To begin the <span class="text-primary font-bold">Ideation Phase</span>, I recommend defining the core system boundaries.
+                        </p>
+<div class="grid grid-cols-2 gap-3 mt-4">
+<button class="p-3 text-left bg-surface-container-highest rounded-xl border border-white/5 hover:border-primary/40 transition-all group">
+<p class="text-[11px] text-primary font-bold uppercase mb-1">Prompt 1</p>
+<p class="text-xs text-on-surface-variant group-hover:text-on-surface">Define microservices architecture for real-time data ingestion.</p>
+</button>
+<button class="p-3 text-left bg-surface-container-highest rounded-xl border border-white/5 hover:border-primary/40 transition-all group">
+<p class="text-[11px] text-primary font-bold uppercase mb-1">Prompt 2</p>
+<p class="text-xs text-on-surface-variant group-hover:text-on-surface">Outline the authentication flow using OAuth2 and JWT.</p>
+</button>
+</div>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex gap-4 flex-row-reverse">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest flex-shrink-0 flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-secondary text-sm">person</span>
+</div>
+<div class="bg-surface-container-high p-4 rounded-2xl rounded-tr-none max-w-[80%] border border-white/5">
+<p class="text-sm text-on-surface">Let's build a Luminescent Project Brief for a high-performance IDE engine that prioritizes AI-first workflows.</p>
+</div>
+</div>
+<!-- AI Streaming Message -->
+<div class="flex gap-4">
+<div class="w-8 h-8 rounded-lg bg-tertiary-container flex-shrink-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-2">
+<p class="text-xs font-bold text-tertiary uppercase">Generating Brief...</p>
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+</div>
+<div class="space-y-3 opacity-80">
+<div class="h-4 bg-surface-container-highest rounded w-3/4"></div>
+<div class="h-4 bg-surface-container-highest rounded w-full"></div>
+<div class="h-4 bg-surface-container-highest rounded w-1/2"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Chat Input -->
+<div class="p-4 bg-surface-container-low border-t border-outline-variant/10">
+<div class="relative flex items-center">
+<input class="w-full bg-surface-container-lowest border border-white/5 rounded-2xl py-4 pl-5 pr-14 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all" placeholder="Type a message or use '/' for commands..." type="text"/>
+<button class="absolute right-3 p-2 bg-primary text-on-primary rounded-xl hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Right: Project Brief Panel -->
+<section class="w-1/3 flex flex-col bg-surface-container rounded-2xl border border-white/5 overflow-hidden">
+<div class="p-6 h-full flex flex-col">
+<div class="flex items-center justify-between mb-8">
+<h2 class="text-2xl font-extrabold tracking-tight text-on-surface">Project Brief</h2>
+<div class="flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest">Drafting</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto space-y-8 pr-2 custom-scrollbar">
+<!-- Title -->
+<div class="space-y-2">
+<label class="text-[10px] font-bold text-primary uppercase tracking-widest opacity-60">Project Title</label>
+<h1 class="text-3xl font-bold text-white leading-tight">Luminescent Core V2</h1>
+</div>
+<!-- Objective -->
+<div class="space-y-3">
+<h4 class="text-sm font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">target</span>
+                            Objective
+                        </h4>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                            Engineered to redefine the developer experience by integrating AI deep into the AST (Abstract Syntax Tree) layer, reducing cognitive load and increasing throughput by 40%.
+                        </p>
+</div>
+<!-- Target Audience -->
+<div class="space-y-3">
+<h4 class="text-sm font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">groups</span>
+                            Target Audience
+                        </h4>
+<ul class="space-y-2">
+<li class="flex items-start gap-3 text-sm text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary mt-1.5"></span>
+                                Senior Systems Engineers
+                            </li>
+<li class="flex items-start gap-3 text-sm text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary mt-1.5"></span>
+                                AI Model Orchestrators
+                            </li>
+</ul>
+</div>
+<!-- Scope -->
+<div class="space-y-3">
+<h4 class="text-sm font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+                            In Scope
+                        </h4>
+<div class="bg-surface-container-low p-4 rounded-xl space-y-3 border border-white/5">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-sm">done</span>
+<span class="text-xs text-on-surface-variant">Real-time collaboration engine</span>
+</div>
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-sm">done</span>
+<span class="text-xs text-on-surface-variant">Native WASM execution environment</span>
+</div>
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary text-sm">done</span>
+<span class="text-xs text-on-surface-variant">GPU-accelerated rendering</span>
+</div>
+</div>
+</div>
+<!-- Out of Scope -->
+<div class="space-y-3">
+<h4 class="text-sm font-bold text-on-surface flex items-center gap-2 opacity-60">
+<span class="material-symbols-outlined text-lg">cancel</span>
+                            Out of Scope
+                        </h4>
+<p class="text-xs text-on-surface-variant/60 italic px-6">
+                            Legacy browser support (IE11/Safari &lt;14), Mobile app development components, and non-UTF8 encoding support.
+                        </p>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="mt-8 pt-6 border-t border-outline-variant/10">
+<button class="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined">verified</span>
+                        Approve Brief
+                    </button>
+<p class="text-center text-[10px] text-outline mt-4 uppercase tracking-tighter">Requires 2/3 peer approval to lock</p>
+</div>
+</div>
+</section>
+<!-- Right Panel: Agent Activity Feed -->
+<section class="w-80 flex flex-col gap-4">
+<div class="bg-surface-container rounded-2xl border border-white/5 flex-1 p-5 overflow-hidden flex flex-col">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-secondary text-sm">hub</span>
+<h3 class="text-[11px] font-bold text-on-secondary uppercase tracking-[0.2em]">Agent Activity</h3>
+</div>
+<div class="flex-1 overflow-y-auto space-y-4 pr-1">
+<!-- Log 1 -->
+<div class="flex gap-3 items-start animate-fade-in">
+<div class="w-1.5 h-10 bg-primary/20 rounded-full flex-shrink-0 relative overflow-hidden">
+<div class="absolute top-0 w-full h-1/2 bg-primary animate-pulse"></div>
+</div>
+<div>
+<p class="text-xs font-bold text-on-surface">Ideation Agent</p>
+<p class="text-[10px] text-on-surface-variant mb-1">Generated initial brief draft</p>
+<span class="text-[9px] font-mono text-outline">10:42:15 AM</span>
+</div>
+</div>
+<!-- Log 2 -->
+<div class="flex gap-3 items-start opacity-70">
+<div class="w-1.5 h-10 bg-outline-variant/20 rounded-full flex-shrink-0"></div>
+<div>
+<p class="text-xs font-bold text-on-surface">System</p>
+<p class="text-[10px] text-on-surface-variant mb-1">Created workspace context</p>
+<span class="text-[9px] font-mono text-outline">10:41:02 AM</span>
+</div>
+</div>
+<!-- Log 3 -->
+<div class="flex gap-3 items-start opacity-50">
+<div class="w-1.5 h-10 bg-outline-variant/20 rounded-full flex-shrink-0"></div>
+<div>
+<p class="text-xs font-bold text-on-surface">Security Bot</p>
+<p class="text-[10px] text-on-surface-variant mb-1">Scanned repository for PII</p>
+<span class="text-[9px] font-mono text-outline">10:40:45 AM</span>
+</div>
+</div>
+</div>
+<div class="mt-4 p-3 bg-surface-container-high rounded-xl border border-white/5">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-on-surface uppercase tracking-widest">Model Load</span>
+<span class="text-[10px] font-mono text-primary">82%</span>
+</div>
+<div class="h-1 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[82%]"></div>
+</div>
+</div>
+</div>
+<!-- Contextual Card -->
+<div class="bg-surface-container-high rounded-2xl p-5 border border-white/5 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl">lightbulb_circle</span>
+</div>
+<h4 class="text-xs font-bold text-primary mb-2 uppercase tracking-widest">Next Step</h4>
+<p class="text-xs text-on-surface leading-relaxed">
+                    Once the brief is approved, the <span class="text-tertiary">Requirements Agent</span> will automatically initialize the technical specification module.
+                </p>
+<button class="mt-4 text-[10px] font-bold text-on-surface flex items-center gap-1 hover:gap-2 transition-all">
+                    LEARN MORE <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Visual Accents: Decorative Glass Glows -->
+<div class="fixed top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10 translate-x-1/4 -translate-y-1/4"></div>
+<div class="fixed bottom-0 left-0 w-[400px] h-[400px] bg-tertiary/5 blur-[100px] rounded-full pointer-events-none -z-10 -translate-x-1/4 translate-y-1/4"></div>
+</body></html>
