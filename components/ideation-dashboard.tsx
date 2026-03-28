@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useMemo, useRef, useState, type ReactNode } from "react"
 import { useTheme } from "next-themes"
 import { ReactFlow, Controls, Background } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -74,7 +74,14 @@ type UserStory = {
 type WorkspaceFile = {
   id: string
   name: string
+  path: string
   content: string
+}
+
+type WorkspaceFolder = {
+  id: string
+  name: string
+  path: string
 }
 
 type SchemaModel = {
@@ -343,24 +350,104 @@ function buildUserStories(feature: Feature, brief: BriefState): UserStory[] {
   }))
 }
 
+function buildWorkspaceFolders() {
+  return [
+    { id: "folder-docs", name: "docs", path: "docs" },
+    { id: "folder-specs", name: "specs", path: "specs" },
+    { id: "folder-src", name: "src", path: "src" },
+    { id: "folder-src-app", name: "app", path: "src/app" },
+    { id: "folder-src-components", name: "components", path: "src/components" },
+    { id: "folder-src-lib", name: "lib", path: "src/lib" },
+  ] satisfies WorkspaceFolder[]
+}
+
 function buildWorkspaceFiles(brief: BriefState, feature: Feature, userStory: UserStory): WorkspaceFile[] {
   return [
     {
       id: "file-brief",
       name: "project-brief.md",
+      path: "docs/project-brief.md",
       content: `# ${brief.title}\n\n## Objective\n${brief.objective}\n\n## Audience\n${brief.audience.map((item) => `- ${item}`).join("\n")}\n\n## Scope\n${brief.scope.map((item) => `- ${item}`).join("\n")}\n`,
     },
     {
       id: "file-feature",
       name: "selected-feature.md",
+      path: "specs/selected-feature.md",
       content: `# ${feature.id} ${feature.title}\n\n${feature.summary}\n\n## Variations\n${feature.variations.map((item) => `- ${item}`).join("\n")}\n`,
     },
     {
-      id: "file-app",
-      name: "app-flow.ts",
-      content: `${userStory.code}\nexport function generatePreview() {\n  return {\n    title: "${userStory.previewTitle}",\n    status: "ready-for-preview",\n    feature: "${feature.id}",\n  }\n}\n`,
+      id: "file-layout",
+      name: "layout.tsx",
+      path: "src/app/layout.tsx",
+      content: `export const appName = ${JSON.stringify(`${brief.title} Test App`)}\nexport const appDescription = ${JSON.stringify("A small mocked workspace app used for validating the live preview loop.")}\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return children\n}\n`,
+    },
+    {
+      id: "file-page",
+      name: "page.tsx",
+      path: "src/app/page.tsx",
+      content: `import { mockTasks, mockStats } from "@/lib/preview-data"\nimport { agentStatuses } from "@/components/agent-status"\n\nexport const heroTitle = ${JSON.stringify("Team Sprint Board")}\nexport const heroSubtitle = ${JSON.stringify("A mocked test app for checking how code changes flow into the integrated preview.")}\nexport const primaryCta = "Create task"\nexport const secondaryCta = "Open backlog"\nexport const stageItems = ${JSON.stringify([
+        "Brief approved",
+        "Feature selected",
+        "Stories generated",
+        "Mock app ready for test",
+      ], null, 2)}\nexport const metricItems = ${JSON.stringify([
+        { label: "Open tasks", value: "12" },
+        { label: "In review", value: "3" },
+        { label: "Agents active", value: "4" },
+      ], null, 2)}\nexport const feedItems = ${JSON.stringify([
+        "Mara refined the homepage copy.",
+        "Tech AI refreshed the runtime config.",
+        "Merge Agent is ready for the next approval gate.",
+      ], null, 2)}\n\nexport default function Page() {\n  return (\n    <main className="grid gap-6 p-6">\n      <section>\n        <h1>{heroTitle}</h1>\n        <p>{heroSubtitle}</p>\n      </section>\n\n      <section>\n        <h2>Stats</h2>\n        <div>\n          {mockStats.map((item) => (\n            <article key={item.label}>\n              <strong>{item.value}</strong>\n              <span>{item.label}</span>\n            </article>\n          ))}\n        </div>\n      </section>\n\n      <section>\n        <h2>Tasks</h2>\n        <div>\n          {mockTasks.map((task) => (\n            <article key={task.id}>\n              <strong>{task.title}</strong>\n              <p>{task.owner} · {task.status}</p>\n            </article>\n          ))}\n        </div>\n      </section>\n\n      <section>\n        <h2>Agents</h2>\n        <div>\n          {agentStatuses.map((agent) => (\n            <article key={agent.name}>\n              <strong>{agent.name}</strong>\n              <span>{agent.status}</span>\n            </article>\n          ))}\n        </div>\n      </section>\n    </main>\n  )\n}\n`,
+    },
+    {
+      id: "file-component",
+      name: "agent-status.tsx",
+      path: "src/components/agent-status.tsx",
+      content: `export const agentStatuses = ${JSON.stringify([
+        { name: "Business AI", status: "active" },
+        { name: "Tech AI", status: "active" },
+        { name: "Frontend Agent", status: "drafting UI" },
+        { name: "Merge Agent", status: "standby" },
+      ], null, 2)}\n`,
+    },
+    {
+      id: "file-lib",
+      name: "preview-data.ts",
+      path: "src/lib/preview-data.ts",
+      content: `${userStory.code}\nexport const previewMeta = {\n  title: ${JSON.stringify("Team Sprint Board")},\n  feature: ${JSON.stringify(feature.id)},\n  status: "ready-for-preview",\n}\n\nexport const mockStats = [\n  { label: "Tasks", value: "12" },\n  { label: "Velocity", value: "23 pts" },\n  { label: "Approval rate", value: "96%" },\n]\n\nexport const mockTasks = [\n  { id: "TASK-01", title: "Design final review panel", owner: "Mara", status: "In progress" },\n  { id: "TASK-02", title: "Wire the Bedrock gateway", owner: "Ionut", status: "Ready for QA" },\n  { id: "TASK-03", title: "Refine merge timeline UI", owner: "Alex", status: "Draft" },\n]\n`,
     },
   ]
+}
+
+function getWorkspaceName(path: string) {
+  const parts = path.split("/").filter(Boolean)
+  return parts[parts.length - 1] ?? path
+}
+
+function getWorkspaceParentPath(path: string) {
+  const parts = path.split("/").filter(Boolean)
+  return parts.slice(0, -1).join("/")
+}
+
+function joinWorkspacePath(parentPath: string, name: string) {
+  return [parentPath, name].filter(Boolean).join("/")
+}
+
+function createDefaultFileContent(path: string) {
+  if (path.endsWith(".md")) {
+    return `# ${getWorkspaceName(path).replace(/[-_]/g, " ")}\n`
+  }
+
+  if (path.endsWith(".ts") || path.endsWith(".tsx")) {
+    return `export const ${toSentenceLabel(getWorkspaceName(path).replace(/\.[^.]+$/, ""), "newFile").replace(/\s+/g, "")} = {}\n`
+  }
+
+  if (path.endsWith(".json")) {
+    return "{\n  \n}\n"
+  }
+
+  return ""
 }
 
 function buildAiReply(message: string) {
@@ -414,6 +501,431 @@ function createTerminalAiResponse(action: TerminalSlashAction, instruction: stri
     command: "npm run dev",
     output: `AI command generated for: ${normalizedInstruction}`,
   }
+}
+
+function escapePreviewHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+}
+
+function readWorkspaceFile(files: WorkspaceFile[], path: string) {
+  return files.find((file) => file.path === path)
+}
+
+function readStringExport(source: string, exportName: string, fallback: string) {
+  const match = source.match(new RegExp(`export const ${exportName} = ([\\s\\S]*?)(?:\\nexport|\\n\\n|$)`))
+  if (!match) return fallback
+
+  try {
+    return JSON.parse(match[1].trim())
+  } catch {
+    return fallback
+  }
+}
+
+function readJsonExport<T>(source: string, exportName: string, fallback: T) {
+  const match = source.match(new RegExp(`export const ${exportName} = ([\\s\\S]*?)(?:\\nexport|\\n\\n|$)`))
+  if (!match) return fallback
+
+  try {
+    return JSON.parse(match[1].trim()) as T
+  } catch {
+    return fallback
+  }
+}
+
+function buildPreviewDocument(
+  brief: BriefState,
+  feature: Feature,
+  userStory: UserStory,
+  files: WorkspaceFile[]
+) {
+  const layoutFile = readWorkspaceFile(files, "src/app/layout.tsx")
+  const pageFile = readWorkspaceFile(files, "src/app/page.tsx")
+  const statusFile = readWorkspaceFile(files, "src/components/agent-status.tsx")
+  const previewMetaFile = readWorkspaceFile(files, "src/lib/preview-data.ts")
+
+  const layoutSource = layoutFile?.content ?? ""
+  const pageSource = pageFile?.content ?? ""
+  const statusSource = statusFile?.content ?? ""
+  const previewMetaSource = previewMetaFile?.content ?? ""
+
+  const appName = readStringExport(layoutSource, "appName", brief.title)
+  const appDescription = readStringExport(layoutSource, "appDescription", brief.objective)
+  const heroTitle = readStringExport(pageSource, "heroTitle", userStory.previewTitle)
+  const heroSubtitle = readStringExport(pageSource, "heroSubtitle", userStory.summary)
+  const primaryCta = readStringExport(pageSource, "primaryCta", "Generate Preview")
+  const secondaryCta = readStringExport(pageSource, "secondaryCta", "Review Story")
+  const stageItems = readJsonExport<string[]>(pageSource, "stageItems", [
+    "Ideation approved",
+    `${feature.id} selected`,
+    `${userStory.id} generated`,
+  ])
+  const metricItems = readJsonExport<{ label: string; value: string }[]>(pageSource, "metricItems", [
+    { label: "Feature", value: feature.id },
+    { label: "Story", value: userStory.id },
+    { label: "Stack", value: userStory.stack },
+  ])
+  const feedItems = readJsonExport<string[]>(pageSource, "feedItems", [
+    "Business AI updated the brief.",
+    "Tech AI aligned the architecture.",
+  ])
+  const agentStatuses = readJsonExport<{ name: string; status: string }[]>(statusSource, "agentStatuses", [
+    { name: "Business AI", status: "active" },
+    { name: "Tech AI", status: "active" },
+    { name: "Merge Agent", status: "standby" },
+  ])
+  const previewMeta = readJsonExport<{ title?: string; feature?: string; status?: string }>(previewMetaSource, "previewMeta", {
+    title: userStory.previewTitle,
+    feature: feature.id,
+    status: "ready-for-preview",
+  })
+
+  const routeFiles = files
+    .filter((file) => file.path.startsWith("src/app/"))
+    .sort((left, right) => left.path.localeCompare(right.path))
+
+  const componentFiles = files
+    .filter((file) => file.path.startsWith("src/components/"))
+    .sort((left, right) => left.path.localeCompare(right.path))
+
+  const runtimeFiles = [...routeFiles, ...componentFiles]
+    .map(
+      (file) => `
+        <div class="runtime-file">
+          <span>${escapePreviewHtml(file.path)}</span>
+          <span>${file.content.split("\n").length} lines</span>
+        </div>
+      `
+    )
+    .join("")
+
+  const stageMarkup = stageItems
+    .map(
+      (item, index) => `
+        <div class="stage-row">
+          <span class="stage-index">${String(index + 1).padStart(2, "0")}</span>
+          <span>${escapePreviewHtml(item)}</span>
+        </div>
+      `
+    )
+    .join("")
+
+  const metricMarkup = metricItems
+    .map(
+      (item) => `
+        <div class="metric-card">
+          <div class="metric-label">${escapePreviewHtml(item.label)}</div>
+          <div class="metric-value">${escapePreviewHtml(item.value)}</div>
+        </div>
+      `
+    )
+    .join("")
+
+  const feedMarkup = feedItems
+    .map(
+      (item) => `
+        <div class="feed-item">${escapePreviewHtml(item)}</div>
+      `
+    )
+    .join("")
+
+  const agentMarkup = agentStatuses
+    .map(
+      (item) => `
+        <div class="agent-row">
+          <span>${escapePreviewHtml(item.name)}</span>
+          <span class="agent-status">${escapePreviewHtml(item.status)}</span>
+        </div>
+      `
+    )
+    .join("")
+
+  return `<!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Live Preview</title>
+      <style>
+        :root {
+          color-scheme: dark;
+          --bg: #0b1118;
+          --panel: rgba(15, 23, 34, 0.92);
+          --panel-strong: rgba(10, 16, 24, 0.98);
+          --line: rgba(148, 163, 184, 0.18);
+          --muted: #8aa0b8;
+          --text: #e8f0f8;
+          --accent: #34d399;
+          --accent-soft: rgba(52, 211, 153, 0.14);
+          --code: #111927;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: "Space Grotesk", system-ui, sans-serif;
+          background:
+            radial-gradient(circle at top left, rgba(52, 211, 153, 0.16), transparent 28%),
+            radial-gradient(circle at top right, rgba(96, 165, 250, 0.14), transparent 26%),
+            linear-gradient(180deg, #091018 0%, #0b1118 100%);
+          color: var(--text);
+        }
+
+        .shell {
+          min-height: 100vh;
+          padding: 28px;
+          display: grid;
+          gap: 18px;
+          grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.7fr);
+        }
+
+        .panel {
+          background: var(--panel);
+          border: 1px solid var(--line);
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+          backdrop-filter: blur(18px);
+        }
+
+        .hero {
+          padding: 26px;
+          background:
+            linear-gradient(135deg, rgba(52, 211, 153, 0.16), rgba(56, 189, 248, 0.08)),
+            var(--panel-strong);
+          border-bottom: 1px solid var(--line);
+        }
+
+        .eyebrow, .meta span, .file-header span:last-child {
+          color: var(--muted);
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+
+        h1 {
+          margin: 10px 0 12px;
+          font-size: 34px;
+          line-height: 1.05;
+        }
+
+        .hero p, .story-copy {
+          margin: 0;
+          color: #c5d3e0;
+          line-height: 1.7;
+          font-size: 14px;
+        }
+
+        .meta {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 18px;
+        }
+
+        .meta span {
+          padding: 8px 10px;
+          border-radius: 999px;
+          background: var(--accent-soft);
+          color: #d8fff1;
+          letter-spacing: 0.08em;
+        }
+
+        .content {
+          padding: 18px;
+          display: grid;
+          gap: 14px;
+        }
+
+        .card {
+          padding: 18px;
+          border: 1px solid var(--line);
+          border-radius: 18px;
+          background: rgba(10, 16, 24, 0.6);
+        }
+
+        .card h2 {
+          margin: 0 0 10px;
+          font-size: 16px;
+        }
+
+        .sidebar {
+          display: grid;
+          gap: 12px;
+          padding: 18px;
+          align-content: start;
+        }
+
+        .hero-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 20px;
+        }
+
+        .hero-actions button {
+          border: 1px solid var(--line);
+          border-radius: 999px;
+          padding: 10px 14px;
+          background: rgba(255, 255, 255, 0.04);
+          color: var(--text);
+          font: inherit;
+        }
+
+        .hero-actions .primary {
+          background: var(--accent);
+          color: #04120d;
+          border-color: transparent;
+          font-weight: 700;
+        }
+
+        .stage-list, .feed-list, .runtime-list, .agent-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .stage-row, .feed-item, .runtime-file, .agent-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          border: 1px solid var(--line);
+          border-radius: 14px;
+          padding: 12px 14px;
+          background: rgba(255, 255, 255, 0.03);
+        }
+
+        .stage-index, .metric-label, .agent-status {
+          color: var(--muted);
+          font-size: 11px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+
+        .metric-grid {
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .metric-card {
+          border: 1px solid var(--line);
+          border-radius: 18px;
+          padding: 16px;
+          background: rgba(255, 255, 255, 0.03);
+        }
+
+        .metric-value {
+          margin-top: 8px;
+          font-size: 16px;
+          font-weight: 700;
+        }
+
+        pre {
+          margin: 0;
+          padding: 14px;
+          overflow: auto;
+          white-space: pre-wrap;
+          word-break: break-word;
+          font: 12px/1.6 "Roboto Mono", "SFMono-Regular", monospace;
+          background: var(--code);
+          color: #dbeafe;
+          max-height: 240px;
+        }
+
+        .live-dot {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .live-dot::before {
+          content: "";
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: var(--accent);
+          box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.12);
+        }
+
+        @media (max-width: 980px) {
+          .shell {
+            grid-template-columns: 1fr;
+            padding: 16px;
+          }
+
+          .metric-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <main class="shell">
+        <section class="panel">
+          <div class="hero">
+            <div class="eyebrow live-dot">Virtual App Runtime</div>
+            <h1>${escapePreviewHtml(heroTitle)}</h1>
+            <p>${escapePreviewHtml(heroSubtitle)}</p>
+            <div class="meta">
+              <span>${escapePreviewHtml(appName)}</span>
+              <span>${escapePreviewHtml(previewMeta.feature ?? feature.id)}</span>
+              <span>${escapePreviewHtml(previewMeta.status ?? "ready-for-preview")}</span>
+            </div>
+            <div class="hero-actions">
+              <button class="primary">${escapePreviewHtml(primaryCta)}</button>
+              <button>${escapePreviewHtml(secondaryCta)}</button>
+            </div>
+          </div>
+          <div class="content">
+            <article class="card">
+              <div class="eyebrow">Application Shell</div>
+              <h2>${escapePreviewHtml(appName)}</h2>
+              <p class="story-copy">${escapePreviewHtml(appDescription)}</p>
+            </article>
+            <article class="card">
+              <div class="eyebrow">Key Metrics</div>
+              <div class="metric-grid">${metricMarkup}</div>
+            </article>
+            <article class="card">
+              <div class="eyebrow">Stage Timeline</div>
+              <div class="stage-list">${stageMarkup}</div>
+            </article>
+            <article class="card">
+              <div class="eyebrow">Activity Feed</div>
+              <div class="feed-list">${feedMarkup}</div>
+            </article>
+          </div>
+        </section>
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="content">
+              <article class="card">
+                <div class="eyebrow">Runtime Entry</div>
+                <h2>${escapePreviewHtml(pageFile?.path ?? "src/app/page.tsx")}</h2>
+                <p class="story-copy">Preview-ul rulează ca o singură aplicație și citește doar fișierele de entry și componentele de app, nu toate fișierele din workspace.</p>
+              </article>
+              <article class="card">
+                <div class="eyebrow">Loaded Runtime Files</div>
+                <div class="runtime-list">${runtimeFiles || `<div class="feed-item">Nu există încă fișiere în src/app sau src/components.</div>`}</div>
+              </article>
+              <article class="card">
+                <div class="eyebrow">Agent States</div>
+                <div class="agent-list">${agentMarkup}</div>
+              </article>
+              <article class="card">
+                <div class="eyebrow">Rendered From</div>
+                <pre>${escapePreviewHtml(pageSource || "// Create src/app/page.tsx to drive the preview")}</pre>
+              </article>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </body>
+  </html>`
 }
 
 function parseSchemaDiagram(schema: string) {
@@ -657,7 +1169,6 @@ function IDEHeader({ title, icon, rightNode }: { title: string; icon: string; ri
 export function IdeationDashboard() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const terminalInputRef = useRef<HTMLInputElement | null>(null)
-  const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
 
   const [currentStage, setCurrentStage] = useState<StageKey>("Conversation")
@@ -673,6 +1184,7 @@ export function IdeationDashboard() {
   const [selectedFeatureId, setSelectedFeatureId] = useState("FEAT-01")
   const [selectedStoryId, setSelectedStoryId] = useState("US-01")
   const [selectedFileId, setSelectedFileId] = useState("file-brief")
+  const [selectedExplorerPath, setSelectedExplorerPath] = useState("docs")
   const [docTab, setDocTab] = useState<"business" | "tech">("business")
   const [autoSave, setAutoSave] = useState(true)
   const [appGenerated, setAppGenerated] = useState(false)
@@ -683,6 +1195,9 @@ export function IdeationDashboard() {
   const [terminalSlashMenuOpen, setTerminalSlashMenuOpen] = useState(false)
   const [terminalSlashAction, setTerminalSlashAction] = useState<TerminalSlashAction>("command")
   const [terminalSlashPrompt, setTerminalSlashPrompt] = useState("")
+  const [workspaceCreateKind, setWorkspaceCreateKind] = useState<"file" | "folder" | null>(null)
+  const [workspaceCreateName, setWorkspaceCreateName] = useState("")
+  const [workspaceCreateParentPath, setWorkspaceCreateParentPath] = useState("")
 
   const [terminalHistory, setTerminalHistory] = useState<{type: string, text: string}[]>([
     { type: "system", text: "Luminescent OS v1.2.0 initialized." },
@@ -711,18 +1226,20 @@ export function IdeationDashboard() {
     setTerminalInput("");
   }
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   const features = useMemo(() => buildFeatures(brief), [brief])
   const selectedFeature = features.find((item) => item.id === selectedFeatureId) ?? features[0]
   const userStories = useMemo(() => buildUserStories(selectedFeature, brief), [selectedFeature, brief])
   const selectedStory = userStories.find((item) => item.id === selectedStoryId) ?? userStories[0]
-  const generatedFiles = useMemo(() => buildWorkspaceFiles(brief, selectedFeature, selectedStory), [brief, selectedFeature, selectedStory])
   const schemaDiagram = useMemo(() => parseSchemaDiagram(brief.dbSchema), [brief.dbSchema])
-  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
+  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>(() => buildWorkspaceFolders())
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(() =>
+    buildWorkspaceFiles(initialBrief, buildFeatures(initialBrief)[0], buildUserStories(buildFeatures(initialBrief)[0], initialBrief)[0])
+  )
   const activeFile = workspaceFiles.find((file) => file.id === selectedFileId) ?? workspaceFiles[0]
+  const previewDocument = useMemo(
+    () => buildPreviewDocument(brief, selectedFeature, selectedStory, workspaceFiles),
+    [brief, selectedFeature, selectedStory, workspaceFiles]
+  )
   const documentationProgress = useMemo(() => {
     const checks = [
       brief.title.trim(),
@@ -740,21 +1257,21 @@ export function IdeationDashboard() {
     return Math.round((filled / checks.length) * 100)
   }, [brief])
 
-  useEffect(() => {
-    if (!workspaceFiles.some((file) => file.id === selectedFileId)) {
-      setSelectedFileId(workspaceFiles[0]?.id ?? "")
-    }
-  }, [workspaceFiles, selectedFileId])
-
-  useEffect(() => {
-    setWorkspaceFiles(generatedFiles)
-  }, [generatedFiles])
-
   function addActivity(title: string, detail: string) {
     setActivity((current) => [
       { id: `a-${Date.now()}-${current.length}`, title, detail, time: "Acum" },
       ...current,
     ])
+  }
+
+  function resetWorkspace(nextBrief: BriefState, nextFeature: Feature, nextStory: UserStory) {
+    const nextFolders = buildWorkspaceFolders()
+    const nextFiles = buildWorkspaceFiles(nextBrief, nextFeature, nextStory)
+
+    setWorkspaceFolders(nextFolders)
+    setWorkspaceFiles(nextFiles)
+    setSelectedFileId(nextFiles[0]?.id ?? "")
+    setSelectedExplorerPath(nextFolders[0]?.path ?? "")
   }
 
   function handleSpeakerChange(speaker: HumanSpeaker) {
@@ -783,6 +1300,72 @@ export function IdeationDashboard() {
     if (detail) {
       addActivity(`Moved to ${stage}`, detail)
     }
+  }
+
+  function openWorkspaceFile(fileId: string) {
+    const file = workspaceFiles.find((entry) => entry.id === fileId)
+    if (!file) return
+
+    setSelectedFileId(file.id)
+    setSelectedExplorerPath(getWorkspaceParentPath(file.path))
+  }
+
+  function startWorkspaceCreation(kind: "file" | "folder", parentPath = selectedExplorerPath) {
+    setWorkspaceCreateKind(kind)
+    setWorkspaceCreateParentPath(parentPath)
+    setWorkspaceCreateName("")
+  }
+
+  function cancelWorkspaceCreation() {
+    setWorkspaceCreateKind(null)
+    setWorkspaceCreateName("")
+  }
+
+  function submitWorkspaceCreation() {
+    const trimmedName = workspaceCreateName.trim()
+    if (!workspaceCreateKind || !trimmedName) return
+
+    const fullPath = joinWorkspacePath(workspaceCreateParentPath, trimmedName)
+
+    if (
+      workspaceFiles.some((file) => file.path === fullPath) ||
+      workspaceFolders.some((folder) => folder.path === fullPath)
+    ) {
+      addActivity("Workspace unchanged", `${fullPath} există deja în explorer.`)
+      cancelWorkspaceCreation()
+      return
+    }
+
+    if (workspaceCreateKind === "folder") {
+      const nextFolder: WorkspaceFolder = {
+        id: `folder-${Date.now()}`,
+        name: getWorkspaceName(fullPath),
+        path: fullPath,
+      }
+
+      setWorkspaceFolders((current) =>
+        [...current, nextFolder].sort((left, right) => left.path.localeCompare(right.path))
+      )
+      setSelectedExplorerPath(nextFolder.path)
+      addActivity("Folder created", `${nextFolder.path} a fost adăugat în workspace.`)
+      cancelWorkspaceCreation()
+      return
+    }
+
+    const nextFile: WorkspaceFile = {
+      id: `file-${Date.now()}`,
+      name: getWorkspaceName(fullPath),
+      path: fullPath,
+      content: createDefaultFileContent(fullPath),
+    }
+
+    setWorkspaceFiles((current) =>
+      [...current, nextFile].sort((left, right) => left.path.localeCompare(right.path))
+    )
+    setSelectedFileId(nextFile.id)
+    setSelectedExplorerPath(getWorkspaceParentPath(nextFile.path))
+    addActivity("File created", `${nextFile.path} este gata de editare.`)
+    cancelWorkspaceCreation()
   }
 
   function updateActiveFileContent(nextContent: string) {
@@ -975,12 +1558,13 @@ export function IdeationDashboard() {
   }
 
   function approveStory() {
+    resetWorkspace(brief, selectedFeature, selectedStory)
     addActivity("Scaffold ready", `${selectedStory.id} trimisă spre backend engine.`)
     moveToStage("Final Code", "Geneză cod sursă finalizată.")
   }
 
   function regenerateCode() {
-    setSelectedStoryId((current) => current)
+    resetWorkspace(brief, selectedFeature, selectedStory)
     addActivity("Code regenerated", "Comentariile și structura finală au fost reîmprospătate.")
   }
 
@@ -1000,10 +1584,69 @@ export function IdeationDashboard() {
     setCurrentStage("Conversation")
     setSelectedFeatureId("FEAT-01")
     setSelectedStoryId("US-01")
-    setSelectedFileId("file-brief")
+    resetWorkspace(initialBrief, buildFeatures(initialBrief)[0], buildUserStories(buildFeatures(initialBrief)[0], initialBrief)[0])
     setAppGenerated(false)
     setPreviewOpened(false)
     addActivity("Flow restarted", "Experiența a fost resetată la conversația inițială.")
+  }
+
+  function renderExplorerTree(parentPath = "", depth = 0): ReactNode {
+    const folders = workspaceFolders
+      .filter((folder) => getWorkspaceParentPath(folder.path) === parentPath)
+      .sort((left, right) => left.path.localeCompare(right.path))
+    const files = workspaceFiles
+      .filter((file) => getWorkspaceParentPath(file.path) === parentPath)
+      .sort((left, right) => left.path.localeCompare(right.path))
+
+    return (
+      <>
+        {folders.map((folder) => {
+          const isSelectedFolder = selectedExplorerPath === folder.path
+
+          return (
+            <div key={folder.id} className="space-y-0.5">
+              <button
+                type="button"
+                onClick={() => setSelectedExplorerPath(folder.path)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[12px] transition-all",
+                  isSelectedFolder
+                    ? "border-primary/20 bg-primary/8 text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+                style={{ paddingLeft: `${depth * 12 + 10}px` }}
+              >
+                <Icon name="folder" className={cn("size-3.5 shrink-0", isSelectedFolder ? "text-primary" : "opacity-80")} />
+                <span className="truncate">{folder.name}</span>
+              </button>
+              {renderExplorerTree(folder.path, depth + 1)}
+            </div>
+          )
+        })}
+
+        {files.map((file) => {
+          const isActive = activeFile?.id === file.id
+
+          return (
+            <button
+              key={file.id}
+              type="button"
+              onClick={() => openWorkspaceFile(file.id)}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-[12px] transition-all",
+                isActive
+                  ? "border-primary/20 bg-primary/10 text-primary font-medium"
+                  : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+              style={{ paddingLeft: `${depth * 12 + 10}px` }}
+            >
+              <Icon name="file" className="size-3.5 shrink-0 opacity-80" />
+              <span className="truncate">{file.name}</span>
+            </button>
+          )
+        })}
+      </>
+    )
   }
 
   const filteredStages = stages.filter((stage) => stage.toLowerCase().includes(search.toLowerCase()))
@@ -1052,16 +1695,14 @@ export function IdeationDashboard() {
           <Badge variant="outline" className="hidden rounded-full border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-widest text-primary sm:inline-flex">
             Userflow First
           </Badge>
-          {mounted && (
-            <Button
-              size="icon"
-              variant="outline"
-              className="size-8 rounded-[8px] border-border/40 bg-muted/30 text-foreground/80 shadow-inner hover:bg-muted"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            >
-              <Icon name={theme === "dark" ? "sun" : "moon"} className="size-4" />
-            </Button>
-          )}
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-8 rounded-[8px] border-border/40 bg-muted/30 text-foreground/80 shadow-inner hover:bg-muted"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            <Icon name={theme === "dark" ? "sun" : "moon"} className="size-4" />
+          </Button>
           <Button
             size="sm"
             className="h-8 rounded-[8px] bg-primary text-[12px] font-medium text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_3px_rgba(16,185,129,0.2)] transition-all hover:bg-primary/95"
@@ -1622,6 +2263,7 @@ export function IdeationDashboard() {
                           variant="outline"
                           onClick={() => {
                             chooseStory(story.id)
+                            resetWorkspace(brief, selectedFeature, story)
                             moveToStage("Final Code", "Codul final a fost generat din User Story-ul ales.")
                           }}
                         >
@@ -1655,21 +2297,61 @@ export function IdeationDashboard() {
                 <div className="flex min-h-0 flex-1">
                   {/* File Explorer */}
                   <div className="hidden w-56 shrink-0 border-r border-border/40 bg-background/10 md:block">
-                    <div className="px-3 flex items-center h-8 text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground border-b border-border/40">EXPLORER</div>
-                    <div className="space-y-0.5 p-2">
-                      {workspaceFiles.map((file) => (
+                    <div className="flex h-8 items-center justify-between border-b border-border/40 px-3 text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground">
+                      <span>Explorer</span>
+                      <div className="flex items-center gap-1">
                         <button
-                          key={file.id}
-                          onClick={() => setSelectedFileId(file.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-sm border px-2 py-1 text-left text-[12px] transition-all",
-                            activeFile.id === file.id ? "border-primary/20 bg-primary/10 text-primary font-medium" : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                          )}
+                          type="button"
+                          onClick={() => startWorkspaceCreation("folder")}
+                          className="rounded px-1.5 py-0.5 text-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                          <Icon name="file" className="size-3.5 shrink-0 opacity-80" />
-                          <span className="truncate">{file.name}</span>
+                          +Dir
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => startWorkspaceCreation("file")}
+                          className="rounded px-1.5 py-0.5 text-[9px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                          +File
+                        </button>
+                      </div>
+                    </div>
+                    <div className="border-b border-border/30 px-3 py-2">
+                      <div className="text-[9px] font-mono uppercase tracking-[0.14em] text-muted-foreground/70">
+                        Target: {selectedExplorerPath || "root"}
+                      </div>
+                      {workspaceCreateKind ? (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            value={workspaceCreateName}
+                            onChange={(event) => setWorkspaceCreateName(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault()
+                                submitWorkspaceCreation()
+                              }
+                              if (event.key === "Escape") {
+                                event.preventDefault()
+                                cancelWorkspaceCreation()
+                              }
+                            }}
+                            placeholder={workspaceCreateKind === "file" ? "new-file.ts" : "new-folder"}
+                            className="h-8 rounded-lg border-border/50 bg-background/70 px-3 text-[11px]"
+                            autoFocus
+                          />
+                          <div className="flex gap-1.5">
+                            <Button size="sm" onClick={submitWorkspaceCreation} className="h-7 px-2 text-[10px]">
+                              Create
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={cancelWorkspaceCreation} className="h-7 px-2 text-[10px]">
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="space-y-0.5 p-2">
+                      {renderExplorerTree()}
                     </div>
                   </div>
                   
@@ -1679,11 +2361,12 @@ export function IdeationDashboard() {
                       {workspaceFiles.map((file) => (
                         <button
                           key={file.id}
-                          onClick={() => setSelectedFileId(file.id)}
+                          onClick={() => openWorkspaceFile(file.id)}
                           className={cn(
                             "flex items-center gap-2 px-3 py-1.5 min-w-[120px] max-w-[200px] border-r border-border/40 text-[11px] font-mono transition-colors",
-                            activeFile.id === file.id ? "bg-background text-foreground border-t-[2px] border-t-primary" : "text-muted-foreground hover:bg-muted/50 border-t-[2px] border-t-transparent"
+                            activeFile?.id === file.id ? "bg-background text-foreground border-t-[2px] border-t-primary" : "text-muted-foreground hover:bg-muted/50 border-t-[2px] border-t-transparent"
                           )}
+                          title={file.path}
                         >
                           <Icon name="file" className="size-3 shrink-0" />
                           <span className="truncate">{file.name}</span>
@@ -1692,6 +2375,9 @@ export function IdeationDashboard() {
                     </div>
                     
                     <div className="flex-1 relative">
+                      <div className="pointer-events-none absolute left-4 top-3 z-10 rounded-md border border-border/40 bg-background/80 px-2 py-1 text-[10px] font-mono text-muted-foreground backdrop-blur-sm">
+                        {activeFile?.path ?? "No file selected"}
+                      </div>
                       {slashMenuOpen ? (
                         <div className="absolute right-4 top-4 z-20 w-[320px] rounded-2xl border border-primary/20 bg-background/95 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.28)] backdrop-blur-xl">
                           <div className="mb-2 flex items-start justify-between gap-3">
@@ -1752,12 +2438,12 @@ export function IdeationDashboard() {
                           </div>
                         </div>
                       ) : null}
-                       <Textarea
+                      <Textarea
                         ref={editorRef}
                         value={activeFile?.content ?? ""}
                         onChange={(event) => updateActiveFileContent(event.target.value)}
                         onKeyDown={handleEditorKeyDown}
-                        className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 font-mono text-[13px] leading-[1.6] text-foreground/90 shadow-none focus-visible:ring-0"
+                        className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 pt-12 font-mono text-[13px] leading-[1.6] text-foreground/90 shadow-none focus-visible:ring-0"
                         spellCheck={false}
                       />
                     </div>
@@ -1870,22 +2556,22 @@ export function IdeationDashboard() {
                     </div>
                     <div className="mx-4 flex h-5 flex-1 items-center justify-start px-2 gap-2 rounded-[4px] border border-border/40 bg-background/50 font-mono text-[10px] text-muted-foreground">
                        <Icon name="search" className="size-3" />
-                       http://localhost:3000
+                       luminescent://live-preview
                     </div>
                   </div>
                   
                   <div className="flex-1 bg-white relative w-full h-full">
                      {appGenerated ? (
                        <iframe 
-                         src="http://localhost:3000" 
+                         srcDoc={previewDocument}
                          className="absolute inset-0 w-full h-full border-none bg-background"
                          title="App Preview"
-                         allow="allow-scripts allow-same-origin"
+                         sandbox="allow-scripts"
                        />
                      ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-card text-muted-foreground">
                          <Icon name="terminal" className="size-12 opacity-20 mb-4" />
-                         <p>Ruleaza `npm run dev` din terminalul &apos;Final Code&apos; pentru a genera app-ul.</p>
+                         <p>Apasă `Generate app preview` sau rulează `npm run dev` pentru a deschide preview-ul live din codul scris în `Final Code`.</p>
                        </div>
                      )}
                   </div>
@@ -1898,7 +2584,7 @@ export function IdeationDashboard() {
                     </Badge>
                     <h3 className="font-serif text-2xl font-semibold tracking-tight">Tot userflow-ul este conectat</h3>
                     <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-                      {previewOpened ? "Preview-ul a fost deschis și poate fi inspectat în browserul integrat." : "Deschide preview-ul după generare pentru a valida experiența cap-coadă."}
+                      {previewOpened ? "Preview-ul este alimentat live din conținutul workspace-ului Final Code." : "Deschide preview-ul pentru a vedea instant modificările făcute în workspace."}
                     </p>
                   </div>
                   <div className="mt-5 space-y-3">
