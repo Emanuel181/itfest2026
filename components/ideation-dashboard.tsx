@@ -39,6 +39,11 @@ type Message = {
   text: string
 }
 
+type BusinessSpeaker = "Alex" | "Mara"
+type TechSpeaker = "Ionut" | "Alex"
+type HumanSpeaker = BusinessSpeaker | TechSpeaker
+type BriefListKey = "audience" | "scope" | "deliverables" | "risks"
+
 type ActivityEntry = {
   id: string
   title: string
@@ -70,6 +75,17 @@ type WorkspaceFile = {
   id: string
   name: string
   content: string
+}
+
+type SchemaModel = {
+  name: string
+  fields: { name: string; type: string }[]
+}
+
+type SchemaRelation = {
+  from: string
+  to: string
+  field: string
 }
 
 const stages: StageKey[] = [
@@ -112,6 +128,45 @@ const collaborators = [
   { name: "Mara", role: "UX architect", initials: "MR", status: "rafinează userflow-ul" },
   { name: "Ionut", role: "Tech lead", initials: "IN", status: "pregătește varianta finală" },
 ]
+
+const businessSpeakers: BusinessSpeaker[] = ["Alex", "Mara"]
+const techSpeakers: TechSpeaker[] = ["Ionut", "Alex"]
+const subagents = [
+  { id: "SA-01", name: "Business AI", specialty: "Brief synthesis", stage: "Documentation", status: "active" },
+  { id: "SA-02", name: "Tech AI", specialty: "Architecture mapping", stage: "Documentation", status: "active" },
+  { id: "SA-03", name: "Security Agent", specialty: "Risk scanning", stage: "Features", status: "queued" },
+  { id: "SA-04", name: "Merge Agent", specialty: "Integration plan", stage: "Final Code", status: "standby" },
+] as const
+
+const documentationFieldMeta: Record<
+  BriefListKey,
+  { label: string; description: string; placeholder: string; accent: string }
+> = {
+  audience: {
+    label: "Audience",
+    description: "Cine beneficiază imediat de produs și ce rol are în echipă.",
+    placeholder: "Add audience segment...",
+    accent: "from-chart-2/20 via-chart-2/10 to-transparent",
+  },
+  scope: {
+    label: "Scope",
+    description: "Ce intră în MVP și stabilește ritmul de livrare.",
+    placeholder: "Define scoped capability...",
+    accent: "from-primary/20 via-primary/10 to-transparent",
+  },
+  deliverables: {
+    label: "Deliverables",
+    description: "Artefactele aprobabile care marchează progresul echipei.",
+    placeholder: "Add expected deliverable...",
+    accent: "from-chart-3/20 via-chart-3/10 to-transparent",
+  },
+  risks: {
+    label: "Risks",
+    description: "Blocaje și surse de ambiguitate pe care vrem să le prevenim devreme.",
+    placeholder: "Document risk or dependency...",
+    accent: "from-destructive/15 via-destructive/8 to-transparent",
+  },
+}
 
 const initialArchNodes = [
   { id: '1', position: { x: 100, y: 0 }, data: { label: '💻 IDE UI (Next.js)' }, type: 'input' },
@@ -158,7 +213,8 @@ const initialBrief: BriefState = {
   ],
   risks: ["Confuzie între etape", "Alegere dificilă între variante tehnice"],
   techStack: ["Next.js", "TailwindCSS", "PostgreSQL", "Supabase", "Redis"],
-  dbSchema: "model User {\n  id String @id @default(uuid())\n  email String @unique\n  role String\n}\n\nmodel Story {\n  id String @id\n  title String\n}",
+  dbSchema:
+    "model User {\n  id String @id @default(uuid())\n  email String @unique\n  role String\n  stories Story[]\n}\n\nmodel Story {\n  id String @id @default(uuid())\n  title String\n  status String\n  userId String\n  owner User @relation(fields: [userId], references: [id])\n  requirements Requirement[]\n}\n\nmodel Requirement {\n  id String @id @default(uuid())\n  title String\n  priority String\n  storyId String\n  story Story @relation(fields: [storyId], references: [id])\n}",
   architecture: "Fullstack Next.js architecture with Edge Functions and collaborative WebSocket server for real-time presence.",
 }
 
@@ -310,6 +366,83 @@ function buildAiReply(message: string) {
   return `Am preluat direcția "${toSentenceLabel(normalized, "Flow Update")}" și o împing în următorul artefact logic.`
 }
 
+function parseSchemaDiagram(schema: string) {
+  const modelRegex = /model\s+(\w+)\s*\{([\s\S]*?)\}/g
+  const scalarTypes = new Set(["String", "Int", "Boolean", "DateTime", "Float", "Decimal", "Json", "Bytes", "BigInt"])
+  const models: SchemaModel[] = []
+  const relations: SchemaRelation[] = []
+
+  for (const match of schema.matchAll(modelRegex)) {
+    const [, modelName, body] = match
+    const fields = body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("//"))
+      .map((line) => line.split(/\s+/))
+      .filter((parts) => parts.length >= 2)
+      .map(([name, rawType]) => ({
+        name,
+        type: rawType.replace(/[?\[\]]/g, ""),
+      }))
+
+    models.push({ name: modelName, fields })
+  }
+
+  const modelNames = new Set(models.map((model) => model.name))
+
+  for (const model of models) {
+    for (const field of model.fields) {
+      if (!scalarTypes.has(field.type) && modelNames.has(field.type)) {
+        const duplicate = relations.some(
+          (relation) => relation.from === model.name && relation.to === field.type && relation.field === field.name
+        )
+
+        if (!duplicate) {
+          relations.push({ from: model.name, to: field.type, field: field.name })
+        }
+      }
+    }
+  }
+
+  const nodes = models.map((model, index) => ({
+    id: model.name,
+    position: {
+      x: (index % 2) * 280,
+      y: Math.floor(index / 2) * 220,
+    },
+    data: {
+      label: `${model.name}\n${model.fields
+        .slice(0, 4)
+        .map((field) => `${field.name}: ${field.type}`)
+        .join("\n")}`,
+    },
+    style: {
+      width: 220,
+      borderRadius: 16,
+      border: "1px solid rgba(25,22,21,0.12)",
+      background: "rgba(255,255,255,0.9)",
+      padding: 14,
+      fontSize: 12,
+      lineHeight: 1.5,
+      whiteSpace: "pre-line" as const,
+      color: "#191615",
+      boxShadow: "0 12px 30px rgba(25,22,21,0.06)",
+    },
+  }))
+
+  const edges = relations.map((relation, index) => ({
+    id: `schema-${index}`,
+    source: relation.from,
+    target: relation.to,
+    animated: true,
+    label: relation.field,
+    style: { stroke: "rgba(16,185,129,0.6)", strokeWidth: 1.5 },
+    labelStyle: { fill: "rgba(25,22,21,0.65)", fontSize: 11 },
+  }))
+
+  return { models, relations, nodes, edges }
+}
+
 function Icon({ name, className }: { name: string; className?: string }) {
   const common = "size-4 stroke-[1.8]"
   switch (name) {
@@ -355,6 +488,28 @@ function Icon({ name, className }: { name: string; className?: string }) {
           <circle cx="12" cy="9" r="3" stroke="currentColor" />
           <path d="M20 19a3 3 0 0 0-3-3" stroke="currentColor" strokeLinecap="round" />
           <path d="M17 6.5a2.5 2.5 0 1 1 0 5" stroke="currentColor" strokeLinecap="round" />
+        </svg>
+      )
+    case "target":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <circle cx="12" cy="12" r="8" stroke="currentColor" />
+          <circle cx="12" cy="12" r="4" stroke="currentColor" />
+          <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+        </svg>
+      )
+    case "plus":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" />
+        </svg>
+      )
+    case "cpu":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <rect x="7" y="7" width="10" height="10" rx="2" stroke="currentColor" />
+          <path d="M9.5 1.5v3M14.5 1.5v3M9.5 19.5v3M14.5 19.5v3M1.5 9.5h3M1.5 14.5h3M19.5 9.5h3M19.5 14.5h3" stroke="currentColor" strokeLinecap="round" />
+          <path d="M10 10h4v4h-4z" stroke="currentColor" />
         </svg>
       )
     case "database":
@@ -501,8 +656,25 @@ export function IdeationDashboard() {
   const userStories = useMemo(() => buildUserStories(selectedFeature, brief), [selectedFeature, brief])
   const selectedStory = userStories.find((item) => item.id === selectedStoryId) ?? userStories[0]
   const generatedFiles = useMemo(() => buildWorkspaceFiles(brief, selectedFeature, selectedStory), [brief, selectedFeature, selectedStory])
+  const schemaDiagram = useMemo(() => parseSchemaDiagram(brief.dbSchema), [brief.dbSchema])
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
   const activeFile = workspaceFiles.find((file) => file.id === selectedFileId) ?? workspaceFiles[0]
+  const documentationProgress = useMemo(() => {
+    const checks = [
+      brief.title.trim(),
+      brief.objective.trim(),
+      ...brief.audience.map((item) => item.trim()),
+      ...brief.scope.map((item) => item.trim()),
+      ...brief.deliverables.map((item) => item.trim()),
+      ...brief.risks.map((item) => item.trim()),
+      brief.architecture.trim(),
+      ...brief.techStack.map((item) => item.trim()),
+      brief.dbSchema.trim(),
+    ]
+
+    const filled = checks.filter(Boolean).length
+    return Math.round((filled / checks.length) * 100)
+  }, [brief])
 
   useEffect(() => {
     if (!workspaceFiles.some((file) => file.id === selectedFileId)) {
@@ -519,6 +691,27 @@ export function IdeationDashboard() {
       { id: `a-${Date.now()}-${current.length}`, title, detail, time: "Acum" },
       ...current,
     ])
+  }
+
+  function handleSpeakerChange(speaker: HumanSpeaker) {
+    if (activeTab === "business" && (speaker === "Alex" || speaker === "Mara")) {
+      setActiveSpeakerBusiness(speaker)
+      return
+    }
+
+    if (activeTab === "tech" && (speaker === "Alex" || speaker === "Ionut")) {
+      setActiveSpeakerTech(speaker)
+    }
+  }
+
+  function updateBriefList(key: BriefListKey, index: number, value: string) {
+    const next = [...brief[key]]
+    next[index] = value
+    setBrief({ ...brief, [key]: next })
+  }
+
+  function addBriefListItem(key: BriefListKey) {
+    setBrief({ ...brief, [key]: [...brief[key], ""] })
   }
 
   function moveToStage(stage: StageKey, detail?: string) {
@@ -762,12 +955,12 @@ export function IdeationDashboard() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline-block">Speaking as:</span>
-                        {(activeTab === "business" ? ["Alex", "Mara"] : ["Ionut", "Alex"]).map((speaker) => (
+                        {(activeTab === "business" ? businessSpeakers : techSpeakers).map((speaker) => (
                           <Button
                             key={speaker}
                             size="sm"
                             variant={(activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech) === speaker ? "secondary" : "outline"}
-                            onClick={() => activeTab === "business" ? setActiveSpeakerBusiness(speaker as any) : setActiveSpeakerTech(speaker as any)}
+                            onClick={() => handleSpeakerChange(speaker)}
                             className={cn("h-7 rounded px-3 text-[10px]", (activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech) === speaker ? "bg-primary/20 text-primary border-primary/30" : "")}
                           >
                             {speaker}
@@ -865,170 +1058,243 @@ export function IdeationDashboard() {
                   </Button>
                 }
               />
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-background/30">
-                <Card className="flex flex-col rounded-[16px] border-border/40 bg-card/70 p-8 md:p-12 w-full max-w-[860px] shadow-sm min-h-full relative">
-                  <div className="flex-1 space-y-8">
-                    {/* Title */}
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono uppercase tracking-[0.2em] text-primary/70">Project Title</label>
-                      <Textarea
-                        value={brief.title}
-                        onChange={(event) => setBrief({ ...brief, title: event.target.value })}
-                        rows={1}
-                        className="min-h-0 resize-none border-none bg-transparent p-0 text-[32px] sm:text-[40px] font-serif font-bold tracking-tight shadow-none outline-none focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground leading-[1.1] rounded-none py-1"
-                      />
-                    </div>
-                    
-                    {/* TABS */}
-                    <div className="flex gap-2 border-b border-border/20 pb-4">
-                      <Button size="sm" variant={docTab === "business" ? "default" : "outline"} onClick={() => setDocTab("business")} className="rounded-full px-5 h-8 text-[12px] transition-all">Business Plan</Button>
-                      <Button size="sm" variant={docTab === "tech" ? "default" : "outline"} onClick={() => setDocTab("tech")} className="rounded-full px-5 h-8 text-[12px] transition-all">Technical Architecture</Button>
+              <div className="flex-1 overflow-y-auto bg-background/20 px-4 py-6 md:px-8 md:py-8">
+                <div className="mx-auto max-w-4xl">
+                  <div className="space-y-8">
+                    <div className="space-y-5">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="rounded-md border-border/50 bg-background/70 text-foreground/80">Draft</Badge>
+                        <Badge variant="outline" className="rounded-md border-border/50 bg-background/70 text-foreground/80">AI Synced</Badge>
+                        <Badge variant="outline" className="rounded-md border-border/50 bg-background/70 text-foreground/80">{documentationProgress}% complete</Badge>
+                      </div>
+
+                      <div id="overview" className="space-y-3">
+                        <Textarea
+                          value={brief.title}
+                          onChange={(event) => setBrief({ ...brief, title: event.target.value })}
+                          rows={1}
+                          className="min-h-0 resize-none border-none bg-transparent p-0 text-[40px] font-bold leading-tight tracking-tight text-foreground shadow-none outline-none placeholder:text-muted-foreground/30 focus-visible:ring-0 sm:text-[54px]"
+                        />
+                        <p className="max-w-3xl text-[15px] leading-8 text-muted-foreground">
+                          {docTab === "business"
+                            ? "Un brief clar, editabil, care poate fi aprobat rapid de echipă înainte de generarea feature-urilor."
+                            : "O pagină tehnică simplă pentru validarea arhitecturii, stack-ului și a modelului de date."}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="inline-flex rounded-lg border border-border/40 bg-background/70 p-1">
+                          <Button
+                            size="sm"
+                            variant={docTab === "business" ? "default" : "ghost"}
+                            onClick={() => setDocTab("business")}
+                            className="h-8 rounded-md px-4 text-[12px]"
+                          >
+                            Business Plan
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={docTab === "tech" ? "default" : "ghost"}
+                            onClick={() => setDocTab("tech")}
+                            className="h-8 rounded-md px-4 text-[12px]"
+                          >
+                            Technical Architecture
+                          </Button>
+                        </div>
+                        <span className="text-[12px] text-muted-foreground">Source: Team Conversation</span>
+                      </div>
                     </div>
 
-                    {docTab === "business" && (
-                      <div className="space-y-10 animate-in fade-in zoom-in-95 duration-200">
-                        {/* Objective */}
-                        <div className="rounded-[16px] border border-border/40 bg-card/40 p-5 shadow-sm transition-colors hover:bg-card/60">
-                          <label className="mb-3 flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary/80">
-                            <Icon name="target" className="size-3.5" /> Core Objective
-                          </label>
-                          <Textarea
-                            value={brief.objective}
-                            onChange={(event) => setBrief({ ...brief, objective: event.target.value })}
-                            className="min-h-[100px] border-none bg-transparent p-0 text-[14.5px] leading-[1.8] shadow-none outline-none focus-visible:ring-0 text-foreground/90 resize-none"
-                            placeholder="What is the main goal of this product?"
-                          />
-                        </div>
-                        
-                        {/* Array Fields */}
-                        <div className="grid gap-6 md:grid-cols-2">
-                           {(["audience", "scope", "deliverables", "risks"] as const).map((key) => (
-                              <div key={key} className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm transition-colors hover:bg-card/40">
-                                <div className="flex items-center justify-between mb-4">
-                                  <label className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground/90">{key}</label>
-                                  <Button size="sm" variant="ghost" onClick={() => setBrief({ ...brief, [key]: [...brief[key], ""] })} className="h-7 w-7 p-0 rounded-full hover:bg-primary/20 text-primary bg-primary/10">
+                    <Separator className="bg-border/40" />
+
+                    <div className="space-y-10">
+                      {docTab === "business" && (
+                        <div className="space-y-10 animate-in fade-in duration-200">
+                          <section id="objective" className="space-y-3">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Objective</div>
+                            <Textarea
+                              value={brief.objective}
+                              onChange={(event) => setBrief({ ...brief, objective: event.target.value })}
+                              className="min-h-[140px] resize-none border-none bg-transparent p-0 text-[16px] leading-8 text-foreground/90 shadow-none outline-none focus-visible:ring-0"
+                              placeholder="What is the main goal of this product?"
+                            />
+                          </section>
+
+                          <div className="space-y-10">
+                            {(["audience", "scope", "deliverables", "risks"] as BriefListKey[]).map((key) => (
+                              <section key={key} id={key} className="space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <h3 className="text-[24px] font-semibold tracking-tight text-foreground">{documentationFieldMeta[key].label}</h3>
+                                    <p className="mt-1 text-[14px] leading-7 text-muted-foreground">{documentationFieldMeta[key].description}</p>
+                                  </div>
+                                  <Button size="icon-sm" variant="ghost" onClick={() => addBriefListItem(key)} className="rounded-md">
                                     <Icon name="plus" className="size-3.5" />
                                   </Button>
                                 </div>
+
                                 <div className="space-y-2">
                                   {brief[key].map((item, index) => (
-                                    <div key={`${key}-${index}`} className="relative group flex items-center">
-                                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 rounded-l-[4px] group-focus-within:bg-primary transition-colors" />
+                                    <div key={`${key}-${index}`} className="flex items-start gap-3">
+                                      <span className="pt-3 text-sm text-muted-foreground">•</span>
                                       <Input
                                         value={item}
-                                        onChange={(event) => {
-                                          const next = [...brief[key]]
-                                          next[index] = event.target.value
-                                          setBrief({ ...brief, [key]: next })
-                                        }}
-                                        className="h-9 border-none bg-background/50 pl-3 pr-2 text-[13px] shadow-sm focus-visible:ring-1 focus-visible:ring-primary/20 rounded-r-[6px] rounded-l-none transition-all placeholder:text-muted-foreground/40"
-                                        placeholder={`Define ${key}...`}
+                                        onChange={(event) => updateBriefList(key, index, event.target.value)}
+                                        className="h-11 rounded-lg border-border/30 bg-transparent px-0 text-[15px] shadow-none focus-visible:ring-0"
+                                        placeholder={documentationFieldMeta[key].placeholder}
                                       />
                                     </div>
                                   ))}
                                 </div>
-                              </div>
+                              </section>
                             ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {docTab === "tech" && (
-                      <div className="space-y-10 animate-in fade-in zoom-in-95 duration-200">
-                        {/* Architecture */}
-                        <div className="rounded-[16px] border border-border/40 bg-card/40 p-5 shadow-sm transition-colors hover:bg-card/60">
-                          <label className="mb-3 flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary/80">
-                             <Icon name="cpu" className="size-3.5" /> System Architecture Abstract
-                          </label>
-                          <Textarea
-                            value={brief.architecture}
-                            onChange={(event) => setBrief({ ...brief, architecture: event.target.value })}
-                            className="min-h-[60px] border-none bg-transparent p-0 text-[14.5px] leading-[1.8] shadow-none outline-none focus-visible:ring-0 text-foreground/90 resize-none"
-                            placeholder="Describe how the components interact..."
-                          />
-                        </div>
-                        
-                        {/* Arrays for Stack + DB */}
-                        <div className="grid gap-6 md:grid-cols-2">
-                           <div className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm transition-colors hover:bg-card/40">
-                              <div className="flex items-center justify-between mb-4">
-                                <label className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground/90">Tech Stack</label>
-                                <Button size="sm" variant="ghost" onClick={() => setBrief({ ...brief, techStack: [...brief.techStack, ""] })} className="h-7 w-7 p-0 rounded-full hover:bg-primary/20 bg-primary/10 text-primary">
-                                  <Icon name="plus" className="size-3.5" />
-                                </Button>
-                              </div>
-                              <div className="space-y-2">
-                                {brief.techStack.map((item, index) => (
-                                  <div key={`tech-${index}`} className="relative group flex items-center">
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/30 rounded-l-[4px] group-focus-within:bg-emerald-500 transition-colors" />
-                                    <Input
-                                      value={item}
-                                      onChange={(event) => {
-                                        const next = [...brief.techStack]
-                                        next[index] = event.target.value
-                                        setBrief({ ...brief, techStack: next })
-                                      }}
-                                      className="h-9 border-none bg-background/50 pl-3 pr-2 text-[13px] shadow-sm font-mono focus-visible:ring-1 focus-visible:ring-emerald-500/20 rounded-r-[6px] rounded-l-none placeholder:text-muted-foreground/40"
-                                      placeholder="Add stack component..."
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                           </div>
-                           
-                           <div className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm flex flex-col transition-colors hover:bg-card/40">
-                              <div className="flex items-center justify-between mb-4">
-                                <label className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground/90">Database Schema</label>
-                              </div>
-                              <Textarea
-                                value={brief.dbSchema}
-                                onChange={(event) => setBrief({ ...brief, dbSchema: event.target.value })}
-                                className="flex-1 min-h-[200px] font-mono text-[12.5px] bg-black/40 text-emerald-400/90 border-none rounded-[8px] p-4 shadow-inner resize-none focus-visible:ring-1 focus-visible:ring-emerald-500/30 leading-relaxed scrollbar-thin scrollbar-thumb-emerald-500/20"
-                                placeholder="model User { ... }"
-                              />
-                           </div>
-                        </div>
-
-                        {/* Interactive Architecture Map */}
-                        <div className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm space-y-4">
-                          <label className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary/80">
-                             <div className="relative flex items-center justify-center size-2">
-                               <div className="absolute inset-0 rounded-full bg-primary/40 animate-ping" />
-                               <div className="relative size-1.5 rounded-full bg-primary" />
-                             </div>
-                             Live Architecture Blueprint
-                          </label>
-                          <div className="w-full h-[400px] md:h-[500px] relative rounded-[12px] border border-border/40 overflow-hidden bg-background/40 shadow-inner isolation-auto">
-                            <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
-                              <ReactFlow 
-                                style={{ width: '100%', height: '100%' }}
-                                nodes={initialArchNodes} 
-                                edges={initialArchEdges} 
-                                fitView
-                                fitViewOptions={{ padding: 0.2 }}
-                                zoomOnScroll={true}
-                                panOnScroll={false}
-                                selectionOnDrag={false}
-                              >
-                                <Background gap={16} size={1} color="rgba(255,255,255,0.05)" />
-                                <Controls showInteractive={false} className="fill-foreground bg-card border-border/40" />
-                              </ReactFlow>
-                            </div>
                           </div>
-                          <p className="text-[10px] text-muted-foreground/50 text-center font-medium tracking-wide">INTERACTIVE CANVAS — PAN & ZOOM ENABLED</p>
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {docTab === "tech" && (
+                        <div className="space-y-10 animate-in fade-in duration-200">
+                          <section id="architecture" className="space-y-3">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Architecture</div>
+                            <Textarea
+                              value={brief.architecture}
+                              onChange={(event) => setBrief({ ...brief, architecture: event.target.value })}
+                              className="min-h-[180px] resize-none border-none bg-transparent p-0 text-[16px] leading-8 text-foreground/90 shadow-none outline-none focus-visible:ring-0"
+                              placeholder="Describe how the components interact..."
+                            />
+                          </section>
+
+                          <section id="blueprint" className="space-y-4">
+                            <div>
+                              <h3 className="text-[24px] font-semibold tracking-tight text-foreground">Architecture Blueprint</h3>
+                              <p className="mt-1 text-[14px] leading-7 text-muted-foreground">O vedere vizuală simplă asupra componentelor majore.</p>
+                            </div>
+                            <div className="relative h-[360px] overflow-hidden rounded-xl border border-border/40 bg-background/50 shadow-inner md:h-[460px]">
+                              <div style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                                <ReactFlow
+                                  style={{ width: "100%", height: "100%" }}
+                                  nodes={initialArchNodes}
+                                  edges={initialArchEdges}
+                                  fitView
+                                  fitViewOptions={{ padding: 0.2 }}
+                                  zoomOnScroll
+                                  panOnScroll={false}
+                                  selectionOnDrag={false}
+                                >
+                                  <Background gap={16} size={1} color="rgba(255,255,255,0.05)" />
+                                  <Controls showInteractive={false} className="fill-foreground border-border/40 bg-card" />
+                                </ReactFlow>
+                              </div>
+                            </div>
+                          </section>
+
+                          <section id="stack" className="space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <h3 className="text-[24px] font-semibold tracking-tight text-foreground">Tech Stack</h3>
+                                <p className="mt-1 text-[14px] leading-7 text-muted-foreground">Componentele de bază ale implementării.</p>
+                              </div>
+                              <Button size="icon-sm" variant="ghost" onClick={() => setBrief({ ...brief, techStack: [...brief.techStack, ""] })} className="rounded-md">
+                                <Icon name="plus" className="size-3.5" />
+                              </Button>
+                            </div>
+
+                            <div className="space-y-2">
+                              {brief.techStack.map((item, index) => (
+                                <div key={`tech-${index}`} className="flex items-start gap-3">
+                                  <span className="pt-3 text-sm text-muted-foreground">•</span>
+                                  <Input
+                                    value={item}
+                                    onChange={(event) => {
+                                      const next = [...brief.techStack]
+                                      next[index] = event.target.value
+                                      setBrief({ ...brief, techStack: next })
+                                    }}
+                                    className="h-11 rounded-lg border-border/30 bg-transparent px-0 font-mono text-[15px] shadow-none focus-visible:ring-0"
+                                    placeholder="Add stack component..."
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+
+                          <section id="schema" className="space-y-4">
+                            <div>
+                              <h3 className="text-[24px] font-semibold tracking-tight text-foreground">Database Schema</h3>
+                              <p className="mt-1 text-[14px] leading-7 text-muted-foreground">Editorul și diagrama live rămân sincronizate, ca să vezi imediat relațiile dintre modele.</p>
+                            </div>
+                            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                              <div className="overflow-hidden rounded-xl border border-border/40 bg-background/60">
+                                <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+                                  <span className="font-mono text-[11px] text-muted-foreground">schema.prisma</span>
+                                  <span className="text-[11px] text-muted-foreground">{schemaDiagram.models.length} models</span>
+                                </div>
+                                <Textarea
+                                  value={brief.dbSchema}
+                                  onChange={(event) => setBrief({ ...brief, dbSchema: event.target.value })}
+                                  className="min-h-[320px] resize-none border-none bg-transparent p-4 font-mono text-[13px] leading-7 text-foreground/88 shadow-none focus-visible:ring-0"
+                                  placeholder="model User { ... }"
+                                />
+                              </div>
+
+                              <div className="overflow-hidden rounded-xl border border-border/40 bg-background/60">
+                                <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+                                  <span className="text-[11px] text-muted-foreground">Schema Map</span>
+                                  <span className="text-[11px] text-muted-foreground">{schemaDiagram.relations.length} relations</span>
+                                </div>
+                                <div className="space-y-3 p-4">
+                                  <div className="relative h-[320px] overflow-hidden rounded-lg border border-border/30 bg-background/70">
+                                    <div style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                                      <ReactFlow
+                                        style={{ width: "100%", height: "100%" }}
+                                        nodes={schemaDiagram.nodes}
+                                        edges={schemaDiagram.edges}
+                                        fitView
+                                        fitViewOptions={{ padding: 0.2 }}
+                                        zoomOnScroll
+                                        panOnScroll={false}
+                                        selectionOnDrag={false}
+                                      >
+                                        <Background gap={18} size={1} color="rgba(25,22,21,0.08)" />
+                                        <Controls showInteractive={false} className="fill-foreground border-border/40 bg-card" />
+                                      </ReactFlow>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    {schemaDiagram.relations.length > 0 ? (
+                                      schemaDiagram.relations.map((relation) => (
+                                        <div key={`${relation.from}-${relation.field}`} className="rounded-lg border border-border/30 bg-background/70 px-3 py-2 text-[12px] text-foreground/85">
+                                          <span className="font-medium">{relation.from}</span>
+                                          {" -> "}
+                                          <span className="font-medium">{relation.to}</span>
+                                          <span className="text-muted-foreground"> via `{relation.field}`</span>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="rounded-lg border border-dashed border-border/40 px-3 py-3 text-[12px] text-muted-foreground">
+                                        Nu am detectat încă relații între modele. Adaugă câmpuri care referă alte modele pentru a vedea conexiunile.
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </section>
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator className="bg-border/40" />
+
+                    <div className="flex items-center justify-between gap-4 pb-8">
+                      <p className="text-[13px] text-muted-foreground">Ready to move this page into feature generation.</p>
+                      <Button onClick={approveDocumentation} size="sm" className="h-10 rounded-md bg-primary px-5 text-[12px] font-medium text-primary-foreground transition-all hover:bg-primary/90">
+                        Generate Features <Icon name="play" className="size-3" />
+                      </Button>
+                    </div>
                   </div>
-                  
-                  {/* GENERATE BUTTON */}
-                  <div className="mt-12 pt-6 border-t border-border/40 flex justify-end items-center gap-3 shrink-0">
-                    <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline-block">Ready to proceed?</span>
-                    <Button onClick={approveDocumentation} size="sm" className="h-9 px-5 text-[12px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_2px_10px_rgba(16,185,129,0.2)] rounded-[8px] transition-all gap-2">
-                      Generate Features <Icon name="play" className="size-3" />
-                    </Button>
-                  </div>
-                </Card>
+                </div>
               </div>
             </div>
           )}
@@ -1289,7 +1555,7 @@ export function IdeationDashboard() {
                 rightNode={
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={openPreviewWindow} className="h-[22px] px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
-                      Open preview
+                      {previewOpened ? "Preview active" : "Open preview"}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => moveToStage("Final Code", "S-a revenit la codul final pentru ajustări.")} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
                       Back to code
@@ -1320,9 +1586,9 @@ export function IdeationDashboard() {
                          allow="allow-scripts allow-same-origin"
                        />
                      ) : (
-                       <div className="h-full w-full flex flex-col items-center justify-center bg-card text-muted-foreground">
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-card text-muted-foreground">
                          <Icon name="terminal" className="size-12 opacity-20 mb-4" />
-                         <p>Ruleaza `npm run dev` din terminalul 'Final Code' pentru a genera app-ul.</p>
+                         <p>Ruleaza `npm run dev` din terminalul &apos;Final Code&apos; pentru a genera app-ul.</p>
                        </div>
                      )}
                   </div>
@@ -1334,6 +1600,9 @@ export function IdeationDashboard() {
                       Flow recap
                     </Badge>
                     <h3 className="font-serif text-2xl font-semibold tracking-tight">Tot userflow-ul este conectat</h3>
+                    <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+                      {previewOpened ? "Preview-ul a fost deschis și poate fi inspectat în browserul integrat." : "Deschide preview-ul după generare pentru a valida experiența cap-coadă."}
+                    </p>
                   </div>
                   <div className="mt-5 space-y-3">
                     {stages.map((stage) => (
@@ -1374,6 +1643,77 @@ export function IdeationDashboard() {
                       </p>
                       <p className="truncate text-[11px] font-medium text-muted-foreground/80">{collaborator.status}</p>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Separator className="bg-border/40" />
+
+            <div className="space-y-4">
+              <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
+                <div className="size-1.5 rounded-full bg-primary shadow-sm" />
+                Agent Activity
+              </h4>
+              <div className="space-y-3">
+                {activity.slice(0, 5).map((entry) => (
+                  <div key={entry.id} className="rounded-[12px] border border-border/40 bg-background/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[12px] font-semibold text-foreground/90">{entry.title}</p>
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-primary/80">{entry.time}</span>
+                    </div>
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{entry.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Separator />
+            <div className="space-y-4 shrink-0">
+              <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
+                <div className="size-1.5 rounded-full bg-primary shadow-sm" />
+                Subagents
+              </h4>
+              <div className="space-y-3">
+                {subagents.map((agent) => (
+                  <div key={agent.id} className="rounded-[12px] border border-border/40 bg-background/65 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-[12px] font-semibold text-foreground/90">{agent.name}</div>
+                        <div className="text-[11px] text-muted-foreground">{agent.specialty}</div>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-full text-[9px] uppercase tracking-[0.14em]",
+                          agent.status === "active"
+                            ? "border-primary/20 bg-primary/10 text-primary"
+                            : "border-border/60 bg-background/60 text-muted-foreground"
+                        )}
+                      >
+                        {agent.status}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 text-[10px] font-mono uppercase tracking-[0.16em] text-muted-foreground/60">
+                      Next stage: {agent.stage}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Separator />
+            <div className="space-y-4 min-h-0">
+              <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
+                <div className="size-1.5 rounded-full bg-chart-4 shadow-sm" />
+                Activity Feed
+              </h4>
+              <div className="space-y-3">
+                {activity.slice(0, 6).map((entry) => (
+                  <div key={entry.id} className="rounded-[12px] border border-border/40 bg-background/65 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[12px] font-semibold text-foreground/90">{entry.title}</div>
+                      <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">{entry.time}</span>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{entry.detail}</p>
                   </div>
                 ))}
               </div>
