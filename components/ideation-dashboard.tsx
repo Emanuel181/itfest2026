@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useTheme } from "next-themes"
+import { ReactFlow, Controls, Background } from "@xyflow/react"
+import "@xyflow/react/dist/style.css"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -13,8 +15,8 @@ import { cn } from "@/lib/utils"
 type StageKey =
   | "Conversation"
   | "Documentation"
-  | "Use Cases"
-  | "Variants"
+  | "Features"
+  | "User Stories"
   | "Final Code"
   | "Preview"
 
@@ -25,11 +27,14 @@ type BriefState = {
   scope: string[]
   deliverables: string[]
   risks: string[]
+  techStack: string[]
+  dbSchema: string
+  architecture: string
 }
 
 type Message = {
   id: string
-  author: "Alex" | "Mara" | "Ionut" | "AI Copilot"
+  author: "Alex" | "Mara" | "Ionut" | "AI Copilot" | "Business AI" | "Tech AI"
   role: "human" | "ai"
   text: string
 }
@@ -41,15 +46,16 @@ type ActivityEntry = {
   time: string
 }
 
-type UseCase = {
+type Feature = {
   id: string
   title: string
   summary: string
   preview: string
+  variations: string[]
   acceptance: string[]
 }
 
-type Variant = {
+type UserStory = {
   id: string
   title: string
   stack: string
@@ -69,8 +75,8 @@ type WorkspaceFile = {
 const stages: StageKey[] = [
   "Conversation",
   "Documentation",
-  "Use Cases",
-  "Variants",
+  "Features",
+  "User Stories",
   "Final Code",
   "Preview",
 ]
@@ -78,18 +84,18 @@ const stages: StageKey[] = [
 const stageNumbers: Record<StageKey, string> = {
   Conversation: "01",
   Documentation: "02",
-  "Use Cases": "03",
-  Variants: "04",
+  Features: "03",
+  "User Stories": "04",
   "Final Code": "05",
   Preview: "06",
 }
 
 const stageDescriptions: Record<StageKey, string> = {
-  Conversation: "Oamenii discută între ei și cu AI-ul.",
-  Documentation: "Conversația este transformată în documentație editabilă.",
-  "Use Cases": "Din documentație se generează use case-uri și preview-uri.",
-  Variants: "Echipele AI propun 3 variante de implementare.",
-  "Final Code": "Se vede codul final pentru varianta aleasă.",
+  Conversation: "Oamenii discută pe ramuri separate: Business și Tech",
+  Documentation: "Generare scheme tehnice și brief de produs.",
+  Features: "Selecție a modulelor și variațiilor recomandate.",
+  "User Stories": "Maparea Agile a feature-urilor bifate.",
+  "Final Code": "Se vede codul final pentru aplicația formată.",
   Preview: "Aplicația este generată și rulată în preview.",
 }
 
@@ -107,42 +113,82 @@ const collaborators = [
   { name: "Ionut", role: "Tech lead", initials: "IN", status: "pregătește varianta finală" },
 ]
 
+const initialArchNodes = [
+  { id: '1', position: { x: 100, y: 0 }, data: { label: '💻 IDE UI (Next.js)' }, type: 'input' },
+  { id: '2', position: { x: 100, y: 80 }, data: { label: '🚪 API Gateway' } },
+  { id: '3', position: { x: 280, y: 80 }, data: { label: '⚡ WebSocket' } },
+  { id: '4', position: { x: -80, y: 80 }, data: { label: '🔴 Redis Cache' } },
+  { id: '5', position: { x: 100, y: 160 }, data: { label: '🧠 AI Orchestrator' } },
+  { id: '6', position: { x: -80, y: 160 }, data: { label: '🐘 PostgreSQL DB' } },
+  { id: '7', position: { x: 280, y: 200 }, data: { label: '🛡️ Security Agent' } },
+  { id: '8', position: { x: 0, y: 250 }, data: { label: '📈 Business AI' } },
+  { id: '9', position: { x: 180, y: 250 }, data: { label: '⚙️ Technical AI' } },
+  { id: '10', position: { x: 100, y: 350 }, data: { label: '☁️ AWS Bedrock' }, type: 'output' },
+]
+
+const initialArchEdges = [
+  { id: 'e1-2', source: '1', target: '2', animated: true },
+  { id: 'e1-3', source: '1', target: '3', animated: true },
+  { id: 'e2-4', source: '2', target: '4' },
+  { id: 'e2-5', source: '2', target: '5' },
+  { id: 'e3-5', source: '3', target: '5' },
+  { id: 'e5-6', source: '5', target: '6' },
+  { id: 'e5-7', source: '5', target: '7', animated: true },
+  { id: 'e5-8', source: '5', target: '8', animated: true },
+  { id: 'e5-9', source: '5', target: '9', animated: true },
+  { id: 'e8-10', source: '8', target: '10' },
+  { id: 'e9-10', source: '9', target: '10' },
+  { id: 'e7-10', source: '7', target: '10' },
+]
+
 const initialBrief: BriefState = {
   title: "AI-Native SDLC IDE",
   objective:
-    "Construiți un IDE colaborativ unde echipele discută, documentează, aleg varianta de implementare și generează aplicația finală cu preview.",
+    "Construiți un IDE unde echipele discută, documentează, aleg feature-uri și generează o aplicație complexă.",
   audience: ["Product manageri", "Developeri", "Technical leads"],
   scope: [
-    "Conversație echipă + AI",
-    "Documentație structurată și aprobată",
-    "3 variante de implementare cu preview",
+    "Conversație pe 2 planuri (Business/Tech)",
+    "Documentație de arhitectură și brief",
+    "Generare dinamică User Stories",
   ],
   deliverables: [
     "Project brief aprobat",
-    "Use case-uri și preview-uri generate",
+    "Arhitectură tehnică validată",
     "Cod final și preview rulabil",
   ],
-  risks: ["Confuzie între etape", "Prea multe butoane fără scop", "Alegere dificilă între variante"],
+  risks: ["Confuzie între etape", "Alegere dificilă între variante tehnice"],
+  techStack: ["Next.js", "TailwindCSS", "PostgreSQL", "Supabase", "Redis"],
+  dbSchema: "model User {\n  id String @id @default(uuid())\n  email String @unique\n  role String\n}\n\nmodel Story {\n  id String @id\n  title String\n}",
+  architecture: "Fullstack Next.js architecture with Edge Functions and collaborative WebSocket server for real-time presence.",
 }
 
-const initialMessages: Message[] = [
+const initialBusinessMessages: Message[] = [
   {
-    id: "m1",
+    id: "mb1",
     author: "Alex",
     role: "human",
-    text: "Vreau un flow unde echipa discută cu AI-ul și totul duce natural spre aplicația finală.",
+    text: "Mă gândesc că targetul nostru sunt agențiile enterprise.",
   },
   {
-    id: "m2",
-    author: "Mara",
-    role: "human",
-    text: "Preview-urile trebuie să apară devreme, ca să putem alege varianta potrivită.",
-  },
-  {
-    id: "m3",
-    author: "AI Copilot",
+    id: "mb2",
+    author: "Business AI",
     role: "ai",
-    text: "Am înțeles. Structurez experiența în 6 etape continue: conversație, documentație, use case-uri, variante, cod final și preview.",
+    text: "Excelent. Pentru agenții, modelul de 'SaaS cu licențiere on-premise' generează cele mai puține frecări. Adăugăm funcții de RBAC în brief?",
+  },
+]
+
+const initialTechMessages: Message[] = [
+  {
+    id: "mt1",
+    author: "Ionut",
+    role: "human",
+    text: "Vrem un delay minim pe live-sync. Posibil un Y.js adapter.",
+  },
+  {
+    id: "mt2",
+    author: "Tech AI",
+    role: "ai",
+    text: "Recomand WebSockets pe instanțe edge. Vom folosi un server Hocuspocus lângă baza ta Supabase/PostgreSQL.",
   },
 ]
 
@@ -161,84 +207,84 @@ function toSentenceLabel(value: string, fallback: string) {
     .join(" ")
 }
 
-function buildUseCases(brief: BriefState): UseCase[] {
+function buildFeatures(brief: BriefState): Feature[] {
   return [
     {
-      id: "UC-01",
-      title: "Conversație ghidată între oameni și AI",
-      summary: `AI-ul preia discuția despre ${brief.title.toLowerCase()} și o transformă într-un brief coerent.`,
+      id: "FEAT-01",
+      title: "Real-time Collaboration Engine",
+      summary: `Infrastructură de sincronizare date pentru ${brief.title.toLowerCase()}.`,
       preview: "Chat orchestration view",
+      variations: ["Utilizare Y.js + WebSockets via Hocuspocus", "Polling optimizat via SWR (mai ieftin)", "Liveblocks managed via REST"],
       acceptance: [
-        "membrii echipei pot contribui în același fir",
-        "AI-ul propune sumar și întrebări de clarificare",
-        "discuția poate fi promovată în documentație",
+        "Cursor prezența vizuală pentru colaboratori",
+        "Conflicte rezolvate per-character",
       ],
     },
     {
-      id: "UC-02",
-      title: "Generare de documentație din context",
-      summary: `Documentația derivă din obiectivul: ${brief.objective}`,
+      id: "FEAT-02",
+      title: "Role-Based Audit & Approval",
+      summary: `Proces de QA formal derivat din obiectivul arhitectural: ${brief.architecture.substring(0, 30)}...`,
       preview: "Editable documentation canvas",
+      variations: ["Sistem hibrid cu AI auto-approve pentru Low-Risk", "Manual strict cu 2+ semnături umane"],
       acceptance: [
-        "brief-ul se poate edita inline",
-        "fiecare secțiune se poate aproba",
-        "use case-urile apar după aprobare",
+        "Jurnale stocate imutabil",
+        "Blocare acțiuni critice for unauthorized users",
       ],
     },
     {
-      id: "UC-03",
-      title: "Comparare a 3 variante de implementare",
-      summary: "Echipa vede tradeoff-uri, preview-uri și selectează varianta finală.",
+      id: "FEAT-03",
+      title: "Automated SDLC Generator",
+      summary: "Agenti de AI ce traduc scheme de DB + Brief în cod boilerplate Node.js.",
       preview: "Variant comparison board",
+      variations: ["Microservices Scaffold in Docker", "Next.js Monolith route generators"],
       acceptance: [
-        "sunt generate exact 3 variante",
-        "fiecare variantă are preview și rezumat",
-        "una singură poate fi aleasă pentru codul final",
+        "Generează Prisma schema automat",
+        "O singură execuție creează minim MVP",
       ],
     },
   ]
 }
 
-function buildVariants(useCase: UseCase, brief: BriefState): Variant[] {
+function buildUserStories(feature: Feature, brief: BriefState): UserStory[] {
   const objectiveKey = toSentenceLabel(brief.objective, "Collaborative Flow")
   return [
     {
-      id: "VAR-A",
-      title: "Variant A · Guided Pipeline",
-      stack: "Next.js + timeline orchestration",
-      summary: "Flow strict, cu aprobări între etape și vizibilitate clară pentru fiecare handoff.",
-      tradeoff: "Cea mai clară variantă pentru demo și onboarding, dar cu libertate mai mică de explorare.",
-      previewTitle: "Linear workspace preview",
-      previewDescription: "Utilizatorul avansează etapă cu etapă și vede mereu următoarea acțiune recomandată.",
-      code: `export const selectedFlow = {\n  name: "${objectiveKey}",\n  variant: "guided-pipeline",\n  stages: ["conversation", "documentation", "use-cases", "variants", "final-code", "preview"],\n  approvalRequired: true,\n}\n`,
+      id: "US-01",
+      title: "Story: Setup Live Sync",
+      stack: "Next.js + WebSockets",
+      summary: "Ca developer, vreau să leg Hocuspocus pentru a suporta cursor prezența.",
+      tradeoff: "Timp de deploy mărit, dar experiența client este flawless.",
+      previewTitle: "Live Sync Preview",
+      previewDescription: "Sincronizarea multi-player pornește automat la accesarea planșei.",
+      code: `export const featureStack = {\n  feat: "${objectiveKey}",\n  adapter: "y-websocket",\n  serverUrl: "wss://engine.luminescent.app",\n}\n`,
     },
     {
-      id: "VAR-B",
-      title: "Variant B · Split Canvas",
-      stack: "Next.js + collaborative panes",
-      summary: "Conversația, documentația și preview-ul apar simultan într-un canvas împărțit.",
-      tradeoff: "Mai spectaculoasă vizual, dar poate încărca utilizatorii care vor un flow simplu.",
-      previewTitle: "Parallel collaboration preview",
-      previewDescription: "Echipa urmărește editarea documentației și preview-ul în același timp.",
-      code: `export const selectedFlow = {\n  name: "${objectiveKey}",\n  variant: "split-canvas",\n  panes: ["chat", "docs", "preview"],\n  comparisonMode: "always-on",\n}\n`,
+      id: "US-02",
+      title: "Story: CI/CD Approvals",
+      stack: "GitHub Actions + Prisma",
+      summary: "Ca product lead, vreau ca orice modificare de schema DB să ceară +1.",
+      tradeoff: "Adaugă un gate de 5 minute la pipeline-uri.",
+      previewTitle: "Approval Gate",
+      previewDescription: "Cererile sunt delegate catre QA agent înainte de merge la origin/main.",
+      code: `export const authPipeline = {\n  feat: "${objectiveKey}",\n  rules: [{ enforce: "db-schema", checks: 2 }],\n}\n`,
     },
     {
-      id: "VAR-C",
-      title: "Variant C · Review First",
-      stack: "Next.js + gated delivery rooms",
-      summary: "Fiecare pas produce un artefact formal și cere review uman înainte de continuare.",
-      tradeoff: "Foarte bună pentru enterprise și audit, dar mai lentă pentru iterații rapide.",
-      previewTitle: "Governed delivery preview",
-      previewDescription: "Fiecare artefact este înghețat, aprobat și împins în etapa următoare.",
-      code: `export const selectedFlow = {\n  name: "${objectiveKey}",\n  variant: "review-first",\n  governance: "strict",\n  rooms: ["brief", "requirements", "selection", "merge"],\n}\n`,
+      id: "US-03",
+      title: "Story: Scaffold Generators",
+      stack: "AST Builders + LLM",
+      summary: "Ca architect, vreau ca endpoint-urile CRUD să fie turn-key.",
+      tradeoff: "Mentenanță grea pe engine-urile de AST parsing dar viteză pentru end-user.",
+      previewTitle: "Boilerplate Factory",
+      previewDescription: "Aplicația injectează rutele Next.js API in runtime pe Vercel Edge.",
+      code: `export const generator = {\n  target: "next-app-router",\n  useActions: true,\n  db: "prisma",\n}\n`,
     },
   ].map((variant) => ({
     ...variant,
-    summary: `${variant.summary} Use case focus: ${useCase.title.toLowerCase()}.`,
+    summary: `${variant.summary} (Derived from ${feature.title.toLowerCase()}).`,
   }))
 }
 
-function buildWorkspaceFiles(brief: BriefState, useCase: UseCase, variant: Variant): WorkspaceFile[] {
+function buildWorkspaceFiles(brief: BriefState, feature: Feature, userStory: UserStory): WorkspaceFile[] {
   return [
     {
       id: "file-brief",
@@ -246,14 +292,14 @@ function buildWorkspaceFiles(brief: BriefState, useCase: UseCase, variant: Varia
       content: `# ${brief.title}\n\n## Objective\n${brief.objective}\n\n## Audience\n${brief.audience.map((item) => `- ${item}`).join("\n")}\n\n## Scope\n${brief.scope.map((item) => `- ${item}`).join("\n")}\n`,
     },
     {
-      id: "file-use-case",
-      name: "selected-use-case.md",
-      content: `# ${useCase.id} ${useCase.title}\n\n${useCase.summary}\n\n## Acceptance Criteria\n${useCase.acceptance.map((item) => `- ${item}`).join("\n")}\n`,
+      id: "file-feature",
+      name: "selected-feature.md",
+      content: `# ${feature.id} ${feature.title}\n\n${feature.summary}\n\n## Variations\n${feature.variations.map((item) => `- ${item}`).join("\n")}\n`,
     },
     {
       id: "file-app",
       name: "app-flow.ts",
-      content: `${variant.code}\nexport function generatePreview() {\n  return {\n    title: "${variant.previewTitle}",\n    status: "ready-for-preview",\n    useCase: "${useCase.id}",\n  }\n}\n`,
+      content: `${userStory.code}\nexport function generatePreview() {\n  return {\n    title: "${userStory.previewTitle}",\n    status: "ready-for-preview",\n    feature: "${feature.id}",\n  }\n}\n`,
     },
   ]
 }
@@ -340,6 +386,12 @@ function Icon({ name, className }: { name: string; className?: string }) {
           <polyline points="14 2 14 8 20 8" stroke="currentColor" />
         </svg>
       )
+    case "folder":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" />
+        </svg>
+      )
     case "terminal":
       return (
         <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
@@ -398,26 +450,57 @@ export function IdeationDashboard() {
   const [currentStage, setCurrentStage] = useState<StageKey>("Conversation")
   const [search, setSearch] = useState("")
   const [brief, setBrief] = useState(initialBrief)
-  const [messages, setMessages] = useState(initialMessages)
+  const [activeTab, setActiveTab] = useState<"business" | "tech">("business")
+  const [businessMessages, setBusinessMessages] = useState(initialBusinessMessages)
+  const [techMessages, setTechMessages] = useState(initialTechMessages)
   const [composer, setComposer] = useState("")
-  const [activeSpeaker, setActiveSpeaker] = useState<"Alex" | "Mara" | "Ionut">("Alex")
+  const [activeSpeakerBusiness, setActiveSpeakerBusiness] = useState<"Alex" | "Mara">("Alex")
+  const [activeSpeakerTech, setActiveSpeakerTech] = useState<"Ionut" | "Alex">("Ionut")
   const [activity, setActivity] = useState(initialActivity)
-  const [selectedUseCaseId, setSelectedUseCaseId] = useState("UC-01")
-  const [selectedVariantId, setSelectedVariantId] = useState("VAR-A")
+  const [selectedFeatureId, setSelectedFeatureId] = useState("FEAT-01")
+  const [selectedStoryId, setSelectedStoryId] = useState("US-01")
   const [selectedFileId, setSelectedFileId] = useState("file-brief")
+  const [docTab, setDocTab] = useState<"business" | "tech">("business")
   const [autoSave, setAutoSave] = useState(true)
   const [appGenerated, setAppGenerated] = useState(false)
   const [previewOpened, setPreviewOpened] = useState(false)
+
+  const [terminalHistory, setTerminalHistory] = useState<{type: string, text: string}[]>([
+    { type: "system", text: "Luminescent OS v1.2.0 initialized." },
+    { type: "system", text: "Type 'help' to see available commands or 'npm run dev'." }
+  ])
+  const [terminalInput, setTerminalInput] = useState("")
+
+  const handleTerminalSubmit = () => {
+    if (!terminalInput.trim()) return;
+    const cmd = terminalInput.trim();
+    setTerminalHistory(prev => [...prev, { type: "cmd", text: `root@ide:~$ ${cmd}` }]);
+    
+    setTimeout(() => {
+      if (cmd === "npm run dev" || cmd === "npm start") {
+        setTerminalHistory(prev => [...prev, { type: "out", text: "v1.2.0 build ready in 140 ms\n\n  ➜  Local:   http://localhost:3000/" }]);
+        setAppGenerated(true);
+        moveToStage("Preview", "Aplicația a pornit pe localhost.");
+      } else if (cmd === "clear") {
+        setTerminalHistory([]);
+      } else if (cmd === "help") {
+        setTerminalHistory(prev => [...prev, { type: "out", text: "Available commands:\n  npm run dev   Start local server and jump to Preview\n  clear         Clear console\n  help          Show this message" }]);
+      } else {
+        setTerminalHistory(prev => [...prev, { type: "error", text: `bash: ${cmd}: command not found` }]);
+      }
+    }, 400);
+    setTerminalInput("");
+  }
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const useCases = useMemo(() => buildUseCases(brief), [brief])
-  const selectedUseCase = useCases.find((item) => item.id === selectedUseCaseId) ?? useCases[0]
-  const variants = useMemo(() => buildVariants(selectedUseCase, brief), [selectedUseCase, brief])
-  const selectedVariant = variants.find((item) => item.id === selectedVariantId) ?? variants[0]
-  const generatedFiles = useMemo(() => buildWorkspaceFiles(brief, selectedUseCase, selectedVariant), [brief, selectedUseCase, selectedVariant])
+  const features = useMemo(() => buildFeatures(brief), [brief])
+  const selectedFeature = features.find((item) => item.id === selectedFeatureId) ?? features[0]
+  const userStories = useMemo(() => buildUserStories(selectedFeature, brief), [selectedFeature, brief])
+  const selectedStory = userStories.find((item) => item.id === selectedStoryId) ?? userStories[0]
+  const generatedFiles = useMemo(() => buildWorkspaceFiles(brief, selectedFeature, selectedStory), [brief, selectedFeature, selectedStory])
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([])
   const activeFile = workspaceFiles.find((file) => file.id === selectedFileId) ?? workspaceFiles[0]
 
@@ -451,21 +534,26 @@ export function IdeationDashboard() {
 
     const nextMessage: Message = {
       id: `m-${Date.now()}`,
-      author: activeSpeaker,
+      author: activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech,
       role: "human",
       text: trimmed,
     }
 
     const aiReply: Message = {
       id: `m-${Date.now() + 1}`,
-      author: "AI Copilot",
+      author: activeTab === "business" ? "Business AI" : "Tech AI",
       role: "ai",
       text: buildAiReply(trimmed),
     }
 
-    setMessages((current) => [...current, nextMessage, aiReply])
+    if (activeTab === "business") {
+      setBusinessMessages((current) => [...current, nextMessage, aiReply])
+    } else {
+      setTechMessages((current) => [...current, nextMessage, aiReply])
+    }
+    
     setComposer("")
-    addActivity(activeSpeaker, `A trimis un mesaj care rafinează direcția produsului.`)
+    addActivity(nextMessage.author, `A trimis un mesaj pe planția de ${activeTab}.`)
   }
 
   function regenerateDocumentation() {
@@ -484,32 +572,32 @@ export function IdeationDashboard() {
   }
 
   function approveDocumentation() {
-    addActivity("Brief approved", "Documentația este gata pentru generarea use case-urilor.")
-    moveToStage("Use Cases", "Use case-urile au fost generate din documentație.")
+    addActivity("Documentation approved", "Brief-ul tehnic și de business e gata.")
+    moveToStage("Features", "Opțiunile de implementare au fost setate.")
   }
 
-  function openUseCase(useCaseId: string) {
-    setSelectedUseCaseId(useCaseId)
-    addActivity("Use case selected", `${useCaseId} a devenit focusul comparației.`)
+  function openFeature(featureId: string) {
+    setSelectedFeatureId(featureId)
+    addActivity("Feature selected", `${featureId} pus în prim-plan.`)
   }
 
-  function moveToVariants() {
-    addActivity("Variants generated", "Au fost generate 3 variante pentru use case-ul ales.")
-    moveToStage("Variants", "Comparăm cele 3 implementări propuse.")
+  function moveToUserStories() {
+    addActivity("Stories generated", "Au fost extrase User Stories din modulele selectate.")
+    moveToStage("User Stories", "Agile backlog creat cu succes.")
   }
 
-  function chooseVariant(variantId: string) {
-    setSelectedVariantId(variantId)
-    addActivity("Variant selected", `${variantId} a fost aleasă pentru codul final.`)
+  function chooseStory(storyId: string) {
+    setSelectedStoryId(storyId)
+    addActivity("Story locked", `${storyId} va bloca arhitectura selectată.`)
   }
 
-  function approveVariant() {
-    addActivity("Final code ready", `${selectedVariant.id} a fost promovată în zona de cod final.`)
-    moveToStage("Final Code", "Codul final reflectă varianta selectată.")
+  function approveStory() {
+    addActivity("Scaffold ready", `${selectedStory.id} trimisă spre backend engine.`)
+    moveToStage("Final Code", "Geneză cod sursă finalizată.")
   }
 
   function regenerateCode() {
-    setSelectedVariantId((current) => current)
+    setSelectedStoryId((current) => current)
     addActivity("Code regenerated", "Comentariile și structura finală au fost reîmprospătate.")
   }
 
@@ -527,8 +615,8 @@ export function IdeationDashboard() {
 
   function restartFlow() {
     setCurrentStage("Conversation")
-    setSelectedUseCaseId("UC-01")
-    setSelectedVariantId("VAR-A")
+    setSelectedFeatureId("FEAT-01")
+    setSelectedStoryId("US-01")
     setSelectedFileId("file-brief")
     setAppGenerated(false)
     setPreviewOpened(false)
@@ -667,15 +755,20 @@ export function IdeationDashboard() {
                 />
                 <div className="grid flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[1.3fr_0.7fr] lg:p-6">
                   <Card className="flex min-h-[420px] flex-col overflow-hidden rounded-[16px] border-border/40 bg-card/70">
-                    <div className="border-b border-border/40 px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {(["Alex", "Mara", "Ionut"] as const).map((speaker) => (
+                    <div className="border-b border-border/40 px-4 py-3 flex flex-wrap gap-4 items-center justify-between">
+                      <div className="flex gap-1 bg-background/50 p-1 rounded-lg shadow-inner">
+                        <Button size="sm" variant={activeTab === "business" ? "default" : "ghost"} onClick={() => setActiveTab("business")} className="h-7 px-3 text-[11px] rounded-md">Business Plan AI</Button>
+                        <Button size="sm" variant={activeTab === "tech" ? "default" : "ghost"} onClick={() => setActiveTab("tech")} className="h-7 px-3 text-[11px] rounded-md">Technical AI</Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline-block">Speaking as:</span>
+                        {(activeTab === "business" ? ["Alex", "Mara"] : ["Ionut", "Alex"]).map((speaker) => (
                           <Button
                             key={speaker}
                             size="sm"
-                            variant={activeSpeaker === speaker ? "default" : "outline"}
-                            onClick={() => setActiveSpeaker(speaker)}
-                            className="h-8 rounded-full px-3 text-[11px]"
+                            variant={(activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech) === speaker ? "secondary" : "outline"}
+                            onClick={() => activeTab === "business" ? setActiveSpeakerBusiness(speaker as any) : setActiveSpeakerTech(speaker as any)}
+                            className={cn("h-7 rounded px-3 text-[10px]", (activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech) === speaker ? "bg-primary/20 text-primary border-primary/30" : "")}
                           >
                             {speaker}
                           </Button>
@@ -683,7 +776,7 @@ export function IdeationDashboard() {
                       </div>
                     </div>
                     <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                      {messages.map((message) => (
+                      {(activeTab === "business" ? businessMessages : techMessages).map((message) => (
                         <div
                           key={message.id}
                           className={cn("flex flex-col gap-1", message.role === "human" ? "items-end" : "items-start")}
@@ -772,80 +865,167 @@ export function IdeationDashboard() {
                   </Button>
                 }
               />
-              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1.1fr_0.9fr] xl:p-6">
-                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
-                  <div className="space-y-5">
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-background/30">
+                <Card className="flex flex-col rounded-[16px] border-border/40 bg-card/70 p-8 md:p-12 w-full max-w-[860px] shadow-sm min-h-full relative">
+                  <div className="flex-1 space-y-8">
+                    {/* Title */}
                     <div>
-                      <label className="mb-2 block text-[10px] font-mono uppercase tracking-[0.15em] text-primary">Project title</label>
+                      <label className="mb-2 block text-[10px] font-mono uppercase tracking-[0.2em] text-primary/70">Project Title</label>
                       <Textarea
                         value={brief.title}
                         onChange={(event) => setBrief({ ...brief, title: event.target.value })}
                         rows={1}
-                        className="min-h-0 resize-none border-border/40 bg-background/60 text-[28px] font-serif font-semibold tracking-tight"
+                        className="min-h-0 resize-none border-none bg-transparent p-0 text-[32px] sm:text-[40px] font-serif font-bold tracking-tight shadow-none outline-none focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground leading-[1.1] rounded-none py-1"
                       />
                     </div>
-                    <div>
-                      <label className="mb-2 block text-[10px] font-mono uppercase tracking-[0.15em] text-primary">Objective</label>
-                      <Textarea
-                        value={brief.objective}
-                        onChange={(event) => setBrief({ ...brief, objective: event.target.value })}
-                        className="min-h-[110px] border-border/40 bg-background/60 leading-[1.7]"
-                      />
+                    
+                    {/* TABS */}
+                    <div className="flex gap-2 border-b border-border/20 pb-4">
+                      <Button size="sm" variant={docTab === "business" ? "default" : "outline"} onClick={() => setDocTab("business")} className="rounded-full px-5 h-8 text-[12px] transition-all">Business Plan</Button>
+                      <Button size="sm" variant={docTab === "tech" ? "default" : "outline"} onClick={() => setDocTab("tech")} className="rounded-full px-5 h-8 text-[12px] transition-all">Technical Architecture</Button>
                     </div>
-                    {(["audience", "scope", "deliverables", "risks"] as const).map((key) => (
-                      <div key={key} className="rounded-[14px] border border-border/40 bg-background/50 p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{key}</label>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setBrief({ ...brief, [key]: [...brief[key], ""] })}
-                            className="h-7 px-2 text-[10px] text-primary hover:bg-primary/10"
-                          >
-                            + Add item
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          {brief[key].map((item, index) => (
-                            <Input
-                              key={`${key}-${index}`}
-                              value={item}
-                              onChange={(event) => {
-                                const next = [...brief[key]]
-                                next[index] = event.target.value
-                                setBrief({ ...brief, [key]: next })
-                              }}
-                              className="h-9 border-border/40 bg-card/70"
-                              placeholder="..."
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
 
-                <Card className="flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5">
-                  <div className="space-y-2">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                      Documentation ready
-                    </Badge>
-                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Brief aprobat, apoi use case-uri</h3>
-                    <p className="text-[13px] leading-relaxed text-muted-foreground">
-                      Etapa asta transformă conversația în document oficial. Când îl aprobăm, trecem direct la use case-uri și preview-uri.
-                    </p>
-                  </div>
-                  <div className="mt-5 space-y-3">
-                    {brief.deliverables.map((item) => (
-                      <div key={item} className="rounded-[12px] border border-border/40 bg-background/70 p-3 text-[13px] text-foreground/85">
-                        {item}
+                    {docTab === "business" && (
+                      <div className="space-y-10 animate-in fade-in zoom-in-95 duration-200">
+                        {/* Objective */}
+                        <div className="rounded-[16px] border border-border/40 bg-card/40 p-5 shadow-sm transition-colors hover:bg-card/60">
+                          <label className="mb-3 flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary/80">
+                            <Icon name="target" className="size-3.5" /> Core Objective
+                          </label>
+                          <Textarea
+                            value={brief.objective}
+                            onChange={(event) => setBrief({ ...brief, objective: event.target.value })}
+                            className="min-h-[100px] border-none bg-transparent p-0 text-[14.5px] leading-[1.8] shadow-none outline-none focus-visible:ring-0 text-foreground/90 resize-none"
+                            placeholder="What is the main goal of this product?"
+                          />
+                        </div>
+                        
+                        {/* Array Fields */}
+                        <div className="grid gap-6 md:grid-cols-2">
+                           {(["audience", "scope", "deliverables", "risks"] as const).map((key) => (
+                              <div key={key} className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm transition-colors hover:bg-card/40">
+                                <div className="flex items-center justify-between mb-4">
+                                  <label className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground/90">{key}</label>
+                                  <Button size="sm" variant="ghost" onClick={() => setBrief({ ...brief, [key]: [...brief[key], ""] })} className="h-7 w-7 p-0 rounded-full hover:bg-primary/20 text-primary bg-primary/10">
+                                    <Icon name="plus" className="size-3.5" />
+                                  </Button>
+                                </div>
+                                <div className="space-y-2">
+                                  {brief[key].map((item, index) => (
+                                    <div key={`${key}-${index}`} className="relative group flex items-center">
+                                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/30 rounded-l-[4px] group-focus-within:bg-primary transition-colors" />
+                                      <Input
+                                        value={item}
+                                        onChange={(event) => {
+                                          const next = [...brief[key]]
+                                          next[index] = event.target.value
+                                          setBrief({ ...brief, [key]: next })
+                                        }}
+                                        className="h-9 border-none bg-background/50 pl-3 pr-2 text-[13px] shadow-sm focus-visible:ring-1 focus-visible:ring-primary/20 rounded-r-[6px] rounded-l-none transition-all placeholder:text-muted-foreground/40"
+                                        placeholder={`Define ${key}...`}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+
+                    {docTab === "tech" && (
+                      <div className="space-y-10 animate-in fade-in zoom-in-95 duration-200">
+                        {/* Architecture */}
+                        <div className="rounded-[16px] border border-border/40 bg-card/40 p-5 shadow-sm transition-colors hover:bg-card/60">
+                          <label className="mb-3 flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary/80">
+                             <Icon name="cpu" className="size-3.5" /> System Architecture Abstract
+                          </label>
+                          <Textarea
+                            value={brief.architecture}
+                            onChange={(event) => setBrief({ ...brief, architecture: event.target.value })}
+                            className="min-h-[60px] border-none bg-transparent p-0 text-[14.5px] leading-[1.8] shadow-none outline-none focus-visible:ring-0 text-foreground/90 resize-none"
+                            placeholder="Describe how the components interact..."
+                          />
+                        </div>
+                        
+                        {/* Arrays for Stack + DB */}
+                        <div className="grid gap-6 md:grid-cols-2">
+                           <div className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm transition-colors hover:bg-card/40">
+                              <div className="flex items-center justify-between mb-4">
+                                <label className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground/90">Tech Stack</label>
+                                <Button size="sm" variant="ghost" onClick={() => setBrief({ ...brief, techStack: [...brief.techStack, ""] })} className="h-7 w-7 p-0 rounded-full hover:bg-primary/20 bg-primary/10 text-primary">
+                                  <Icon name="plus" className="size-3.5" />
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {brief.techStack.map((item, index) => (
+                                  <div key={`tech-${index}`} className="relative group flex items-center">
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/30 rounded-l-[4px] group-focus-within:bg-emerald-500 transition-colors" />
+                                    <Input
+                                      value={item}
+                                      onChange={(event) => {
+                                        const next = [...brief.techStack]
+                                        next[index] = event.target.value
+                                        setBrief({ ...brief, techStack: next })
+                                      }}
+                                      className="h-9 border-none bg-background/50 pl-3 pr-2 text-[13px] shadow-sm font-mono focus-visible:ring-1 focus-visible:ring-emerald-500/20 rounded-r-[6px] rounded-l-none placeholder:text-muted-foreground/40"
+                                      placeholder="Add stack component..."
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                           </div>
+                           
+                           <div className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm flex flex-col transition-colors hover:bg-card/40">
+                              <div className="flex items-center justify-between mb-4">
+                                <label className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground/90">Database Schema</label>
+                              </div>
+                              <Textarea
+                                value={brief.dbSchema}
+                                onChange={(event) => setBrief({ ...brief, dbSchema: event.target.value })}
+                                className="flex-1 min-h-[200px] font-mono text-[12.5px] bg-black/40 text-emerald-400/90 border-none rounded-[8px] p-4 shadow-inner resize-none focus-visible:ring-1 focus-visible:ring-emerald-500/30 leading-relaxed scrollbar-thin scrollbar-thumb-emerald-500/20"
+                                placeholder="model User { ... }"
+                              />
+                           </div>
+                        </div>
+
+                        {/* Interactive Architecture Map */}
+                        <div className="rounded-[16px] border border-border/40 bg-card/30 p-5 shadow-sm space-y-4">
+                          <label className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary/80">
+                             <div className="relative flex items-center justify-center size-2">
+                               <div className="absolute inset-0 rounded-full bg-primary/40 animate-ping" />
+                               <div className="relative size-1.5 rounded-full bg-primary" />
+                             </div>
+                             Live Architecture Blueprint
+                          </label>
+                          <div className="w-full h-[400px] md:h-[500px] relative rounded-[12px] border border-border/40 overflow-hidden bg-background/40 shadow-inner isolation-auto">
+                            <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
+                              <ReactFlow 
+                                style={{ width: '100%', height: '100%' }}
+                                nodes={initialArchNodes} 
+                                edges={initialArchEdges} 
+                                fitView
+                                fitViewOptions={{ padding: 0.2 }}
+                                zoomOnScroll={true}
+                                panOnScroll={false}
+                                selectionOnDrag={false}
+                              >
+                                <Background gap={16} size={1} color="rgba(255,255,255,0.05)" />
+                                <Controls showInteractive={false} className="fill-foreground bg-card border-border/40" />
+                              </ReactFlow>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/50 text-center font-medium tracking-wide">INTERACTIVE CANVAS — PAN & ZOOM ENABLED</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-auto flex flex-col gap-2 pt-6">
-                    <Button onClick={approveDocumentation}>Aprobă brief-ul și generează use case-uri</Button>
-                    <Button variant="outline" onClick={() => moveToStage("Conversation", "Echipa revine la discuție pentru clarificări.")}>
-                      Înapoi la conversație
+                  
+                  {/* GENERATE BUTTON */}
+                  <div className="mt-12 pt-6 border-t border-border/40 flex justify-end items-center gap-3 shrink-0">
+                    <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline-block">Ready to proceed?</span>
+                    <Button onClick={approveDocumentation} size="sm" className="h-9 px-5 text-[12px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_2px_10px_rgba(16,185,129,0.2)] rounded-[8px] transition-all gap-2">
+                      Generate Features <Icon name="play" className="size-3" />
                     </Button>
                   </div>
                 </Card>
@@ -853,24 +1033,24 @@ export function IdeationDashboard() {
             </div>
           )}
 
-          {currentStage === "Use Cases" && (
+          {currentStage === "Features" && (
             <div className="flex h-full flex-col">
               <IDEHeader
-                title="Use Cases & Previews"
+                title="Features & Variations"
                 icon="layout"
                 rightNode={
-                  <Button size="sm" variant="ghost" onClick={moveToVariants} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
-                    Generate 3 variants
+                  <Button size="sm" variant="ghost" onClick={moveToUserStories} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
+                    Generate User Stories
                   </Button>
                 }
               />
               <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1.2fr_0.8fr] xl:p-6">
                 <div className="grid content-start gap-4 lg:grid-cols-2">
-                  {useCases.map((useCase) => {
-                    const active = selectedUseCase.id === useCase.id
+                  {features.map((feature) => {
+                    const active = selectedFeature.id === feature.id
                     return (
                       <Card
-                        key={useCase.id}
+                        key={feature.id}
                         className={cn(
                           "flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5 transition-all",
                           active && "border-primary/50 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
@@ -878,25 +1058,25 @@ export function IdeationDashboard() {
                       >
                         <div className="mb-4 flex items-center justify-between">
                           <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                            {useCase.id}
+                            {feature.id}
                           </Badge>
-                          <span className="text-[11px] text-muted-foreground">{useCase.preview}</span>
+                          <span className="text-[11px] text-muted-foreground">{feature.preview}</span>
                         </div>
-                        <h3 className="mb-2 text-[18px] font-semibold leading-snug text-foreground/90">{useCase.title}</h3>
-                        <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">{useCase.summary}</p>
+                        <h3 className="mb-2 text-[18px] font-semibold leading-snug text-foreground/90">{feature.title}</h3>
+                        <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">{feature.summary}</p>
+                        
+                        {/* Variations generated by AI */}
                         <div className="space-y-2 border-t border-border/30 pt-4">
-                          {useCase.acceptance.map((criterion) => (
-                            <div key={criterion} className="rounded-[10px] bg-background/60 px-3 py-2 text-[12px] text-foreground/85">
+                          <span className="text-[10px] font-mono text-primary/70 uppercase">Variations (AI Recommended)</span>
+                          {feature.variations.map((criterion) => (
+                            <div key={criterion} className="rounded-[10px] bg-background/60 px-3 py-2 text-[12px] text-foreground/85 border-l-[1.5px] border-primary/40">
                               {criterion}
                             </div>
                           ))}
                         </div>
                         <div className="mt-auto flex gap-2 pt-5">
-                          <Button onClick={() => openUseCase(useCase.id)} className="flex-1">
-                            Alege use case-ul
-                          </Button>
-                          <Button variant="outline" onClick={() => moveToStage("Documentation", "S-a revenit la documentație pentru ajustări.")} className="flex-1">
-                            Editează brief-ul
+                          <Button onClick={() => openFeature(feature.id)} className="flex-1 text-[12px] h-9">
+                            {active ? "Focus Enabled" : "Select Feature"}
                           </Button>
                         </div>
                       </Card>
@@ -907,27 +1087,30 @@ export function IdeationDashboard() {
                 <Card className="flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5">
                   <div className="space-y-2">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                      Selected preview
+                      Selected Feature
                     </Badge>
-                    <h3 className="font-serif text-2xl font-semibold tracking-tight">{selectedUseCase.title}</h3>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">{selectedFeature.title}</h3>
                     <p className="text-[13px] leading-relaxed text-muted-foreground">
-                      Din acest use case vor fi generate cele 3 variante pe care echipa le compară înainte de codul final.
+                      Din acest modul vor fi extrase User Stories. Bifează implementarea tehnică dorită.
                     </p>
                   </div>
                   <div className="mt-5 rounded-[18px] border border-border/40 bg-background/80 p-5">
-                    <div className="mb-3 text-[10px] font-mono uppercase tracking-widest text-primary">{selectedUseCase.preview}</div>
+                    <div className="mb-3 text-[10px] font-mono uppercase tracking-widest text-primary">{selectedFeature.preview}</div>
                     <div className="space-y-3">
                       <div className="rounded-[12px] bg-primary/10 p-4 text-sm font-medium text-foreground/90">
-                        Live preview focus: colaborare, generare și selecție controlată.
+                        Mapare logică: {selectedFeature.summary}
                       </div>
                       <div className="rounded-[12px] border border-dashed border-border/50 p-4 text-[12px] leading-relaxed text-muted-foreground">
-                        UI-ul afișează un rezumat al conversației, documentația aprobată și CTA-ul care deschide comparația între cele 3 variante.
+                        Acceptance Criteria base:
+                        <ul className="list-disc pl-5 mt-2 space-y-1 text-foreground/80">
+                           {selectedFeature.acceptance.map(acc => <li key={acc}>{acc}</li>)}
+                        </ul>
                       </div>
                     </div>
                   </div>
                   <div className="mt-auto pt-6">
-                    <Button onClick={moveToVariants} className="w-full">
-                      Continuă către cele 3 variante
+                    <Button onClick={moveToUserStories} className="w-full">
+                      Generează Pipeline Agile (Stories)
                     </Button>
                   </div>
                 </Card>
@@ -935,23 +1118,23 @@ export function IdeationDashboard() {
             </div>
           )}
 
-          {currentStage === "Variants" && (
+          {currentStage === "User Stories" && (
             <div className="flex h-full flex-col">
               <IDEHeader
-                title="Three Generated Variants"
+                title="Agile User Stories Dashboard"
                 icon="branch"
                 rightNode={
-                  <Button size="sm" variant="ghost" onClick={approveVariant} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
+                  <Button size="sm" variant="ghost" onClick={approveStory} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
                     Open final code
                   </Button>
                 }
               />
               <div className="grid flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-3 lg:p-6">
-                {variants.map((variant) => {
-                  const active = selectedVariant.id === variant.id
+                {userStories.map((story) => {
+                  const active = selectedStory.id === story.id
                   return (
                     <Card
-                      key={variant.id}
+                      key={story.id}
                       className={cn(
                         "flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5 transition-all",
                         active && "border-primary/50 shadow-[0_0_0_1px_rgba(16,185,129,0.22)]"
@@ -959,31 +1142,34 @@ export function IdeationDashboard() {
                     >
                       <div className="mb-4 flex items-center justify-between">
                         <Badge variant="outline" className={cn("uppercase", active ? "border-primary/20 bg-primary/10 text-primary" : "text-muted-foreground")}>
-                          {variant.id}
+                          {story.id}
                         </Badge>
-                        <span className="text-[11px] text-muted-foreground">{variant.stack}</span>
+                        <span className="text-[11px] text-muted-foreground">{story.stack}</span>
                       </div>
-                      <h3 className="mb-2 text-[19px] font-semibold">{variant.title}</h3>
-                      <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">{variant.summary}</p>
+                      <h3 className="mb-2 text-[19px] font-semibold">{story.title}</h3>
+                      <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">{story.summary}</p>
+                      
                       <div className="rounded-[14px] border border-border/40 bg-background/70 p-4">
-                        <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">{variant.previewTitle}</div>
-                        <p className="text-[12px] leading-relaxed text-foreground/85">{variant.previewDescription}</p>
+                        <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">{story.previewTitle}</div>
+                        <p className="text-[12px] leading-relaxed text-foreground/85">{story.previewDescription}</p>
                       </div>
                       <div className="mt-3 rounded-[14px] border border-dashed border-border/40 bg-background/60 p-4 text-[12px] leading-relaxed text-muted-foreground">
-                        {variant.tradeoff}
+                        <span className="text-primary/70 font-semibold block mb-1 text-[10px] uppercase">Tradeoff Analysis:</span>
+                        {story.tradeoff}
                       </div>
+
                       <div className="mt-auto flex flex-col gap-2 pt-5">
-                        <Button onClick={() => chooseVariant(variant.id)}>
-                          {active ? "Varianta selectată" : "Alege varianta"}
+                        <Button onClick={() => chooseStory(story.id)}>
+                          {active ? "Scaffold Pinned" : "Select Story Scaffold"}
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => {
-                            chooseVariant(variant.id)
-                            moveToStage("Final Code", "Codul final a fost deschis pentru varianta aleasă.")
+                            chooseStory(story.id)
+                            moveToStage("Final Code", "Codul final a fost generat din User Story-ul ales.")
                           }}
                         >
-                          Vezi codul final
+                          Generate Code
                         </Button>
                       </div>
                     </Card>
@@ -1011,15 +1197,17 @@ export function IdeationDashboard() {
                   }
                 />
                 <div className="flex min-h-0 flex-1">
+                  {/* File Explorer */}
                   <div className="hidden w-56 shrink-0 border-r border-border/40 bg-background/10 md:block">
-                    <div className="space-y-1 p-2">
+                    <div className="px-3 flex items-center h-8 text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground border-b border-border/40">EXPLORER</div>
+                    <div className="space-y-0.5 p-2">
                       {workspaceFiles.map((file) => (
                         <button
                           key={file.id}
                           onClick={() => setSelectedFileId(file.id)}
                           className={cn(
-                            "flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left text-[12.5px] transition-all",
-                            activeFile.id === file.id ? "border-primary/20 bg-primary/10 font-medium text-primary shadow-sm" : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                            "flex w-full items-center gap-2 rounded-sm border px-2 py-1 text-left text-[12px] transition-all",
+                            activeFile.id === file.id ? "border-primary/20 bg-primary/10 text-primary font-medium" : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                           )}
                         >
                           <Icon name="file" className="size-3.5 shrink-0 opacity-80" />
@@ -1028,33 +1216,63 @@ export function IdeationDashboard() {
                       ))}
                     </div>
                   </div>
-                  <div className="relative flex-1 border-r border-border/40">
-                    <Textarea
-                      value={activeFile?.content ?? ""}
-                      onChange={(event) =>
-                        setWorkspaceFiles((current) =>
-                          current.map((file) =>
-                            file.id === activeFile?.id ? { ...file, content: event.target.value } : file
+                  
+                  {/* Editor Frame */}
+                  <div className="relative flex-1 flex flex-col min-w-0 border-r border-border/40">
+                    <div className="flex bg-muted/20 border-b border-border/40 overflow-x-auto no-scrollbar">
+                      {workspaceFiles.map((file) => (
+                        <button
+                          key={file.id}
+                          onClick={() => setSelectedFileId(file.id)}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 min-w-[120px] max-w-[200px] border-r border-border/40 text-[11px] font-mono transition-colors",
+                            activeFile.id === file.id ? "bg-background text-foreground border-t-[2px] border-t-primary" : "text-muted-foreground hover:bg-muted/50 border-t-[2px] border-t-transparent"
+                          )}
+                        >
+                          <Icon name="file" className="size-3 shrink-0" />
+                          <span className="truncate">{file.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <div className="flex-1 relative">
+                       <Textarea
+                        value={activeFile?.content ?? ""}
+                        onChange={(event) =>
+                          setWorkspaceFiles((current) =>
+                            current.map((file) =>
+                              file.id === activeFile?.id ? { ...file, content: event.target.value } : file
+                            )
                           )
-                        )
-                      }
-                      className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 font-mono text-[13.5px] leading-[1.7] text-foreground/90 shadow-none focus-visible:ring-0"
-                      spellCheck={false}
-                    />
-                  </div>
-                  <div className="hidden w-[360px] shrink-0 flex-col bg-card/50 xl:flex">
-                    <IDEHeader title="Code Summary" icon="terminal" />
-                    <div className="flex-1 space-y-4 p-4">
-                      <div className="rounded-[14px] border border-border/40 bg-background/70 p-4">
-                        <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Chosen variant</div>
-                        <div className="text-[14px] font-semibold">{selectedVariant.title}</div>
-                        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{selectedVariant.tradeoff}</p>
+                        }
+                        className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 font-mono text-[13px] leading-[1.6] text-foreground/90 shadow-none focus-visible:ring-0"
+                        spellCheck={false}
+                      />
+                    </div>
+                    
+                    {/* Terminal pane underneath editor */}
+                    <div className="h-[200px] shrink-0 bg-secondary flex flex-col text-[11.5px] font-mono shadow-inner border-t border-border/40 z-10 w-full overflow-hidden">
+                      <div className="flex h-7 items-center justify-start border-b border-border/40 px-0 bg-secondary/80 gap-1 overflow-x-auto no-scrollbar">
+                        <button className="px-3 h-full border-b-[2px] border-b-transparent text-muted-foreground uppercase text-[10px] tracking-widest hover:text-foreground">Problems</button>
+                        <button className="px-3 h-full border-b-[2px] border-b-transparent text-muted-foreground uppercase text-[10px] tracking-widest hover:text-foreground">Output</button>
+                        <button className="px-3 h-full border-b-[2px] border-b-primary text-foreground font-bold uppercase text-[10px] tracking-widest bg-background/50">Terminal</button>
                       </div>
-                      <div className="rounded-[14px] border border-border/40 bg-background/70 p-4">
-                        <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Next step</div>
-                        <p className="text-[12px] leading-relaxed text-foreground/85">
-                          Din acest punct, butonul principal generează aplicația și o deschide în preview.
-                        </p>
+                      <div className="flex-1 overflow-y-auto p-3 space-y-1 w-full bg-background/20 font-medium">
+                        {terminalHistory.map((line, i) => (
+                          <div key={i} className={cn("whitespace-pre-wrap leading-relaxed", line.type === 'error' ? 'text-destructive' : line.type === 'cmd' ? 'text-foreground font-bold' : 'text-chart-2/90')}>
+                            {line.text}
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 mt-1 -ml-0.5">
+                          <span className="text-chart-2 font-bold shrink-0">root@ide:~$</span>
+                          <input 
+                            value={terminalInput}
+                            onChange={(e) => setTerminalInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleTerminalSubmit()}
+                            className="flex-1 min-w-0 bg-transparent outline-none text-foreground placeholder:text-muted-foreground/60 focus:ring-0 shadow-none border-none appearance-none"
+                            spellCheck={false}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1080,59 +1298,33 @@ export function IdeationDashboard() {
                 }
               />
               <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1fr_360px] xl:p-6">
-                <Card className="flex min-h-[520px] flex-col overflow-hidden rounded-[18px] border-border/40 bg-card/70">
-                  <div className="flex h-8 items-center gap-2 border-b border-border/40 bg-muted/40 px-3">
+                <Card className="flex min-h-[520px] flex-col overflow-hidden rounded-[18px] border-border/40 bg-card/70 flex-1">
+                  <div className="flex h-8 items-center gap-2 border-b border-border/40 bg-muted/40 px-3 shrink-0">
                     <div className="flex gap-1.5">
                       <div className="size-2.5 rounded-full bg-destructive/80" />
                       <div className="size-2.5 rounded-full bg-chart-4/80" />
                       <div className="size-2.5 rounded-full bg-chart-2/80" />
                     </div>
-                    <div className="mx-4 flex h-5 flex-1 items-center justify-center rounded-sm border border-border/40 bg-background/50 text-center font-mono text-[10px] text-muted-foreground">
-                      preview.luminescent.app
+                    <div className="mx-4 flex h-5 flex-1 items-center justify-start px-2 gap-2 rounded-[4px] border border-border/40 bg-background/50 font-mono text-[10px] text-muted-foreground">
+                       <Icon name="search" className="size-3" />
+                       http://localhost:3000
                     </div>
                   </div>
-                  <div className="flex flex-1 flex-col justify-between p-6">
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                          {appGenerated ? "App generated" : "Ready to generate"}
-                        </Badge>
-                        <h1 className="font-serif text-3xl font-semibold tracking-tight">{brief.title}</h1>
-                        <p className="max-w-2xl text-[14px] leading-relaxed text-muted-foreground">{brief.objective}</p>
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="rounded-[16px] border border-border/40 bg-background/80 p-4">
-                          <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Selected use case</div>
-                          <div className="text-[14px] font-semibold">{selectedUseCase.title}</div>
-                        </div>
-                        <div className="rounded-[16px] border border-border/40 bg-background/80 p-4">
-                          <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Chosen variant</div>
-                          <div className="text-[14px] font-semibold">{selectedVariant.title}</div>
-                        </div>
-                        <div className="rounded-[16px] border border-border/40 bg-background/80 p-4">
-                          <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Preview status</div>
-                          <div className="text-[14px] font-semibold">{previewOpened ? "Live" : "Paused"}</div>
-                        </div>
-                      </div>
-                      <div className="rounded-[20px] border border-dashed border-primary/30 bg-primary/5 p-6">
-                        <div className="mb-2 text-[10px] font-mono uppercase tracking-widest text-primary">{selectedVariant.previewTitle}</div>
-                        <p className="mb-4 max-w-2xl text-[14px] leading-relaxed text-foreground/85">{selectedVariant.previewDescription}</p>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div className="rounded-[14px] border border-border/40 bg-background/80 p-4 text-[13px] text-foreground/85">
-                            Team chat, documentația și selecția de variante sunt legate într-un singur flux coerent.
-                          </div>
-                          <div className="rounded-[14px] border border-border/40 bg-background/80 p-4 text-[13px] text-foreground/85">
-                            CTA-ul principal duce mereu utilizatorul către pasul logic următor, fără butoane moarte.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-6 flex flex-wrap gap-3">
-                      <Button onClick={restartFlow}>Pornește un flow nou</Button>
-                      <Button variant="outline" onClick={() => moveToStage("Conversation", "Echipa revine la primul pas al userflow-ului.")}>
-                        Înapoi la conversație
-                      </Button>
-                    </div>
+                  
+                  <div className="flex-1 bg-white relative w-full h-full">
+                     {appGenerated ? (
+                       <iframe 
+                         src="http://localhost:3000" 
+                         className="absolute inset-0 w-full h-full border-none bg-background"
+                         title="App Preview"
+                         allow="allow-scripts allow-same-origin"
+                       />
+                     ) : (
+                       <div className="h-full w-full flex flex-col items-center justify-center bg-card text-muted-foreground">
+                         <Icon name="terminal" className="size-12 opacity-20 mb-4" />
+                         <p>Ruleaza `npm run dev` din terminalul 'Final Code' pentru a genera app-ul.</p>
+                       </div>
+                     )}
                   </div>
                 </Card>
 
@@ -1158,13 +1350,13 @@ export function IdeationDashboard() {
           )}
         </main>
 
-        <aside className="relative z-10 hidden w-72 shrink-0 flex-col border-l border-white/5 bg-background/50 backdrop-blur-xl 2xl:flex">
+        <aside className="relative z-10 hidden w-[260px] 2xl:w-[300px] shrink-0 flex-col border-l border-white/5 bg-background/50 backdrop-blur-xl lg:flex overflow-hidden">
           <div className="flex h-[42px] shrink-0 items-center justify-between border-b border-border/30 bg-black/10 px-4">
             <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/70">Team & Trace</span>
             <Icon name="users" className="size-4 text-muted-foreground/70" />
           </div>
-          <div className="flex-1 space-y-8 overflow-y-auto p-5">
-            <div className="space-y-4">
+          <div className="flex flex-col flex-1 gap-6 overflow-y-auto p-5">
+            <div className="space-y-4 shrink-0">
               <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
                 <div className="size-1.5 rounded-full bg-chart-2 shadow-sm" />
                 Active Peers
@@ -1181,30 +1373,6 @@ export function IdeationDashboard() {
                         <span className="rounded-[4px] bg-muted/60 px-1 py-0.5 text-[9px] font-mono uppercase text-muted-foreground">{collaborator.role.split(" ")[0]}</span>
                       </p>
                       <p className="truncate text-[11px] font-medium text-muted-foreground/80">{collaborator.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator className="bg-border/30" />
-
-            <div className="space-y-4">
-              <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
-                <Icon name="pulse" className="size-3 text-primary/80" />
-                Auto-Logs
-              </h4>
-              <div className="space-y-0 pb-4">
-                {activity.slice(0, 8).map((entry) => (
-                  <div key={entry.id} className="relative cursor-default pb-5 pl-5 opacity-80 transition-opacity hover:opacity-100 last:pb-0">
-                    <div className="absolute left-0 top-1.5 z-10 size-2 rounded-full bg-primary ring-4 ring-background shadow-[0_0_10px_rgba(16,185,129,0.35)]" />
-                    <div className="absolute bottom-[-10px] left-[3px] top-3 -z-0 w-px bg-gradient-to-b from-border/70 to-border/20 last:hidden" />
-                    <div className="mt-[-2px] space-y-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[12.5px] font-semibold tracking-tight text-primary">{entry.title}</span>
-                        <span className="shrink-0 text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground/60">{entry.time}</span>
-                      </div>
-                      <p className="text-[11.5px] leading-snug text-muted-foreground/80">{entry.detail}</p>
                     </div>
                   </div>
                 ))}
