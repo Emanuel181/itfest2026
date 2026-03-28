@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { IdeationDashboard } from "@/components/ideation-dashboard"
 
 export default function Home() {
-  redirect("/analysis");
+  return <IdeationDashboard />
 }

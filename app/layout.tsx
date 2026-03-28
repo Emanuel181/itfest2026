@@ -1,25 +1,22 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto_Slab, Inter } from "next/font/google";
-import "./globals.css";
-import { cn } from "@/lib/utils";
+import type { Metadata } from "next"
+import { Inter, Roboto_Slab, Space_Grotesk } from "next/font/google"
+import "./globals.css"
+import { cn } from "@/lib/utils"
+import { ThemeProvider } from "@/components/theme-provider"
 
-const robotoSlab = Roboto_Slab({subsets:['latin'],variable:'--font-serif'});
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const robotoSlab = Roboto_Slab({ subsets: ["latin"], variable: "--font-serif" })
+
+const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  variable: "--font-brand",
+})
 
 export const metadata: Metadata = {
   title: "Luminescent IDE",
-  description: "AI-Native IDE for collaborative SDLC",
-};
+  description: "Responsive ideation dashboard integrated in Next.js",
+}
 
 export default function RootLayout({
   children,
@@ -29,16 +26,24 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn(
-              "dark h-full antialiased",
-              geistSans.variable,
-              geistMono.variable,
-              inter.variable
-            , "font-serif", robotoSlab.variable)}
+        "h-full antialiased",
+        inter.variable,
+        robotoSlab.variable,
+        spaceGrotesk.variable
+      )}
     >
-      <body className="min-h-full flex flex-col bg-[#131313] text-[#e5e2e1]">
-        {children}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
