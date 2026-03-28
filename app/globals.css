@@ -50,8 +50,6 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -82,6 +80,8 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 }
 
 .dark {
@@ -129,3 +129,41 @@
     @apply font-serif;
   }
 }
+
+/* === Luminescent IDE Design Tokens === */
+:root {
+  --ide-primary: #4edea3;
+  --ide-primary-dim: #4edea3;
+  --ide-primary-container: #10b981;
+  --ide-tertiary: #4ae176;
+  --ide-tertiary-container: #06bb56;
+  --ide-secondary: #c8c6c5;
+  --ide-surface: #131313;
+  --ide-surface-low: #1c1b1b;
+  --ide-surface-container: #201f1f;
+  --ide-surface-high: #2a2a2a;
+  --ide-surface-highest: #353534;
+  --ide-surface-variant: #353534;
+  --ide-surface-bright: #3a3939;
+  --ide-surface-lowest: #0e0e0e;
+  --ide-on-surface: #e5e2e1;
+  --ide-on-primary: #003824;
+  --ide-outline-variant: #3c4a42;
+  --ide-outline: #86948a;
+  --ide-error: #ffb4ab;
+  --ide-error-container: #93000a;
+}
+
+.code-gradient {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(19, 19, 19, 0) 100%);
+}
+
+.primary-gradient {
+  background: linear-gradient(135deg, #4edea3 0%, #10b981 100%);
+}
+
+/* Custom scrollbar */
+.ide-scroll::-webkit-scrollbar { width: 5px; }
+.ide-scroll::-webkit-scrollbar-track { background: #131313; }
+.ide-scroll::-webkit-scrollbar-thumb { background: #353534; border-radius: 10px; }
+.ide-scroll::-webkit-scrollbar-thumb:hover { background: #474746; }
