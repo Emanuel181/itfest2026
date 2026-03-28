@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Luminescent IDE
 
-## Getting Started
+Aplicatia este pregatita acum cu un backend local pentru proiect, workflow SDLC, workspace de cod si mesaje AI prin OpenAI.
 
-First, run the development server:
+## Pornire
+
+1. Creeaza fisierul de env:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Completeaza cheia OpenAI:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5-mini
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Ruleaza aplicatia:
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Aplicatia porneste pe `http://localhost:3000`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Ce este deja pregatit
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- store local persistent in `.data/project-state.json`
+- backend Next App Router pentru proiect, workflow si workspace
+- endpoint AI pregatit pentru OpenAI
+- fallback local daca lipseste cheia OpenAI
 
-## Deploy on Vercel
+## Endpoint-uri principale
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `GET /api/health`
+- `GET /api/project`
+- `PATCH /api/project`
+- `POST /api/messages`
+- `POST /api/ai/respond`
+- `GET /api/workspace/files`
+- `POST /api/workspace/files`
+- `PATCH /api/workspace/files/:fileId`
+- `POST /api/workspace/folders`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Exemple rapide
+
+Obtine starea proiectului:
+
+```bash
+curl http://localhost:3000/api/project
+```
+
+Trimite un mesaj catre Business AI:
+
+```bash
+curl -X POST http://localhost:3000/api/messages \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"business","author":"Alex","text":"Vreau approval gates clare pentru fiecare etapa."}'
+```
+
+Creeaza un fisier nou in workspace:
+
+```bash
+curl -X POST http://localhost:3000/api/workspace/files \
+  -H "Content-Type: application/json" \
+  -d '{"parentPath":"src/app","name":"review/page.tsx"}'
+```
+
+## Structura backend
+
+- [lib/backend/types.ts](/home/chiriac-alexandru/Github/itfest2026/lib/backend/types.ts)
+- [lib/backend/defaults.ts](/home/chiriac-alexandru/Github/itfest2026/lib/backend/defaults.ts)
+- [lib/backend/store.ts](/home/chiriac-alexandru/Github/itfest2026/lib/backend/store.ts)
+- [lib/backend/service.ts](/home/chiriac-alexandru/Github/itfest2026/lib/backend/service.ts)
+- [lib/backend/openai.ts](/home/chiriac-alexandru/Github/itfest2026/lib/backend/openai.ts)
+
+## Observatie
+
+Frontend-ul actual este inca un demo bogat de UI si nu consuma complet acest backend in toate ecranele. Dar backend-ul este deja pregatit pentru rulare locala si pentru integrarea completa a UI-ului peste el.

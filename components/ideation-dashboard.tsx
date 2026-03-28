@@ -1,7 +1,8 @@
 "use client"
 
-import { useMemo, useRef, useState, type ReactNode } from "react"
-import { useTheme } from "next-themes"
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react"
+import { withProjectQuery } from "@/lib/backend/project-url"
+import { useTheme } from "@/components/theme-provider"
 import { ReactFlow, Controls, Background } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { Badge } from "@/components/ui/badge"
@@ -10,14 +11,20 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import type { ProjectState as BackendProjectState } from "@/lib/backend/types"
 import { cn } from "@/lib/utils"
 
 type StageKey =
   | "Conversation"
   | "Documentation"
+  | "Requirements"
   | "Features"
   | "User Stories"
+  | "Planning"
   | "Final Code"
+  | "Security Review"
+  | "Merge"
+  | "Project Review"
   | "Preview"
 
 type BriefState = {
@@ -32,44 +39,7 @@ type BriefState = {
   architecture: string
 }
 
-type Message = {
-  id: string
-  author: "Alex" | "Mara" | "Ionut" | "AI Copilot" | "Business AI" | "Tech AI"
-  role: "human" | "ai"
-  text: string
-}
-
-type BusinessSpeaker = "Alex" | "Mara"
-type TechSpeaker = "Ionut" | "Alex"
-type HumanSpeaker = BusinessSpeaker | TechSpeaker
 type BriefListKey = "audience" | "scope" | "deliverables" | "risks"
-
-type ActivityEntry = {
-  id: string
-  title: string
-  detail: string
-  time: string
-}
-
-type Feature = {
-  id: string
-  title: string
-  summary: string
-  preview: string
-  variations: string[]
-  acceptance: string[]
-}
-
-type UserStory = {
-  id: string
-  title: string
-  stack: string
-  summary: string
-  tradeoff: string
-  previewTitle: string
-  previewDescription: string
-  code: string
-}
 
 type WorkspaceFile = {
   id: string
@@ -95,58 +65,75 @@ type SchemaRelation = {
   field: string
 }
 
+type RequirementView = {
+  id: string
+  title: string
+  detail: string
+  kind: "functional" | "non-functional"
+  status: "draft" | "derived" | "approved"
+  featureIds: string[]
+  storyIds: string[]
+}
+
+type TraceSegment = {
+  label: string
+  value: string
+  tone?: "default" | "primary" | "accent"
+}
+
 type SlashAction = "refactor" | "comment" | "scaffold"
 type TerminalSlashAction = "fix" | "explain" | "command"
+type TerminalLine = { type: "system" | "out" | "error" | "cmd" | "trace"; text: string }
 
 const stages: StageKey[] = [
   "Conversation",
   "Documentation",
+  "Requirements",
   "Features",
   "User Stories",
+  "Planning",
   "Final Code",
+  "Security Review",
+  "Merge",
+  "Project Review",
   "Preview",
 ]
 
 const stageNumbers: Record<StageKey, string> = {
   Conversation: "01",
   Documentation: "02",
-  Features: "03",
-  "User Stories": "04",
-  "Final Code": "05",
-  Preview: "06",
+  Requirements: "03",
+  Features: "04",
+  "User Stories": "05",
+  Planning: "06",
+  "Final Code": "07",
+  "Security Review": "08",
+  Merge: "09",
+  "Project Review": "10",
+  Preview: "11",
 }
 
 const stageDescriptions: Record<StageKey, string> = {
   Conversation: "Oamenii discută pe ramuri separate: Business și Tech",
   Documentation: "Generare scheme tehnice și brief de produs.",
+  Requirements: "Derivare și aprobare requirements funcționale și non-funcționale.",
   Features: "Selecție a modulelor și variațiilor recomandate.",
   "User Stories": "Maparea Agile a feature-urilor bifate.",
+  Planning: "Estimări, dependențe și handoff pentru implementare.",
   "Final Code": "Se vede codul final pentru aplicația formată.",
+  "Security Review": "Audit automat și aprobare umană înainte de merge.",
+  Merge: "Integrare ordonată și changelog pentru story-ul ales.",
+  "Project Review": "Raport de sănătate, progres și datorie tehnică.",
   Preview: "Aplicația este generată și rulată în preview.",
 }
 
-const topLinks: StageKey[] = ["Conversation", "Documentation", "Preview"]
+const topLinks: StageKey[] = ["Conversation", "Documentation", "Security Review", "Preview"]
 
 const starterPrompts = [
   "Avem nevoie de un flow clar de la idee la preview.",
   "Documentația trebuie aprobată de echipă înainte de implementare.",
   "Vreau să compar 3 variante generate și să aleg rapid una.",
 ]
-
-const collaborators = [
-  { name: "Alex", role: "Product lead", initials: "AC", status: "clarifică ideea" },
-  { name: "Mara", role: "UX architect", initials: "MR", status: "rafinează userflow-ul" },
-  { name: "Ionut", role: "Tech lead", initials: "IN", status: "pregătește varianta finală" },
-]
-
-const businessSpeakers: BusinessSpeaker[] = ["Alex", "Mara"]
-const techSpeakers: TechSpeaker[] = ["Ionut", "Alex"]
-const subagents = [
-  { id: "SA-01", name: "Business AI", specialty: "Brief synthesis", stage: "Documentation", status: "active" },
-  { id: "SA-02", name: "Tech AI", specialty: "Architecture mapping", stage: "Documentation", status: "active" },
-  { id: "SA-03", name: "Security Agent", specialty: "Risk scanning", stage: "Features", status: "queued" },
-  { id: "SA-04", name: "Merge Agent", specialty: "Integration plan", stage: "Final Code", status: "standby" },
-] as const
 
 const documentationFieldMeta: Record<
   BriefListKey,
@@ -206,276 +193,39 @@ const initialArchEdges = [
   { id: 'e7-10', source: '7', target: '10' },
 ]
 
-const initialBrief: BriefState = {
-  title: "AI-Native SDLC IDE",
-  objective:
-    "Construiți un IDE unde echipele discută, documentează, aleg feature-uri și generează o aplicație complexă.",
-  audience: ["Product manageri", "Developeri", "Technical leads"],
-  scope: [
-    "Conversație pe 2 planuri (Business/Tech)",
-    "Documentație de arhitectură și brief",
-    "Generare dinamică User Stories",
-  ],
-  deliverables: [
-    "Project brief aprobat",
-    "Arhitectură tehnică validată",
-    "Cod final și preview rulabil",
-  ],
-  risks: ["Confuzie între etape", "Alegere dificilă între variante tehnice"],
-  techStack: ["Next.js", "TailwindCSS", "PostgreSQL", "Supabase", "Redis"],
-  dbSchema:
-    "model User {\n  id String @id @default(uuid())\n  email String @unique\n  role String\n  stories Story[]\n}\n\nmodel Story {\n  id String @id @default(uuid())\n  title String\n  status String\n  userId String\n  owner User @relation(fields: [userId], references: [id])\n  requirements Requirement[]\n}\n\nmodel Requirement {\n  id String @id @default(uuid())\n  title String\n  priority String\n  storyId String\n  story Story @relation(fields: [storyId], references: [id])\n}",
-  architecture: "Fullstack Next.js architecture with Edge Functions and collaborative WebSocket server for real-time presence.",
-}
-
-const initialBusinessMessages: Message[] = [
-  {
-    id: "mb1",
-    author: "Alex",
-    role: "human",
-    text: "Mă gândesc că targetul nostru sunt agențiile enterprise.",
-  },
-  {
-    id: "mb2",
-    author: "Business AI",
-    role: "ai",
-    text: "Excelent. Pentru agenții, modelul de 'SaaS cu licențiere on-premise' generează cele mai puține frecări. Adăugăm funcții de RBAC în brief?",
-  },
-]
-
-const initialTechMessages: Message[] = [
-  {
-    id: "mt1",
-    author: "Ionut",
-    role: "human",
-    text: "Vrem un delay minim pe live-sync. Posibil un Y.js adapter.",
-  },
-  {
-    id: "mt2",
-    author: "Tech AI",
-    role: "ai",
-    text: "Recomand WebSockets pe instanțe edge. Vom folosi un server Hocuspocus lângă baza ta Supabase/PostgreSQL.",
-  },
-]
-
-const initialActivity: ActivityEntry[] = [
-  { id: "a1", title: "Flow initialized", detail: "Workspace-ul pornește din etapa de conversație.", time: "Acum" },
-  { id: "a2", title: "AI Copilot", detail: "A sintetizat direcția produsului în 6 pași.", time: "Acum" },
-]
-
-function toSentenceLabel(value: string, fallback: string) {
-  const cleaned = value.trim().replace(/[.:]/g, "")
-  if (!cleaned) return fallback
-  return cleaned
-    .split(/\s+/)
-    .slice(0, 6)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
-function buildFeatures(brief: BriefState): Feature[] {
-  return [
-    {
-      id: "FEAT-01",
-      title: "Real-time Collaboration Engine",
-      summary: `Infrastructură de sincronizare date pentru ${brief.title.toLowerCase()}.`,
-      preview: "Chat orchestration view",
-      variations: ["Utilizare Y.js + WebSockets via Hocuspocus", "Polling optimizat via SWR (mai ieftin)", "Liveblocks managed via REST"],
-      acceptance: [
-        "Cursor prezența vizuală pentru colaboratori",
-        "Conflicte rezolvate per-character",
-      ],
-    },
-    {
-      id: "FEAT-02",
-      title: "Role-Based Audit & Approval",
-      summary: `Proces de QA formal derivat din obiectivul arhitectural: ${brief.architecture.substring(0, 30)}...`,
-      preview: "Editable documentation canvas",
-      variations: ["Sistem hibrid cu AI auto-approve pentru Low-Risk", "Manual strict cu 2+ semnături umane"],
-      acceptance: [
-        "Jurnale stocate imutabil",
-        "Blocare acțiuni critice for unauthorized users",
-      ],
-    },
-    {
-      id: "FEAT-03",
-      title: "Automated SDLC Generator",
-      summary: "Agenti de AI ce traduc scheme de DB + Brief în cod boilerplate Node.js.",
-      preview: "Variant comparison board",
-      variations: ["Microservices Scaffold in Docker", "Next.js Monolith route generators"],
-      acceptance: [
-        "Generează Prisma schema automat",
-        "O singură execuție creează minim MVP",
-      ],
-    },
-  ]
-}
-
-function buildUserStories(feature: Feature, brief: BriefState): UserStory[] {
-  const objectiveKey = toSentenceLabel(brief.objective, "Collaborative Flow")
-  return [
-    {
-      id: "US-01",
-      title: "Story: Setup Live Sync",
-      stack: "Next.js + WebSockets",
-      summary: "Ca developer, vreau să leg Hocuspocus pentru a suporta cursor prezența.",
-      tradeoff: "Timp de deploy mărit, dar experiența client este flawless.",
-      previewTitle: "Live Sync Preview",
-      previewDescription: "Sincronizarea multi-player pornește automat la accesarea planșei.",
-      code: `export const featureStack = {\n  feat: "${objectiveKey}",\n  adapter: "y-websocket",\n  serverUrl: "wss://engine.luminescent.app",\n}\n`,
-    },
-    {
-      id: "US-02",
-      title: "Story: CI/CD Approvals",
-      stack: "GitHub Actions + Prisma",
-      summary: "Ca product lead, vreau ca orice modificare de schema DB să ceară +1.",
-      tradeoff: "Adaugă un gate de 5 minute la pipeline-uri.",
-      previewTitle: "Approval Gate",
-      previewDescription: "Cererile sunt delegate catre QA agent înainte de merge la origin/main.",
-      code: `export const authPipeline = {\n  feat: "${objectiveKey}",\n  rules: [{ enforce: "db-schema", checks: 2 }],\n}\n`,
-    },
-    {
-      id: "US-03",
-      title: "Story: Scaffold Generators",
-      stack: "AST Builders + LLM",
-      summary: "Ca architect, vreau ca endpoint-urile CRUD să fie turn-key.",
-      tradeoff: "Mentenanță grea pe engine-urile de AST parsing dar viteză pentru end-user.",
-      previewTitle: "Boilerplate Factory",
-      previewDescription: "Aplicația injectează rutele Next.js API in runtime pe Vercel Edge.",
-      code: `export const generator = {\n  target: "next-app-router",\n  useActions: true,\n  db: "prisma",\n}\n`,
-    },
-  ].map((variant) => ({
-    ...variant,
-    summary: `${variant.summary} (Derived from ${feature.title.toLowerCase()}).`,
-  }))
-}
-
-function buildWorkspaceFolders() {
-  return [
-    { id: "folder-docs", name: "docs", path: "docs" },
-    { id: "folder-specs", name: "specs", path: "specs" },
-    { id: "folder-src", name: "src", path: "src" },
-    { id: "folder-src-app", name: "app", path: "src/app" },
-    { id: "folder-src-components", name: "components", path: "src/components" },
-    { id: "folder-src-lib", name: "lib", path: "src/lib" },
-  ] satisfies WorkspaceFolder[]
-}
-
-function buildWorkspaceFiles(brief: BriefState, feature: Feature, userStory: UserStory): WorkspaceFile[] {
-  return [
-    {
-      id: "file-brief",
-      name: "project-brief.md",
-      path: "docs/project-brief.md",
-      content: `# ${brief.title}\n\n## Objective\n${brief.objective}\n\n## Audience\n${brief.audience.map((item) => `- ${item}`).join("\n")}\n\n## Scope\n${brief.scope.map((item) => `- ${item}`).join("\n")}\n`,
-    },
-    {
-      id: "file-feature",
-      name: "selected-feature.md",
-      path: "specs/selected-feature.md",
-      content: `# ${feature.id} ${feature.title}\n\n${feature.summary}\n\n## Variations\n${feature.variations.map((item) => `- ${item}`).join("\n")}\n`,
-    },
-    {
-      id: "file-layout",
-      name: "layout.tsx",
-      path: "src/app/layout.tsx",
-      content: `export const appName = ${JSON.stringify(`${brief.title} Test App`)}\nexport const appDescription = ${JSON.stringify("A small mocked workspace app used for validating the live preview loop.")}\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return children\n}\n`,
-    },
-    {
-      id: "file-page",
-      name: "page.tsx",
-      path: "src/app/page.tsx",
-      content: `import { mockTasks, mockStats } from "@/lib/preview-data"\nimport { agentStatuses } from "@/components/agent-status"\n\nexport const heroTitle = ${JSON.stringify("Team Sprint Board")}\nexport const heroSubtitle = ${JSON.stringify("A mocked test app for checking how code changes flow into the integrated preview.")}\nexport const primaryCta = "Create task"\nexport const secondaryCta = "Open backlog"\nexport const stageItems = ${JSON.stringify([
-        "Brief approved",
-        "Feature selected",
-        "Stories generated",
-        "Mock app ready for test",
-      ], null, 2)}\nexport const metricItems = ${JSON.stringify([
-        { label: "Open tasks", value: "12" },
-        { label: "In review", value: "3" },
-        { label: "Agents active", value: "4" },
-      ], null, 2)}\nexport const feedItems = ${JSON.stringify([
-        "Mara refined the homepage copy.",
-        "Tech AI refreshed the runtime config.",
-        "Merge Agent is ready for the next approval gate.",
-      ], null, 2)}\n\nexport default function Page() {\n  return (\n    <main className="grid gap-6 p-6">\n      <section>\n        <h1>{heroTitle}</h1>\n        <p>{heroSubtitle}</p>\n      </section>\n\n      <section>\n        <h2>Stats</h2>\n        <div>\n          {mockStats.map((item) => (\n            <article key={item.label}>\n              <strong>{item.value}</strong>\n              <span>{item.label}</span>\n            </article>\n          ))}\n        </div>\n      </section>\n\n      <section>\n        <h2>Tasks</h2>\n        <div>\n          {mockTasks.map((task) => (\n            <article key={task.id}>\n              <strong>{task.title}</strong>\n              <p>{task.owner} · {task.status}</p>\n            </article>\n          ))}\n        </div>\n      </section>\n\n      <section>\n        <h2>Agents</h2>\n        <div>\n          {agentStatuses.map((agent) => (\n            <article key={agent.name}>\n              <strong>{agent.name}</strong>\n              <span>{agent.status}</span>\n            </article>\n          ))}\n        </div>\n      </section>\n    </main>\n  )\n}\n`,
-    },
-    {
-      id: "file-component",
-      name: "agent-status.tsx",
-      path: "src/components/agent-status.tsx",
-      content: `export const agentStatuses = ${JSON.stringify([
-        { name: "Business AI", status: "active" },
-        { name: "Tech AI", status: "active" },
-        { name: "Frontend Agent", status: "drafting UI" },
-        { name: "Merge Agent", status: "standby" },
-      ], null, 2)}\n`,
-    },
-    {
-      id: "file-lib",
-      name: "preview-data.ts",
-      path: "src/lib/preview-data.ts",
-      content: `${userStory.code}\nexport const previewMeta = {\n  title: ${JSON.stringify("Team Sprint Board")},\n  feature: ${JSON.stringify(feature.id)},\n  status: "ready-for-preview",\n}\n\nexport const mockStats = [\n  { label: "Tasks", value: "12" },\n  { label: "Velocity", value: "23 pts" },\n  { label: "Approval rate", value: "96%" },\n]\n\nexport const mockTasks = [\n  { id: "TASK-01", title: "Design final review panel", owner: "Mara", status: "In progress" },\n  { id: "TASK-02", title: "Wire the Bedrock gateway", owner: "Ionut", status: "Ready for QA" },\n  { id: "TASK-03", title: "Refine merge timeline UI", owner: "Alex", status: "Draft" },\n]\n`,
-    },
-  ]
-}
-
-function getWorkspaceName(path: string) {
-  const parts = path.split("/").filter(Boolean)
-  return parts[parts.length - 1] ?? path
-}
-
 function getWorkspaceParentPath(path: string) {
   const parts = path.split("/").filter(Boolean)
   return parts.slice(0, -1).join("/")
 }
 
-function joinWorkspacePath(parentPath: string, name: string) {
-  return [parentPath, name].filter(Boolean).join("/")
-}
+function getMessageOrderValue(id: string, fallbackIndex: number) {
+  const match = id.match(/-(\d+)-/)
+  if (!match) return fallbackIndex
 
-function createDefaultFileContent(path: string) {
-  if (path.endsWith(".md")) {
-    return `# ${getWorkspaceName(path).replace(/[-_]/g, " ")}\n`
-  }
-
-  if (path.endsWith(".ts") || path.endsWith(".tsx")) {
-    return `export const ${toSentenceLabel(getWorkspaceName(path).replace(/\.[^.]+$/, ""), "newFile").replace(/\s+/g, "")} = {}\n`
-  }
-
-  if (path.endsWith(".json")) {
-    return "{\n  \n}\n"
-  }
-
-  return ""
-}
-
-function buildAiReply(message: string) {
-  const normalized = message.trim()
-  if (!normalized) return "Continuăm."
-  return `Am preluat direcția "${toSentenceLabel(normalized, "Flow Update")}" și o împing în următorul artefact logic.`
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) ? parsed : fallbackIndex
 }
 
 function createAiEditedContent(file: WorkspaceFile, action: SlashAction, instruction: string) {
-  const normalizedInstruction = instruction.trim() || "tighten the implementation"
+  const normalizedInstruction = instruction.trim() || "update the active application flow"
 
   if (file.name.endsWith(".md")) {
-    return `${file.content}\n## AI Edit\n- Action: ${action}\n- Prompt: ${normalizedInstruction}\n- Result: mock update applied directly from the slash popup.\n`
+    return `${file.content}\n## AI Edit Request\n- File: ${file.path}\n- Action: ${action}\n- Requested app change: ${normalizedInstruction}\n- Result: update drafted from the slash editor prompt.\n`
   }
 
-  const header =
+  const summaryComment =
     action === "comment"
-      ? `// AI note: ${normalizedInstruction}`
+      ? `// AI note for app update: ${normalizedInstruction}`
       : action === "scaffold"
-        ? `// AI scaffold: ${normalizedInstruction}`
-        : `// AI refactor: ${normalizedInstruction}`
+        ? `// AI scaffold request: ${normalizedInstruction}`
+        : `// AI refactor request: ${normalizedInstruction}`
 
   const snippet =
     action === "comment"
-      ? `${header}\n`
+      ? `${summaryComment}\n`
       : action === "scaffold"
-        ? `${header}\nexport const aiEditedBlock = {\n  status: "draft-applied",\n  prompt: ${JSON.stringify(normalizedInstruction)},\n}\n`
-        : `${header}\nexport function applyAiInstruction() {\n  return ${JSON.stringify(normalizedInstruction)}\n}\n`
+        ? `${summaryComment}\nexport const aiEditDraft = {\n  targetFile: ${JSON.stringify(file.path)},\n  requestedChange: ${JSON.stringify(normalizedInstruction)},\n  status: "draft-applied",\n}\n`
+        : `${summaryComment}\nexport function applyAiInstructionDraft() {\n  return {\n    targetFile: ${JSON.stringify(file.path)},\n    requestedChange: ${JSON.stringify(normalizedInstruction)},\n    status: "needs-review",\n  }\n}\n`
 
   return `${snippet}\n${file.content}`
 }
@@ -503,429 +253,8 @@ function createTerminalAiResponse(action: TerminalSlashAction, instruction: stri
   }
 }
 
-function escapePreviewHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-}
-
-function readWorkspaceFile(files: WorkspaceFile[], path: string) {
-  return files.find((file) => file.path === path)
-}
-
-function readStringExport(source: string, exportName: string, fallback: string) {
-  const match = source.match(new RegExp(`export const ${exportName} = ([\\s\\S]*?)(?:\\nexport|\\n\\n|$)`))
-  if (!match) return fallback
-
-  try {
-    return JSON.parse(match[1].trim())
-  } catch {
-    return fallback
-  }
-}
-
-function readJsonExport<T>(source: string, exportName: string, fallback: T) {
-  const match = source.match(new RegExp(`export const ${exportName} = ([\\s\\S]*?)(?:\\nexport|\\n\\n|$)`))
-  if (!match) return fallback
-
-  try {
-    return JSON.parse(match[1].trim()) as T
-  } catch {
-    return fallback
-  }
-}
-
-function buildPreviewDocument(
-  brief: BriefState,
-  feature: Feature,
-  userStory: UserStory,
-  files: WorkspaceFile[]
-) {
-  const layoutFile = readWorkspaceFile(files, "src/app/layout.tsx")
-  const pageFile = readWorkspaceFile(files, "src/app/page.tsx")
-  const statusFile = readWorkspaceFile(files, "src/components/agent-status.tsx")
-  const previewMetaFile = readWorkspaceFile(files, "src/lib/preview-data.ts")
-
-  const layoutSource = layoutFile?.content ?? ""
-  const pageSource = pageFile?.content ?? ""
-  const statusSource = statusFile?.content ?? ""
-  const previewMetaSource = previewMetaFile?.content ?? ""
-
-  const appName = readStringExport(layoutSource, "appName", brief.title)
-  const appDescription = readStringExport(layoutSource, "appDescription", brief.objective)
-  const heroTitle = readStringExport(pageSource, "heroTitle", userStory.previewTitle)
-  const heroSubtitle = readStringExport(pageSource, "heroSubtitle", userStory.summary)
-  const primaryCta = readStringExport(pageSource, "primaryCta", "Generate Preview")
-  const secondaryCta = readStringExport(pageSource, "secondaryCta", "Review Story")
-  const stageItems = readJsonExport<string[]>(pageSource, "stageItems", [
-    "Ideation approved",
-    `${feature.id} selected`,
-    `${userStory.id} generated`,
-  ])
-  const metricItems = readJsonExport<{ label: string; value: string }[]>(pageSource, "metricItems", [
-    { label: "Feature", value: feature.id },
-    { label: "Story", value: userStory.id },
-    { label: "Stack", value: userStory.stack },
-  ])
-  const feedItems = readJsonExport<string[]>(pageSource, "feedItems", [
-    "Business AI updated the brief.",
-    "Tech AI aligned the architecture.",
-  ])
-  const agentStatuses = readJsonExport<{ name: string; status: string }[]>(statusSource, "agentStatuses", [
-    { name: "Business AI", status: "active" },
-    { name: "Tech AI", status: "active" },
-    { name: "Merge Agent", status: "standby" },
-  ])
-  const previewMeta = readJsonExport<{ title?: string; feature?: string; status?: string }>(previewMetaSource, "previewMeta", {
-    title: userStory.previewTitle,
-    feature: feature.id,
-    status: "ready-for-preview",
-  })
-
-  const routeFiles = files
-    .filter((file) => file.path.startsWith("src/app/"))
-    .sort((left, right) => left.path.localeCompare(right.path))
-
-  const componentFiles = files
-    .filter((file) => file.path.startsWith("src/components/"))
-    .sort((left, right) => left.path.localeCompare(right.path))
-
-  const runtimeFiles = [...routeFiles, ...componentFiles]
-    .map(
-      (file) => `
-        <div class="runtime-file">
-          <span>${escapePreviewHtml(file.path)}</span>
-          <span>${file.content.split("\n").length} lines</span>
-        </div>
-      `
-    )
-    .join("")
-
-  const stageMarkup = stageItems
-    .map(
-      (item, index) => `
-        <div class="stage-row">
-          <span class="stage-index">${String(index + 1).padStart(2, "0")}</span>
-          <span>${escapePreviewHtml(item)}</span>
-        </div>
-      `
-    )
-    .join("")
-
-  const metricMarkup = metricItems
-    .map(
-      (item) => `
-        <div class="metric-card">
-          <div class="metric-label">${escapePreviewHtml(item.label)}</div>
-          <div class="metric-value">${escapePreviewHtml(item.value)}</div>
-        </div>
-      `
-    )
-    .join("")
-
-  const feedMarkup = feedItems
-    .map(
-      (item) => `
-        <div class="feed-item">${escapePreviewHtml(item)}</div>
-      `
-    )
-    .join("")
-
-  const agentMarkup = agentStatuses
-    .map(
-      (item) => `
-        <div class="agent-row">
-          <span>${escapePreviewHtml(item.name)}</span>
-          <span class="agent-status">${escapePreviewHtml(item.status)}</span>
-        </div>
-      `
-    )
-    .join("")
-
-  return `<!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Live Preview</title>
-      <style>
-        :root {
-          color-scheme: dark;
-          --bg: #0b1118;
-          --panel: rgba(15, 23, 34, 0.92);
-          --panel-strong: rgba(10, 16, 24, 0.98);
-          --line: rgba(148, 163, 184, 0.18);
-          --muted: #8aa0b8;
-          --text: #e8f0f8;
-          --accent: #34d399;
-          --accent-soft: rgba(52, 211, 153, 0.14);
-          --code: #111927;
-        }
-
-        * { box-sizing: border-box; }
-        body {
-          margin: 0;
-          font-family: "Space Grotesk", system-ui, sans-serif;
-          background:
-            radial-gradient(circle at top left, rgba(52, 211, 153, 0.16), transparent 28%),
-            radial-gradient(circle at top right, rgba(96, 165, 250, 0.14), transparent 26%),
-            linear-gradient(180deg, #091018 0%, #0b1118 100%);
-          color: var(--text);
-        }
-
-        .shell {
-          min-height: 100vh;
-          padding: 28px;
-          display: grid;
-          gap: 18px;
-          grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.7fr);
-        }
-
-        .panel {
-          background: var(--panel);
-          border: 1px solid var(--line);
-          border-radius: 24px;
-          overflow: hidden;
-          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
-          backdrop-filter: blur(18px);
-        }
-
-        .hero {
-          padding: 26px;
-          background:
-            linear-gradient(135deg, rgba(52, 211, 153, 0.16), rgba(56, 189, 248, 0.08)),
-            var(--panel-strong);
-          border-bottom: 1px solid var(--line);
-        }
-
-        .eyebrow, .meta span, .file-header span:last-child {
-          color: var(--muted);
-          font-size: 11px;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-        }
-
-        h1 {
-          margin: 10px 0 12px;
-          font-size: 34px;
-          line-height: 1.05;
-        }
-
-        .hero p, .story-copy {
-          margin: 0;
-          color: #c5d3e0;
-          line-height: 1.7;
-          font-size: 14px;
-        }
-
-        .meta {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          margin-top: 18px;
-        }
-
-        .meta span {
-          padding: 8px 10px;
-          border-radius: 999px;
-          background: var(--accent-soft);
-          color: #d8fff1;
-          letter-spacing: 0.08em;
-        }
-
-        .content {
-          padding: 18px;
-          display: grid;
-          gap: 14px;
-        }
-
-        .card {
-          padding: 18px;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          background: rgba(10, 16, 24, 0.6);
-        }
-
-        .card h2 {
-          margin: 0 0 10px;
-          font-size: 16px;
-        }
-
-        .sidebar {
-          display: grid;
-          gap: 12px;
-          padding: 18px;
-          align-content: start;
-        }
-
-        .hero-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          margin-top: 20px;
-        }
-
-        .hero-actions button {
-          border: 1px solid var(--line);
-          border-radius: 999px;
-          padding: 10px 14px;
-          background: rgba(255, 255, 255, 0.04);
-          color: var(--text);
-          font: inherit;
-        }
-
-        .hero-actions .primary {
-          background: var(--accent);
-          color: #04120d;
-          border-color: transparent;
-          font-weight: 700;
-        }
-
-        .stage-list, .feed-list, .runtime-list, .agent-list {
-          display: grid;
-          gap: 10px;
-        }
-
-        .stage-row, .feed-item, .runtime-file, .agent-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          padding: 12px 14px;
-          background: rgba(255, 255, 255, 0.03);
-        }
-
-        .stage-index, .metric-label, .agent-status {
-          color: var(--muted);
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-
-        .metric-grid {
-          display: grid;
-          gap: 12px;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .metric-card {
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          padding: 16px;
-          background: rgba(255, 255, 255, 0.03);
-        }
-
-        .metric-value {
-          margin-top: 8px;
-          font-size: 16px;
-          font-weight: 700;
-        }
-
-        pre {
-          margin: 0;
-          padding: 14px;
-          overflow: auto;
-          white-space: pre-wrap;
-          word-break: break-word;
-          font: 12px/1.6 "Roboto Mono", "SFMono-Regular", monospace;
-          background: var(--code);
-          color: #dbeafe;
-          max-height: 240px;
-        }
-
-        .live-dot {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .live-dot::before {
-          content: "";
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          background: var(--accent);
-          box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.12);
-        }
-
-        @media (max-width: 980px) {
-          .shell {
-            grid-template-columns: 1fr;
-            padding: 16px;
-          }
-
-          .metric-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <main class="shell">
-        <section class="panel">
-          <div class="hero">
-            <div class="eyebrow live-dot">Virtual App Runtime</div>
-            <h1>${escapePreviewHtml(heroTitle)}</h1>
-            <p>${escapePreviewHtml(heroSubtitle)}</p>
-            <div class="meta">
-              <span>${escapePreviewHtml(appName)}</span>
-              <span>${escapePreviewHtml(previewMeta.feature ?? feature.id)}</span>
-              <span>${escapePreviewHtml(previewMeta.status ?? "ready-for-preview")}</span>
-            </div>
-            <div class="hero-actions">
-              <button class="primary">${escapePreviewHtml(primaryCta)}</button>
-              <button>${escapePreviewHtml(secondaryCta)}</button>
-            </div>
-          </div>
-          <div class="content">
-            <article class="card">
-              <div class="eyebrow">Application Shell</div>
-              <h2>${escapePreviewHtml(appName)}</h2>
-              <p class="story-copy">${escapePreviewHtml(appDescription)}</p>
-            </article>
-            <article class="card">
-              <div class="eyebrow">Key Metrics</div>
-              <div class="metric-grid">${metricMarkup}</div>
-            </article>
-            <article class="card">
-              <div class="eyebrow">Stage Timeline</div>
-              <div class="stage-list">${stageMarkup}</div>
-            </article>
-            <article class="card">
-              <div class="eyebrow">Activity Feed</div>
-              <div class="feed-list">${feedMarkup}</div>
-            </article>
-          </div>
-        </section>
-        <aside class="sidebar">
-          <section class="panel">
-            <div class="content">
-              <article class="card">
-                <div class="eyebrow">Runtime Entry</div>
-                <h2>${escapePreviewHtml(pageFile?.path ?? "src/app/page.tsx")}</h2>
-                <p class="story-copy">Preview-ul rulează ca o singură aplicație și citește doar fișierele de entry și componentele de app, nu toate fișierele din workspace.</p>
-              </article>
-              <article class="card">
-                <div class="eyebrow">Loaded Runtime Files</div>
-                <div class="runtime-list">${runtimeFiles || `<div class="feed-item">Nu există încă fișiere în src/app sau src/components.</div>`}</div>
-              </article>
-              <article class="card">
-                <div class="eyebrow">Agent States</div>
-                <div class="agent-list">${agentMarkup}</div>
-              </article>
-              <article class="card">
-                <div class="eyebrow">Rendered From</div>
-                <pre>${escapePreviewHtml(pageSource || "// Create src/app/page.tsx to drive the preview")}</pre>
-              </article>
-            </div>
-          </section>
-        </aside>
-      </main>
-    </body>
-  </html>`
+function buildAiTrace(title: string, steps: string[]) {
+  return `AI Trace · ${title}\n${steps.map((step, index) => `${index + 1}. ${step}`).join("\n")}`
 }
 
 function parseSchemaDiagram(schema: string) {
@@ -1003,6 +332,212 @@ function parseSchemaDiagram(schema: string) {
   }))
 
   return { models, relations, nodes, edges }
+}
+
+function tokenizeForMatching(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length >= 4)
+}
+
+function scoreRequirementMatch(requirementText: string, candidateText: string) {
+  const requirementTokens = new Set(tokenizeForMatching(requirementText))
+  const candidateTokens = new Set(tokenizeForMatching(candidateText))
+  let score = 0
+
+  requirementTokens.forEach((token) => {
+    if (candidateTokens.has(token)) {
+      score += 1
+    }
+  })
+
+  return score
+}
+
+function findRelatedFeatureIds(
+  requirementText: string,
+  features: BackendProjectState["features"],
+  fallbackIndex?: number
+) {
+  const matches = features
+    .map((feature, index) => ({
+      id: feature.id,
+      score: scoreRequirementMatch(
+        requirementText,
+        [feature.title, feature.summary, feature.complexityNote, ...feature.variations, ...feature.acceptance].join(" ")
+      ),
+      index,
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3)
+    .map((entry) => entry.id)
+
+  if (matches.length > 0) {
+    return matches
+  }
+
+  return typeof fallbackIndex === "number" && features[fallbackIndex] ? [features[fallbackIndex].id] : []
+}
+
+function findRelatedStoryIds(
+  requirementText: string,
+  stories: BackendProjectState["userStories"],
+  fallbackIndex?: number
+) {
+  const matches = stories
+    .map((story, index) => ({
+      id: story.id,
+      score: scoreRequirementMatch(
+        requirementText,
+        [story.title, story.summary, story.tradeoff, story.complexityNote, story.previewTitle, story.previewDescription].join(" ")
+      ),
+      index,
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3)
+    .map((entry) => entry.id)
+
+  if (matches.length > 0) {
+    return matches
+  }
+
+  return typeof fallbackIndex === "number" && stories[fallbackIndex] ? [stories[fallbackIndex].id] : []
+}
+
+function buildRequirementsView(brief: BriefState, features: BackendProjectState["features"], stories: BackendProjectState["userStories"]) {
+  const scopedRequirements: RequirementView[] = brief.scope.map((item, index) => ({
+    id: `REQ-F-${String(index + 1).padStart(2, "0")}`,
+    title: item || `Functional requirement ${index + 1}`,
+    detail: features[index]?.summary || "Derived from the approved product scope.",
+    kind: "functional",
+    status: "approved",
+    featureIds: findRelatedFeatureIds([item, features[index]?.summary ?? ""].join(" "), features, index),
+    storyIds: findRelatedStoryIds([item, features[index]?.summary ?? ""].join(" "), stories, index),
+  }))
+
+  const deliveryRequirements: RequirementView[] = brief.deliverables.map((item, index) => ({
+    id: `REQ-D-${String(index + 1).padStart(2, "0")}`,
+    title: item || `Deliverable requirement ${index + 1}`,
+    detail: stories[index]?.summary || "Must produce a reviewable implementation artifact.",
+    kind: "functional",
+    status: "derived",
+    featureIds: findRelatedFeatureIds([item, stories[index]?.summary ?? ""].join(" "), features, index),
+    storyIds: findRelatedStoryIds([item, stories[index]?.summary ?? ""].join(" "), stories, index),
+  }))
+
+  const riskRequirements: RequirementView[] = brief.risks.map((item, index) => ({
+    id: `REQ-NF-${String(index + 1).padStart(2, "0")}`,
+    title: item || `Non-functional requirement ${index + 1}`,
+    detail: "Tracked as a quality or delivery risk that affects implementation planning.",
+    kind: "non-functional",
+    status: "draft",
+    featureIds: findRelatedFeatureIds(item, features, index),
+    storyIds: findRelatedStoryIds(item, stories, index),
+  }))
+
+  return [...scopedRequirements, ...deliveryRequirements, ...riskRequirements]
+}
+
+function buildDependencyGraph(
+  features: BackendProjectState["features"],
+  stories: BackendProjectState["userStories"],
+  mode: "features" | "stories",
+  activeId?: string,
+  highlightedIds: string[] = []
+) {
+  const items = mode === "features" ? features : stories
+  const highlightedIdSet = new Set(highlightedIds)
+  const nodeWidth = 220
+  const nodes = items.map((item, index) => ({
+    id: item.id,
+    position: {
+      x: (index % 2) * 250,
+      y: Math.floor(index / 2) * 130,
+    },
+    data: {
+      label:
+        mode === "features"
+          ? `${item.id}\n${item.title}\nEst. ${item.estimate}`
+          : `${item.id}\n${item.title}\nEst. ${item.estimate}`,
+    },
+    style: {
+      width: nodeWidth,
+      borderRadius: 16,
+      border:
+        item.id === activeId
+          ? "1px solid rgba(16,185,129,0.55)"
+          : highlightedIdSet.has(item.id)
+            ? "1px solid rgba(234,179,8,0.45)"
+            : "1px solid rgba(25,22,21,0.12)",
+      background:
+        item.id === activeId
+          ? "rgba(16,185,129,0.12)"
+          : highlightedIdSet.has(item.id)
+            ? "rgba(234,179,8,0.12)"
+            : "rgba(255,255,255,0.92)",
+      padding: 14,
+      fontSize: 12,
+      lineHeight: 1.45,
+      whiteSpace: "pre-line" as const,
+      color: "#191615",
+      boxShadow:
+        item.id === activeId
+          ? "0 16px 36px rgba(16,185,129,0.16)"
+          : highlightedIdSet.has(item.id)
+            ? "0 16px 36px rgba(234,179,8,0.12)"
+            : "0 12px 30px rgba(25,22,21,0.06)",
+      cursor: "pointer",
+    },
+  }))
+
+  const edges = items.flatMap((item, index) =>
+    item.dependencyIds.map((dependencyId) => ({
+      id: `${dependencyId}-${item.id}-${index}`,
+      source: dependencyId,
+      target: item.id,
+      animated: true,
+      style: {
+        stroke:
+          highlightedIdSet.has(item.id) && highlightedIdSet.has(dependencyId)
+            ? "rgba(234,179,8,0.75)"
+            : "rgba(16,185,129,0.65)",
+        strokeWidth: highlightedIdSet.has(item.id) && highlightedIdSet.has(dependencyId) ? 2 : 1.5,
+      },
+    }))
+  )
+
+  return { nodes, edges }
+}
+
+function TraceBreadcrumb({ segments }: { segments: TraceSegment[] }) {
+  if (segments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-[14px] border border-border/40 bg-background/60 px-3 py-2">
+      {segments.map((segment, index) => (
+        <div key={`${segment.label}-${segment.value}-${index}`} className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">{segment.label}</span>
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[10px] font-medium",
+              segment.tone === "primary" && "border-primary/25 bg-primary/10 text-primary",
+              segment.tone === "accent" && "border-chart-2/30 bg-chart-2/10 text-chart-2",
+              (!segment.tone || segment.tone === "default") && "border-border/40 bg-background/80 text-foreground/85"
+            )}
+          >
+            {segment.value}
+          </span>
+          {index < segments.length - 1 ? <span className="text-[11px] text-muted-foreground/60">→</span> : null}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function Icon({ name, className }: { name: string; className?: string }) {
@@ -1136,6 +671,20 @@ function Icon({ name, className }: { name: string; className?: string }) {
           <polygon points="5 3 19 12 5 21 5 3" stroke="currentColor" strokeLinejoin="round" strokeLinecap="round" />
         </svg>
       )
+    case "shield":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <path d="M12 3 5 6v6c0 4.5 2.8 7.8 7 9 4.2-1.2 7-4.5 7-9V6l-7-3Z" stroke="currentColor" strokeLinejoin="round" />
+          <path d="m9.5 12 1.7 1.7 3.6-3.9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
+    case "chart":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
+          <path d="M4 19h16" stroke="currentColor" strokeLinecap="round" />
+          <path d="M7 16v-4M12 16V8M17 16V5" stroke="currentColor" strokeLinecap="round" />
+        </svg>
+      )
     case "sun":
       return (
         <svg viewBox="0 0 24 24" fill="none" className={cn(common, className)}>
@@ -1166,29 +715,60 @@ function IDEHeader({ title, icon, rightNode }: { title: string; icon: string; ri
   )
 }
 
-export function IdeationDashboard() {
+const fallbackSecurityReport = {
+  status: "idle" as const,
+  summary: "Security review has not started yet.",
+  issues: [],
+}
+
+const fallbackMergeReport = {
+  status: "idle" as const,
+  summary: "Merge & integration has not started yet.",
+  mergedStoryIds: [],
+  changelog: [],
+}
+
+const fallbackProjectHealth = {
+  status: "idle" as const,
+  summary: "Project review has not been generated yet.",
+  progress: 0,
+  coverage: "No merged stories yet.",
+  technicalDebt: [],
+  nextActions: [],
+}
+
+export function IdeationDashboard({
+  initialProject,
+  initialProjectId,
+}: {
+  initialProject: BackendProjectState
+  initialProjectId: string
+}) {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const terminalInputRef = useRef<HTMLInputElement | null>(null)
+  const saveTimeoutRef = useRef<number | null>(null)
+  const briefSaveTimeoutRef = useRef<number | null>(null)
   const { theme, setTheme } = useTheme()
+  const [isHydrated, setIsHydrated] = useState(false)
 
-  const [currentStage, setCurrentStage] = useState<StageKey>("Conversation")
-  const [search, setSearch] = useState("")
-  const [brief, setBrief] = useState(initialBrief)
-  const [activeTab, setActiveTab] = useState<"business" | "tech">("business")
-  const [businessMessages, setBusinessMessages] = useState(initialBusinessMessages)
-  const [techMessages, setTechMessages] = useState(initialTechMessages)
+  const [currentStage, setCurrentStage] = useState<StageKey>(initialProject.currentStage)
+  const [search, setSearch] = useState(initialProject.search)
+  const [brief, setBrief] = useState(initialProject.brief)
+  const [businessMessages, setBusinessMessages] = useState(initialProject.messages.business)
+  const [techMessages, setTechMessages] = useState(initialProject.messages.tech)
   const [composer, setComposer] = useState("")
-  const [activeSpeakerBusiness, setActiveSpeakerBusiness] = useState<"Alex" | "Mara">("Alex")
-  const [activeSpeakerTech, setActiveSpeakerTech] = useState<"Ionut" | "Alex">("Ionut")
-  const [activity, setActivity] = useState(initialActivity)
-  const [selectedFeatureId, setSelectedFeatureId] = useState("FEAT-01")
-  const [selectedStoryId, setSelectedStoryId] = useState("US-01")
-  const [selectedFileId, setSelectedFileId] = useState("file-brief")
-  const [selectedExplorerPath, setSelectedExplorerPath] = useState("docs")
+  const [composerChannel, setComposerChannel] = useState<"business" | "tech">("business")
+  const [activity, setActivity] = useState(initialProject.activity)
+  const [currentProjectId] = useState(initialProjectId)
+  const [requirements, setRequirements] = useState<RequirementView[]>((initialProject as BackendProjectState & { requirements?: RequirementView[] }).requirements ?? [])
+  const [selectedFeatureId, setSelectedFeatureId] = useState(initialProject.selectedFeatureId)
+  const [selectedStoryId, setSelectedStoryId] = useState(initialProject.selectedStoryId)
+  const [selectedFileId, setSelectedFileId] = useState(initialProject.workspace.selectedFileId)
+  const [selectedExplorerPath, setSelectedExplorerPath] = useState(initialProject.workspace.folders[0]?.path ?? "docs")
   const [docTab, setDocTab] = useState<"business" | "tech">("business")
   const [autoSave, setAutoSave] = useState(true)
-  const [appGenerated, setAppGenerated] = useState(false)
-  const [previewOpened, setPreviewOpened] = useState(false)
+  const [appGenerated, setAppGenerated] = useState(initialProject.preview.appGenerated)
+  const [previewOpened, setPreviewOpened] = useState(initialProject.preview.previewOpened)
   const [slashMenuOpen, setSlashMenuOpen] = useState(false)
   const [slashAction, setSlashAction] = useState<SlashAction>("refactor")
   const [slashPrompt, setSlashPrompt] = useState("")
@@ -1198,10 +778,30 @@ export function IdeationDashboard() {
   const [workspaceCreateKind, setWorkspaceCreateKind] = useState<"file" | "folder" | null>(null)
   const [workspaceCreateName, setWorkspaceCreateName] = useState("")
   const [workspaceCreateParentPath, setWorkspaceCreateParentPath] = useState("")
+  const [featureRequirementFilterId, setFeatureRequirementFilterId] = useState("")
+  const [storyRequirementFilterId, setStoryRequirementFilterId] = useState("")
+  const [isGeneratingFeatures, setIsGeneratingFeatures] = useState(false)
+  const [isGeneratingRequirements, setIsGeneratingRequirements] = useState(false)
+  const [isGeneratingStories, setIsGeneratingStories] = useState(false)
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isGeneratingSecurityReview, setIsGeneratingSecurityReview] = useState(false)
+  const [isRunningMerge, setIsRunningMerge] = useState(false)
+  const [isGeneratingProjectReview, setIsGeneratingProjectReview] = useState(false)
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false)
+  const [codeGenerationStatus, setCodeGenerationStatus] = useState<{
+    stage: "idle" | "running" | "completed" | "failed"
+    storyId: string
+    detail: string
+  }>({
+    stage: "idle",
+    storyId: "",
+    detail: "Așteaptă o user story pentru a porni generarea codului.",
+  })
 
-  const [terminalHistory, setTerminalHistory] = useState<{type: string, text: string}[]>([
+  const [terminalHistory, setTerminalHistory] = useState<TerminalLine[]>([
     { type: "system", text: "Luminescent OS v1.2.0 initialized." },
-    { type: "system", text: "Type 'help' to see available commands or 'npm run dev'." }
+    { type: "system", text: "Type 'help' to see available commands or 'npm run dev' for the virtual preview runtime." }
   ])
   const [terminalInput, setTerminalInput] = useState("")
 
@@ -1212,13 +812,47 @@ export function IdeationDashboard() {
     
     setTimeout(() => {
       if (cmd === "npm run dev" || cmd === "npm start") {
-        setTerminalHistory(prev => [...prev, { type: "out", text: "v1.2.0 build ready in 140 ms\n\n  ➜  Local:   http://localhost:3000/" }]);
-        setAppGenerated(true);
-        moveToStage("Preview", "Aplicația a pornit pe localhost.");
+        setTerminalHistory(prev => [
+          ...prev,
+          {
+            type: "trace",
+            text: buildAiTrace("terminal preview command", [
+              "validate command and map it to the virtual preview runtime",
+              "prepare preview generation request from the current workspace",
+              "wait for backend preview state to be updated",
+              "announce runtime endpoint in the terminal",
+            ]),
+          },
+          { type: "out", text: "starting virtual preview runtime...\n- validating stage gates\n- requesting preview generation from backend" },
+        ]);
+        void requestProjectUpdate("/api/project", {
+          method: "PATCH",
+          body: JSON.stringify({ type: "generate-preview" }),
+        })
+          .then(() => {
+            setTerminalHistory((prev) => [
+              ...prev,
+              { type: "out", text: "virtual preview runtime ready in 140 ms\n\n  ➜  Runtime: luminescent://live-preview" },
+            ])
+          })
+          .catch((error) => {
+            const message = error instanceof Error ? error.message : "Preview request failed"
+            setTerminalHistory((prev) => [...prev, { type: "error", text: `preview:failed\n${message}` }])
+          })
       } else if (cmd === "clear") {
         setTerminalHistory([]);
       } else if (cmd === "help") {
-        setTerminalHistory(prev => [...prev, { type: "out", text: "Available commands:\n  npm run dev   Start local server and jump to Preview\n  clear         Clear console\n  help          Show this message" }]);
+        setTerminalHistory(prev => [
+          ...prev,
+          {
+            type: "trace",
+            text: buildAiTrace("terminal help", [
+              "inspect available terminal shortcuts",
+              "return the small built-in command set",
+            ]),
+          },
+          { type: "out", text: "Available commands:\n  npm run dev   Start virtual preview runtime and jump to Preview\n  clear         Clear console\n  help          Show this message" },
+        ]);
       } else {
         setTerminalHistory(prev => [...prev, { type: "error", text: `bash: ${cmd}: command not found` }]);
       }
@@ -1226,19 +860,105 @@ export function IdeationDashboard() {
     setTerminalInput("");
   }
 
-  const features = useMemo(() => buildFeatures(brief), [brief])
+  const [collaboratorsState, setCollaboratorsState] = useState(initialProject.collaborators ?? [])
+  const [subagentsState, setSubagentsState] = useState(initialProject.agents ?? [])
+  const [agentRunsState, setAgentRunsState] = useState(initialProject.agentRuns ?? [])
+  const [artifactsState, setArtifactsState] = useState(initialProject.artifacts ?? [])
+  const [features, setFeatures] = useState(initialProject.features ?? [])
+  const [userStories, setUserStories] = useState(initialProject.userStories ?? [])
+  const [securityReport, setSecurityReport] = useState(initialProject.securityReport ?? fallbackSecurityReport)
+  const [mergeReport, setMergeReport] = useState(initialProject.mergeReport ?? fallbackMergeReport)
+  const [projectHealth, setProjectHealth] = useState(initialProject.projectHealth ?? fallbackProjectHealth)
+
   const selectedFeature = features.find((item) => item.id === selectedFeatureId) ?? features[0]
-  const userStories = useMemo(() => buildUserStories(selectedFeature, brief), [selectedFeature, brief])
   const selectedStory = userStories.find((item) => item.id === selectedStoryId) ?? userStories[0]
+  const selectedVariant = selectedStory?.variants.find((item) => item.id === selectedStory.selectedVariantId) ?? selectedStory?.variants[0]
   const schemaDiagram = useMemo(() => parseSchemaDiagram(brief.dbSchema), [brief.dbSchema])
-  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>(() => buildWorkspaceFolders())
-  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(() =>
-    buildWorkspaceFiles(initialBrief, buildFeatures(initialBrief)[0], buildUserStories(buildFeatures(initialBrief)[0], initialBrief)[0])
+  const requirementsView = useMemo(() => buildRequirementsView(brief, features, userStories), [brief, features, userStories])
+  const activeFeatureRequirement = requirementsView.find((requirement) => requirement.id === featureRequirementFilterId)
+  const activeStoryRequirement = requirementsView.find((requirement) => requirement.id === storyRequirementFilterId)
+  const traceRequirement = useMemo(() => {
+    if (activeStoryRequirement) {
+      return activeStoryRequirement
+    }
+
+    if (activeFeatureRequirement) {
+      return activeFeatureRequirement
+    }
+
+    if (selectedStory) {
+      return requirementsView.find((requirement) => requirement.storyIds.includes(selectedStory.id))
+    }
+
+    if (selectedFeature) {
+      return requirementsView.find((requirement) => requirement.featureIds.includes(selectedFeature.id))
+    }
+
+    return undefined
+  }, [activeFeatureRequirement, activeStoryRequirement, requirementsView, selectedFeature, selectedStory])
+  const activeFeatureRequirementNodeIds = useMemo(() => activeFeatureRequirement?.featureIds ?? [], [activeFeatureRequirement])
+  const activeStoryRequirementNodeIds = useMemo(() => activeStoryRequirement?.storyIds ?? [], [activeStoryRequirement])
+  const highlightedFeatureRequirementIds = useMemo(
+    () => new Set(requirementsView.filter((requirement) => selectedFeature && requirement.featureIds.includes(selectedFeature.id)).map((requirement) => requirement.id)),
+    [requirementsView, selectedFeature]
   )
+  const highlightedStoryRequirementIds = useMemo(
+    () => new Set(requirementsView.filter((requirement) => selectedStory && requirement.storyIds.includes(selectedStory.id)).map((requirement) => requirement.id)),
+    [requirementsView, selectedStory]
+  )
+  const filteredFeatures = useMemo(() => {
+    if (!activeFeatureRequirement) {
+      return features
+    }
+
+    return features.filter((feature) => activeFeatureRequirement.featureIds.includes(feature.id))
+  }, [activeFeatureRequirement, features])
+  const filteredStories = useMemo(() => {
+    if (!activeStoryRequirement) {
+      return userStories
+    }
+
+    return userStories.filter((story) => activeStoryRequirement.storyIds.includes(story.id))
+  }, [activeStoryRequirement, userStories])
+  const featureDependencyGraph = useMemo(
+    () => buildDependencyGraph(filteredFeatures, userStories, "features", selectedFeature?.id, activeFeatureRequirementNodeIds),
+    [activeFeatureRequirementNodeIds, filteredFeatures, userStories, selectedFeature?.id]
+  )
+  const storyDependencyGraph = useMemo(
+    () => buildDependencyGraph(features, filteredStories, "stories", selectedStory?.id, activeStoryRequirementNodeIds),
+    [activeStoryRequirementNodeIds, features, filteredStories, selectedStory?.id]
+  )
+  const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>(initialProject.workspace?.folders ?? [])
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>(initialProject.workspace?.files ?? [])
   const activeFile = workspaceFiles.find((file) => file.id === selectedFileId) ?? workspaceFiles[0]
-  const previewDocument = useMemo(
-    () => buildPreviewDocument(brief, selectedFeature, selectedStory, workspaceFiles),
-    [brief, selectedFeature, selectedStory, workspaceFiles]
+  const [projectVersion, setProjectVersion] = useState(initialProject.updatedAt)
+  const hasFeatures = features.length > 0
+  const hasRequirements = requirements.length > 0
+  const hasStories = userStories.length > 0
+  const hasWorkspaceFiles = workspaceFiles.length > 0
+  const securityCounts = useMemo(
+    () => ({
+      high: securityReport.issues.filter((issue) => issue.severity === "high").length,
+      medium: securityReport.issues.filter((issue) => issue.severity === "medium").length,
+      low: securityReport.issues.filter((issue) => issue.severity === "low").length,
+    }),
+    [securityReport]
+  )
+  const featureEstimateSummary = useMemo(
+    () =>
+      ["S", "M", "L", "XL"].map((size) => ({
+        size,
+        count: filteredFeatures.filter((feature) => feature.estimate === size).length,
+      })),
+    [filteredFeatures]
+  )
+  const storyEstimateSummary = useMemo(
+    () =>
+      ["S", "M", "L", "XL"].map((size) => ({
+        size,
+        count: filteredStories.filter((story) => story.estimate === size).length,
+      })),
+    [filteredStories]
   )
   const documentationProgress = useMemo(() => {
     const checks = [
@@ -1256,50 +976,180 @@ export function IdeationDashboard() {
     const filled = checks.filter(Boolean).length
     return Math.round((filled / checks.length) * 100)
   }, [brief])
+  const generalMessages = useMemo(
+    () =>
+      [...businessMessages, ...techMessages].sort(
+        (left, right) =>
+          getMessageOrderValue(left.id, 0) - getMessageOrderValue(right.id, 0)
+      ),
+    [businessMessages, techMessages]
+  )
+  const traceSegments = useMemo(() => {
+    const segments: TraceSegment[] = []
 
-  function addActivity(title: string, detail: string) {
-    setActivity((current) => [
-      { id: `a-${Date.now()}-${current.length}`, title, detail, time: "Acum" },
-      ...current,
-    ])
-  }
+    if (traceRequirement) {
+      segments.push({ label: "Requirement", value: `${traceRequirement.id} · ${traceRequirement.title}`, tone: "accent" })
+    }
 
-  function resetWorkspace(nextBrief: BriefState, nextFeature: Feature, nextStory: UserStory) {
-    const nextFolders = buildWorkspaceFolders()
-    const nextFiles = buildWorkspaceFiles(nextBrief, nextFeature, nextStory)
+    if (selectedFeature) {
+      segments.push({ label: "Feature", value: `${selectedFeature.id} · ${selectedFeature.title}`, tone: "primary" })
+    }
 
-    setWorkspaceFolders(nextFolders)
-    setWorkspaceFiles(nextFiles)
-    setSelectedFileId(nextFiles[0]?.id ?? "")
-    setSelectedExplorerPath(nextFolders[0]?.path ?? "")
-  }
+    if (selectedStory) {
+      segments.push({ label: "Story", value: `${selectedStory.id} · ${selectedStory.title}`, tone: "primary" })
+    }
 
-  function handleSpeakerChange(speaker: HumanSpeaker) {
-    if (activeTab === "business" && (speaker === "Alex" || speaker === "Mara")) {
-      setActiveSpeakerBusiness(speaker)
+    if (selectedVariant) {
+      segments.push({ label: "Variant", value: `${selectedVariant.label} · ${selectedVariant.teamName}` })
+    }
+
+    if (activeFile) {
+      segments.push({ label: "Code", value: activeFile.path })
+    }
+
+    return segments
+  }, [activeFile, selectedFeature, selectedStory, selectedVariant, traceRequirement])
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  function handleDependencyNodeClick(_: ReactMouseEvent, node: { id: string }) {
+    if (features.some((feature) => feature.id === node.id)) {
+      void openFeature(node.id)
       return
     }
 
-    if (activeTab === "tech" && (speaker === "Alex" || speaker === "Ionut")) {
-      setActiveSpeakerTech(speaker)
+    if (userStories.some((story) => story.id === node.id)) {
+      void chooseStory(node.id)
     }
+  }
+
+  function toggleRequirementFilter(mode: "features" | "stories", requirementId: string) {
+    if (mode === "features") {
+      setFeatureRequirementFilterId((current) => (current === requirementId ? "" : requirementId))
+      return
+    }
+
+    setStoryRequirementFilterId((current) => (current === requirementId ? "" : requirementId))
+  }
+
+  function applyProjectState(project: BackendProjectState) {
+    const workspaceFiles = project.workspace?.files ?? []
+    const selectedFile =
+      workspaceFiles.find((file) => file.id === project.workspace?.selectedFileId) ?? workspaceFiles[0]
+
+    setCurrentStage(project.currentStage)
+    setSearch(project.search)
+    setBrief(project.brief)
+    setRequirements((project as BackendProjectState & { requirements?: RequirementView[] }).requirements ?? [])
+    setFeatures(project.features ?? [])
+    setSelectedFeatureId(project.selectedFeatureId ?? "")
+    setUserStories(project.userStories ?? [])
+    setSelectedStoryId(project.selectedStoryId ?? "")
+    setBusinessMessages(project.messages?.business ?? [])
+    setTechMessages(project.messages?.tech ?? [])
+    setCollaboratorsState(project.collaborators ?? [])
+    setSubagentsState(project.agents ?? [])
+    setAgentRunsState(project.agentRuns ?? [])
+    setArtifactsState(project.artifacts ?? [])
+    setActivity(project.activity ?? [])
+    setWorkspaceFolders(project.workspace?.folders ?? [])
+    setWorkspaceFiles(project.workspace?.files ?? [])
+    setSelectedFileId(project.workspace?.selectedFileId ?? "")
+    setSelectedExplorerPath(selectedFile ? getWorkspaceParentPath(selectedFile.path) : project.workspace?.folders?.[0]?.path ?? "")
+    setSecurityReport(project.securityReport ?? fallbackSecurityReport)
+    setMergeReport(project.mergeReport ?? fallbackMergeReport)
+    setProjectHealth(project.projectHealth ?? fallbackProjectHealth)
+    setAppGenerated(project.preview?.appGenerated ?? false)
+    setPreviewOpened(project.preview?.previewOpened ?? false)
+    setProjectVersion(project.updatedAt)
+  }
+
+  async function requestProjectUpdate(url: string, init?: RequestInit) {
+    const response = await fetch(withProjectQuery(url, currentProjectId), {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    })
+
+    if (!response.ok) {
+      let detail = ""
+      try {
+        const payload = (await response.json()) as { error?: string }
+        detail = payload.error ? `: ${payload.error}` : ""
+      } catch {
+        try {
+          const text = await response.text()
+          detail = text ? `: ${text}` : ""
+        } catch {}
+      }
+
+      throw new Error(`Request failed with status ${response.status}${detail}`)
+    }
+
+    const project = (await response.json()) as BackendProjectState
+    applyProjectState(project)
+    return project
+  }
+
+  function queueFileSave(fileId: string, content: string) {
+    if (!autoSave) return
+
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current)
+    }
+
+    saveTimeoutRef.current = window.setTimeout(() => {
+      void requestProjectUpdate(`/api/workspace/files/${fileId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content }),
+      }).catch(() => undefined)
+    }, 450)
+  }
+
+  function queueBriefSave(nextBrief: BriefState) {
+    if (!autoSave) return
+
+    if (briefSaveTimeoutRef.current) {
+      window.clearTimeout(briefSaveTimeoutRef.current)
+    }
+
+    briefSaveTimeoutRef.current = window.setTimeout(() => {
+      void requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "update-brief", brief: nextBrief }),
+      }).catch(() => undefined)
+    }, 500)
+  }
+
+  function updateBriefDraft(updater: (current: BriefState) => BriefState) {
+    const nextBrief = updater(brief)
+    setBrief(nextBrief)
+    queueBriefSave(nextBrief)
   }
 
   function updateBriefList(key: BriefListKey, index: number, value: string) {
     const next = [...brief[key]]
     next[index] = value
-    setBrief({ ...brief, [key]: next })
+    updateBriefDraft((current) => ({ ...current, [key]: next }))
   }
 
   function addBriefListItem(key: BriefListKey) {
-    setBrief({ ...brief, [key]: [...brief[key], ""] })
+    updateBriefDraft((current) => ({ ...current, [key]: [...current[key], ""] }))
   }
 
-  function moveToStage(stage: StageKey, detail?: string) {
-    setCurrentStage(stage)
-    if (detail) {
-      addActivity(`Moved to ${stage}`, detail)
-    }
+  async function moveToStage(stage: StageKey, detail?: string) {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "transition-stage", stage, detail }),
+    })
+  }
+
+  function transitionToStage(stage: StageKey, detail?: string) {
+    void moveToStage(stage, detail).catch(() => undefined)
   }
 
   function openWorkspaceFile(fileId: string) {
@@ -1308,6 +1158,10 @@ export function IdeationDashboard() {
 
     setSelectedFileId(file.id)
     setSelectedExplorerPath(getWorkspaceParentPath(file.path))
+    void requestProjectUpdate("/api/workspace/files", {
+      method: "POST",
+      body: JSON.stringify({ selectedFileId: file.id }),
+    }).catch(() => undefined)
   }
 
   function startWorkspaceCreation(kind: "file" | "folder", parentPath = selectedExplorerPath) {
@@ -1321,59 +1175,35 @@ export function IdeationDashboard() {
     setWorkspaceCreateName("")
   }
 
-  function submitWorkspaceCreation() {
+  async function submitWorkspaceCreation() {
     const trimmedName = workspaceCreateName.trim()
     if (!workspaceCreateKind || !trimmedName) return
 
-    const fullPath = joinWorkspacePath(workspaceCreateParentPath, trimmedName)
-
-    if (
-      workspaceFiles.some((file) => file.path === fullPath) ||
-      workspaceFolders.some((folder) => folder.path === fullPath)
-    ) {
-      addActivity("Workspace unchanged", `${fullPath} există deja în explorer.`)
-      cancelWorkspaceCreation()
-      return
-    }
-
     if (workspaceCreateKind === "folder") {
-      const nextFolder: WorkspaceFolder = {
-        id: `folder-${Date.now()}`,
-        name: getWorkspaceName(fullPath),
-        path: fullPath,
-      }
-
-      setWorkspaceFolders((current) =>
-        [...current, nextFolder].sort((left, right) => left.path.localeCompare(right.path))
-      )
-      setSelectedExplorerPath(nextFolder.path)
-      addActivity("Folder created", `${nextFolder.path} a fost adăugat în workspace.`)
+      await requestProjectUpdate("/api/workspace/folders", {
+        method: "POST",
+        body: JSON.stringify({ parentPath: workspaceCreateParentPath, name: trimmedName }),
+      })
       cancelWorkspaceCreation()
       return
     }
 
-    const nextFile: WorkspaceFile = {
-      id: `file-${Date.now()}`,
-      name: getWorkspaceName(fullPath),
-      path: fullPath,
-      content: createDefaultFileContent(fullPath),
-    }
-
-    setWorkspaceFiles((current) =>
-      [...current, nextFile].sort((left, right) => left.path.localeCompare(right.path))
-    )
-    setSelectedFileId(nextFile.id)
-    setSelectedExplorerPath(getWorkspaceParentPath(nextFile.path))
-    addActivity("File created", `${nextFile.path} este gata de editare.`)
+    await requestProjectUpdate("/api/workspace/files", {
+      method: "POST",
+      body: JSON.stringify({ parentPath: workspaceCreateParentPath, name: trimmedName }),
+    })
     cancelWorkspaceCreation()
   }
 
   function updateActiveFileContent(nextContent: string) {
+    if (!activeFile) return
+
     setWorkspaceFiles((current) =>
       current.map((file) =>
         file.id === activeFile?.id ? { ...file, content: nextContent } : file
       )
     )
+    queueFileSave(activeFile.id, nextContent)
   }
 
   function openSlashMenu(nextAction: SlashAction = "refactor") {
@@ -1412,11 +1242,19 @@ export function IdeationDashboard() {
     setTerminalHistory((current) => [
       ...current,
       {
+        type: "trace",
+        text: buildAiTrace("slash edit", [
+          `read active file ${activeFile.path}`,
+          `interpret request as ${slashAction} on the current application surface`,
+          `draft file changes from prompt: ${slashPrompt.trim() || "update the active application flow"}`,
+          "apply the edit mock directly in the editor and queue autosave",
+        ]),
+      },
+      {
         type: "out",
         text: `AI edit applied on ${activeFile.name} with /${slashAction}${slashPrompt.trim() ? ` -> ${slashPrompt.trim()}` : ""}`,
       },
     ])
-    addActivity("AI inline edit", `${activeFile.name} a fost actualizat din slash command.`)
     closeSlashMenu()
   }
 
@@ -1425,6 +1263,15 @@ export function IdeationDashboard() {
 
     setTerminalHistory((current) => [
       ...current,
+      {
+        type: "trace",
+        text: buildAiTrace("terminal slash command", [
+          `inspect slash mode /${terminalSlashAction}`,
+          `interpret prompt: ${terminalSlashPrompt.trim() || "inspect the current terminal flow"}`,
+          aiResult.command ? `prepare suggested command: ${aiResult.command}` : "prepare explanation without shell command",
+          "print the AI-assisted terminal response",
+        ]),
+      },
       {
         type: "out",
         text: aiResult.output,
@@ -1435,7 +1282,6 @@ export function IdeationDashboard() {
       setTerminalInput(aiResult.command)
     }
 
-    addActivity("AI terminal assist", `Terminalul a primit o sugestie pentru /${terminalSlashAction}.`)
     closeTerminalSlashMenu()
   }
 
@@ -1494,100 +1340,444 @@ export function IdeationDashboard() {
     openTerminalSlashMenu()
   }
 
-  function sendMessage() {
+  async function sendMessage() {
+    if (isSendingMessage) return
+
     const trimmed = composer.trim()
     if (!trimmed) return
 
-    const nextMessage: Message = {
-      id: `m-${Date.now()}`,
-      author: activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech,
-      role: "human",
+    const optimisticMessage = {
+      id: `pending-${Date.now()}`,
+      author: "Alex",
+      role: "human" as const,
       text: trimmed,
     }
 
-    const aiReply: Message = {
-      id: `m-${Date.now() + 1}`,
-      author: activeTab === "business" ? "Business AI" : "Tech AI",
-      role: "ai",
-      text: buildAiReply(trimmed),
-    }
-
-    if (activeTab === "business") {
-      setBusinessMessages((current) => [...current, nextMessage, aiReply])
-    } else {
-      setTechMessages((current) => [...current, nextMessage, aiReply])
-    }
-    
     setComposer("")
-    addActivity(nextMessage.author, `A trimis un mesaj pe planția de ${activeTab}.`)
+    setIsSendingMessage(true)
+    setBusinessMessages((current) =>
+      composerChannel === "business" ? [...current, optimisticMessage] : current
+    )
+    setTechMessages((current) =>
+      composerChannel === "tech" ? [...current, optimisticMessage] : current
+    )
+
+    try {
+      await requestProjectUpdate("/api/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          channel: composerChannel,
+          author: "Alex",
+          text: trimmed,
+        }),
+      })
+    } catch (error) {
+      setBusinessMessages((current) => current.filter((message) => message.id !== optimisticMessage.id))
+      setTechMessages((current) => current.filter((message) => message.id !== optimisticMessage.id))
+      setComposer(trimmed)
+      throw error
+    } finally {
+      setIsSendingMessage(false)
+    }
   }
 
-  function regenerateDocumentation() {
-    setBrief((current) => ({
-      ...current,
-      title: `${toSentenceLabel(current.title, "AI Native IDE")} Flow`,
-      objective: `${current.objective} Echipa vede clar ce urmează și poate avansa fără blocaje.`,
-      deliverables: Array.from(new Set([...current.deliverables, "Flow final aprobat pentru demo"])),
-    }))
-    addActivity("Documentation regenerated", "Brief-ul a fost actualizat din conversație.")
+  async function regenerateDocumentation() {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "generate-documentation-from-conversation" }),
+    })
   }
 
-  function pushToDocumentation() {
-    regenerateDocumentation()
-    moveToStage("Documentation", "Conversația a fost promovată în documentație.")
+  async function pushToDocumentation() {
+    await regenerateDocumentation()
+    await moveToStage("Documentation", "Conversația a fost promovată în documentație.")
   }
 
-  function approveDocumentation() {
-    addActivity("Documentation approved", "Brief-ul tehnic și de business e gata.")
-    moveToStage("Features", "Opțiunile de implementare au fost setate.")
+  async function approveDocumentation() {
+    if (isGeneratingRequirements) return
+    setIsGeneratingRequirements(true)
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-requirements" }),
+      })
+    } finally {
+      setIsGeneratingRequirements(false)
+    }
   }
 
-  function openFeature(featureId: string) {
-    setSelectedFeatureId(featureId)
-    addActivity("Feature selected", `${featureId} pus în prim-plan.`)
+  async function moveToFeatures() {
+    if (isGeneratingFeatures) return
+    setIsGeneratingFeatures(true)
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-features" }),
+      })
+    } finally {
+      setIsGeneratingFeatures(false)
+    }
   }
 
-  function moveToUserStories() {
-    addActivity("Stories generated", "Au fost extrase User Stories din modulele selectate.")
-    moveToStage("User Stories", "Agile backlog creat cu succes.")
+  async function openFeature(featureId: string) {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "select-feature", featureId }),
+    })
   }
 
-  function chooseStory(storyId: string) {
-    setSelectedStoryId(storyId)
-    addActivity("Story locked", `${storyId} va bloca arhitectura selectată.`)
+  async function moveToUserStories() {
+    if (isGeneratingStories) return
+    setIsGeneratingStories(true)
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-user-stories" }),
+      })
+    } finally {
+      setIsGeneratingStories(false)
+    }
   }
 
-  function approveStory() {
-    resetWorkspace(brief, selectedFeature, selectedStory)
-    addActivity("Scaffold ready", `${selectedStory.id} trimisă spre backend engine.`)
-    moveToStage("Final Code", "Geneză cod sursă finalizată.")
+  async function chooseStory(storyId: string) {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "select-story", storyId }),
+    })
   }
 
-  function regenerateCode() {
-    resetWorkspace(brief, selectedFeature, selectedStory)
-    addActivity("Code regenerated", "Comentariile și structura finală au fost reîmprospătate.")
+  async function chooseVariant(storyId: string, variantId: string) {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "select-variant", storyId, variantId }),
+    })
   }
 
-  function generateApplication() {
-    setAppGenerated(true)
-    setPreviewOpened(true)
-    addActivity("Application generated", "Preview-ul aplicației este gata de vizualizare.")
-    moveToStage("Preview", "Aplicația finală a fost generată din codul selectat.")
+  async function moveToPlanning() {
+    await moveToStage("Planning", "User stories au fost trimise către etapa de planning și assignment.")
   }
 
-  function openPreviewWindow() {
-    setPreviewOpened(true)
-    addActivity("Preview opened", "Fereastra de preview este activă.")
+  async function approveStory() {
+    if (isGeneratingCode) return
+    const storyId = selectedStory?.id ?? ""
+    setIsGeneratingCode(true)
+    setCodeGenerationStatus({
+      stage: "running",
+      storyId,
+      detail: `Pornesc regenerarea workspace-ului pentru ${storyId || "story-ul selectat"} cu ${selectedVariant?.label ?? "varianta selectată"}.`,
+    })
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: `codegen:start ${storyId || "selected-story"}` },
+      {
+        type: "trace",
+        text: buildAiTrace("generate code", [
+          `resolve selected story: ${storyId || "selected-story"}`,
+          `resolve selected variant: ${selectedVariant?.label ?? "selected-variant"}`,
+          "read brief, selected feature, and selected story context",
+          "build or refresh the workspace scaffold in backend",
+          "merge generated files into Final Code and focus the runtime entrypoint",
+        ]),
+      },
+      { type: "out", text: `Generating code for ${storyId || "selected story"}...\n- selecting story context\n- selecting implementation variant\n- building workspace scaffold\n- preparing Final Code editor` },
+    ])
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-code" }),
+      })
+      setCodeGenerationStatus({
+        stage: "completed",
+        storyId,
+        detail: `Workspace-ul pentru ${storyId || "story-ul selectat"} este gata în Final Code cu ${selectedVariant?.label ?? "varianta selectată"}.`,
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "out", text: `codegen:done ${storyId || "selected-story"}\nWorkspace ready. You can now inspect and edit the generated files.` },
+      ])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown code generation error"
+      setCodeGenerationStatus({
+        stage: "failed",
+        storyId,
+        detail: `Generarea codului a eșuat pentru ${storyId || "story-ul selectat"}.`,
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "error", text: `codegen:failed ${storyId || "selected-story"}\n${message}` },
+      ])
+      throw error
+    } finally {
+      setIsGeneratingCode(false)
+    }
   }
 
-  function restartFlow() {
-    setCurrentStage("Conversation")
-    setSelectedFeatureId("FEAT-01")
-    setSelectedStoryId("US-01")
-    resetWorkspace(initialBrief, buildFeatures(initialBrief)[0], buildUserStories(buildFeatures(initialBrief)[0], initialBrief)[0])
-    setAppGenerated(false)
-    setPreviewOpened(false)
-    addActivity("Flow restarted", "Experiența a fost resetată la conversația inițială.")
+  async function generateCodeForStory(storyId: string) {
+    if (isGeneratingCode) return
+    setIsGeneratingCode(true)
+    setCodeGenerationStatus({
+      stage: "running",
+      storyId,
+      detail: `Pornesc regenerarea workspace-ului pentru ${storyId} cu varianta aleasă.`,
+    })
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: `codegen:start ${storyId}` },
+      {
+        type: "trace",
+        text: buildAiTrace("generate code for story", [
+          `pin story context to ${storyId}`,
+          "resolve the selected implementation variant for this story",
+          "read implementation brief and active feature dependencies",
+          "request workspace scaffold generation for the chosen story",
+          "apply generated files and switch focus to Final Code output",
+        ]),
+      },
+      { type: "out", text: `Generating code for ${storyId}...\n- selecting story context\n- selecting implementation variant\n- building workspace scaffold\n- preparing Final Code editor` },
+    ])
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-code", storyId }),
+      })
+      setCodeGenerationStatus({
+        stage: "completed",
+        storyId,
+        detail: `Workspace-ul pentru ${storyId} este gata în Final Code cu varianta aleasă.`,
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "out", text: `codegen:done ${storyId}\nWorkspace ready. You can now inspect and edit the generated files.` },
+      ])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown code generation error"
+      setCodeGenerationStatus({
+        stage: "failed",
+        storyId,
+        detail: `Generarea codului a eșuat pentru ${storyId}.`,
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "error", text: `codegen:failed ${storyId}\n${message}` },
+      ])
+      throw error
+    } finally {
+      setIsGeneratingCode(false)
+    }
+  }
+
+  async function regenerateCode() {
+    const storyId = selectedStory?.id ?? ""
+    if (isGeneratingCode) return
+    setIsGeneratingCode(true)
+    setCodeGenerationStatus({
+      stage: "running",
+      storyId,
+      detail: `Regenerare manuală pentru ${storyId || "story-ul selectat"} cu ${selectedVariant?.label ?? "varianta selectată"}.`,
+    })
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: `codegen:refresh ${storyId || "selected-story"}` },
+      {
+        type: "trace",
+        text: buildAiTrace("regenerate code", [
+          `reuse current story context: ${storyId || "selected-story"}`,
+          `reuse selected variant: ${selectedVariant?.label ?? "selected-variant"}`,
+          "compare existing workspace with the incoming generated scaffold",
+          "preserve editable files where possible and refresh generated runtime files",
+          "persist the refreshed workspace back into Final Code",
+        ]),
+      },
+      { type: "out", text: `Regenerating workspace for ${storyId || "selected story"}...\nExisting edits are preserved whenever possible.` },
+    ])
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "regenerate-workspace" }),
+      })
+      setCodeGenerationStatus({
+        stage: "completed",
+        storyId,
+        detail: `Regenerarea pentru ${storyId || "story-ul selectat"} s-a încheiat.`,
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "out", text: `codegen:refresh-done ${storyId || "selected-story"}\nWorkspace refreshed.` },
+      ])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown code regeneration error"
+      setCodeGenerationStatus({
+        stage: "failed",
+        storyId,
+        detail: `Regenerarea codului a eșuat pentru ${storyId || "story-ul selectat"}.`,
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "error", text: `codegen:refresh-failed ${storyId || "selected-story"}\n${message}` },
+      ])
+      throw error
+    } finally {
+      setIsGeneratingCode(false)
+    }
+  }
+
+  async function runSecurityReviewStage() {
+    if (isGeneratingSecurityReview) return
+    setIsGeneratingSecurityReview(true)
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: `security:start ${selectedStory?.id || "selected-story"}` },
+      {
+        type: "trace",
+        text: buildAiTrace("security review", [
+          "inspect the current workspace, requirement trace, and active story",
+          "derive OWASP-style findings from generated code and requirements",
+          "persist the security report and move the workflow into Security Review",
+        ]),
+      },
+      { type: "out", text: "Running security review...\n- scanning workspace\n- checking requirement trace\n- preparing report for approval" },
+    ])
+
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-security-review" }),
+      })
+      setTerminalHistory((prev) => [...prev, { type: "out", text: "security:done\nSecurity report ready for human approval." }])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown security review error"
+      setTerminalHistory((prev) => [...prev, { type: "error", text: `security:failed\n${message}` }])
+      throw error
+    } finally {
+      setIsGeneratingSecurityReview(false)
+    }
+  }
+
+  async function approveSecurityAndMerge() {
+    if (isRunningMerge) return
+    setIsRunningMerge(true)
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: `merge:approve ${selectedStory?.id || "selected-story"}` },
+      {
+        type: "trace",
+        text: buildAiTrace("security approval and merge", [
+          "approve the reviewed security report for merge handoff",
+          "build integration changelog from artifacts and activity feed",
+          "persist merge completion for the selected implementation candidate",
+        ]),
+      },
+      { type: "out", text: "Approving security review and running merge...\n- persisting approval\n- compiling changelog\n- integrating merge candidate" },
+    ])
+
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "approve-security-review" }),
+      })
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "run-merge" }),
+      })
+      setTerminalHistory((prev) => [...prev, { type: "out", text: "merge:done\nMerge & integration completed." }])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown merge error"
+      setTerminalHistory((prev) => [...prev, { type: "error", text: `merge:failed\n${message}` }])
+      throw error
+    } finally {
+      setIsRunningMerge(false)
+    }
+  }
+
+  async function runProjectReviewStage() {
+    if (isGeneratingProjectReview) return
+    setIsGeneratingProjectReview(true)
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: "project-review:start" },
+      {
+        type: "trace",
+        text: buildAiTrace("project review", [
+          "collect merge output, artifact history, and workflow status",
+          "compute progress, coverage, and technical debt summary",
+          "persist the health report for final preview handoff",
+        ]),
+      },
+      { type: "out", text: "Generating project review...\n- summarizing merge output\n- computing health metrics\n- preparing preview handoff" },
+    ])
+
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-project-review" }),
+      })
+      setTerminalHistory((prev) => [...prev, { type: "out", text: "project-review:done\nProject health report is ready." }])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown project review error"
+      setTerminalHistory((prev) => [...prev, { type: "error", text: `project-review:failed\n${message}` }])
+      throw error
+    } finally {
+      setIsGeneratingProjectReview(false)
+    }
+  }
+
+  async function generateApplication() {
+    if (isGeneratingPreview) return
+    setIsGeneratingPreview(true)
+    setTerminalHistory((prev) => [
+      ...prev,
+      { type: "system", text: `preview:start ${selectedStory?.id || "selected-story"}` },
+      {
+        type: "trace",
+        text: buildAiTrace("generate preview", [
+          "inspect the current workspace files and runtime entrypoints",
+          "prepare the preview stage from the persisted Final Code workspace",
+          "bundle the browser runtime through esbuild",
+          "open the live preview surface for inspection",
+        ]),
+      },
+      { type: "out", text: "Generating preview from the current workspace...\n- validating entrypoints\n- bundling browser runtime\n- opening Preview stage" },
+    ])
+    try {
+      await requestProjectUpdate("/api/project", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "generate-preview" }),
+      })
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "out", text: `preview:done ${selectedStory?.id || "selected-story"}\nPreview stage is ready from the current Final Code workspace.` },
+      ])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown preview generation error"
+      setTerminalHistory((prev) => [
+        ...prev,
+        { type: "error", text: `preview:failed ${selectedStory?.id || "selected-story"}\n${message}` },
+      ])
+      throw error
+    } finally {
+      setIsGeneratingPreview(false)
+    }
+  }
+
+  async function runFullRuntime() {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "run-full-pipeline" }),
+    })
+  }
+
+  async function openPreviewWindow() {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "open-preview" }),
+    })
+  }
+
+  async function restartFlow() {
+    await requestProjectUpdate("/api/project", {
+      method: "PATCH",
+      body: JSON.stringify({ type: "reset-project" }),
+    })
   }
 
   function renderExplorerTree(parentPath = "", depth = 0): ReactNode {
@@ -1670,13 +1860,13 @@ export function IdeationDashboard() {
                 key={item}
                 size="sm"
                 variant="ghost"
-                onClick={() => moveToStage(item, `Navigare rapidă către ${item.toLowerCase()}.`)}
+                onClick={() => transitionToStage(item, `Navigare rapidă către ${item.toLowerCase()}.`)}
                 className={cn(
                   "h-8 rounded-[8px] px-3 text-[12px]",
                   currentStage === item ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {item}
+                <span>{isHydrated ? item : ""}</span>
               </Button>
             ))}
           </nav>
@@ -1709,10 +1899,18 @@ export function IdeationDashboard() {
             onClick={() =>
               currentStage === "Preview"
                 ? restartFlow()
-                : moveToStage(stages[Math.min(stages.indexOf(currentStage) + 1, stages.length - 1)], "A fost deschisă etapa următoare din flow.")
+                : transitionToStage(stages[Math.min(stages.indexOf(currentStage) + 1, stages.length - 1)], "A fost deschisă etapa următoare din flow.")
             }
           >
             {currentStage === "Preview" ? "Restart Flow" : "Next Step"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 rounded-[8px] border-primary/20 bg-primary/10 px-3 text-[12px] text-primary hover:bg-primary/15"
+            onClick={runFullRuntime}
+          >
+            Run A-Z Runtime
           </Button>
         </div>
       </header>
@@ -1734,7 +1932,7 @@ export function IdeationDashboard() {
                 return (
                   <button
                     key={stage}
-                    onClick={() => moveToStage(stage, `S-a navigat către ${stage.toLowerCase()}.`)}
+                    onClick={() => transitionToStage(stage, `S-a navigat către ${stage.toLowerCase()}.`)}
                     className={cn(
                       "group flex w-full items-start gap-3 rounded-[8px] px-2 py-2 text-left text-[13px] font-medium transition-all duration-200",
                       active ? "bg-primary/10 text-primary shadow-sm ring-1 ring-inset ring-primary/20" : "text-muted-foreground/80 hover:bg-card hover:text-foreground hover:shadow-sm"
@@ -1749,8 +1947,10 @@ export function IdeationDashboard() {
                       {stageNumbers[stage]}
                     </span>
                     <span className="flex flex-col gap-0.5">
-                      <span>{stage}</span>
-                      <span className="text-[11px] font-normal leading-snug text-muted-foreground/75">{stageDescriptions[stage]}</span>
+                      <span>{isHydrated ? stage : ""}</span>
+                      <span className="text-[11px] font-normal leading-snug text-muted-foreground/75">
+                        {isHydrated ? stageDescriptions[stage] : ""}
+                      </span>
                     </span>
                   </button>
                 )
@@ -1780,53 +1980,82 @@ export function IdeationDashboard() {
                 <div className="grid flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-[1.3fr_0.7fr] lg:p-6">
                   <Card className="flex min-h-[420px] flex-col overflow-hidden rounded-[16px] border-border/40 bg-card/70">
                     <div className="border-b border-border/40 px-4 py-3 flex flex-wrap gap-4 items-center justify-between">
-                      <div className="flex gap-1 bg-background/50 p-1 rounded-lg shadow-inner">
-                        <Button size="sm" variant={activeTab === "business" ? "default" : "ghost"} onClick={() => setActiveTab("business")} className="h-7 px-3 text-[11px] rounded-md">Business Plan AI</Button>
-                        <Button size="sm" variant={activeTab === "tech" ? "default" : "ghost"} onClick={() => setActiveTab("tech")} className="h-7 px-3 text-[11px] rounded-md">Technical AI</Button>
+                      <div>
+                        <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-primary">
+                          General Discovery AI · {composerChannel}
+                        </div>
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          Un singur chat pentru business + tehnologie. Dacă nu dai detalii tehnice, AI-ul vine cu recomandări de producție.
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1 hidden sm:inline-block">Speaking as:</span>
-                        {(activeTab === "business" ? businessSpeakers : techSpeakers).map((speaker) => (
-                          <Button
-                            key={speaker}
-                            size="sm"
-                            variant={(activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech) === speaker ? "secondary" : "outline"}
-                            onClick={() => handleSpeakerChange(speaker)}
-                            className={cn("h-7 rounded px-3 text-[10px]", (activeTab === "business" ? activeSpeakerBusiness : activeSpeakerTech) === speaker ? "bg-primary/20 text-primary border-primary/30" : "")}
+                        <div className="inline-flex rounded-full border border-border/50 bg-background/60 p-1">
+                          <button
+                            type="button"
+                            onClick={() => setComposerChannel("business")}
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors",
+                              composerChannel === "business" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                            )}
                           >
-                            {speaker}
-                          </Button>
-                        ))}
+                            Business
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setComposerChannel("tech")}
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors",
+                              composerChannel === "tech" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                            )}
+                          >
+                            Tech
+                          </button>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={restartFlow} className="h-7 rounded-md text-[11px]">
+                          Reset project
+                        </Button>
                       </div>
                     </div>
                     <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                      {(activeTab === "business" ? businessMessages : techMessages).map((message) => (
-                        <div
-                          key={message.id}
-                          className={cn("flex flex-col gap-1", message.role === "human" ? "items-end" : "items-start")}
-                        >
-                          <span className="px-1 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/60">{message.author}</span>
+                      {generalMessages.length > 0 ? (
+                        generalMessages.map((message) => (
                           <div
-                            className={cn(
-                              "max-w-[90%] rounded-[16px] px-3.5 py-2.5 text-[13px] leading-[1.6] shadow-sm",
-                              message.role === "human" ? "rounded-tr-[4px] bg-primary text-primary-foreground" : "rounded-tl-[4px] border border-border/40 bg-background/80 text-foreground/90"
-                            )}
+                            key={message.id}
+                            className={cn("flex flex-col gap-1", message.role === "human" ? "items-end" : "items-start")}
                           >
-                            {message.text}
+                            <span className="px-1 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/60">{message.author}</span>
+                            <div
+                              className={cn(
+                                "max-w-[90%] rounded-[16px] px-3.5 py-2.5 text-[13px] leading-[1.6] shadow-sm",
+                                message.role === "human"
+                                  ? "rounded-tr-[4px] bg-primary text-primary-foreground"
+                                  : "rounded-tl-[4px] border border-border/40 bg-background/80 text-foreground/90"
+                              )}
+                            >
+                              {message.text}
+                            </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="rounded-[16px] border border-dashed border-border/40 bg-background/50 px-4 py-6 text-[13px] leading-relaxed text-muted-foreground">
+                          Conversația este goală. Spune pe scurt ce website vrei să construiești, pentru cine este și ce trebuie să facă. AI-ul continuă cu întrebări simple și recomandări tehnice dacă lipsesc.
                         </div>
-                      ))}
+                      )}
                     </div>
                     <div className="border-t border-border/40 bg-card/60 p-3">
                       <div className="flex items-center gap-2">
                         <Input
                           value={composer}
                           onChange={(event) => setComposer(event.target.value)}
-                          onKeyDown={(event) => event.key === "Enter" && sendMessage()}
-                          placeholder="Scrie următoarea clarificare pentru AI..."
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter") return
+                            event.preventDefault()
+                            void sendMessage()
+                          }}
+                          placeholder="Scrie pe scurt ideea, cerința sau răspunsul tău..."
                           className="h-10 rounded-full border-border/50 bg-background/50 px-4 text-[12px]"
                         />
-                        <Button size="icon" onClick={sendMessage} disabled={!composer.trim()} className="size-9 rounded-full">
+                        <Button size="icon" onClick={() => void sendMessage()} disabled={!composer.trim() || isSendingMessage} className="size-9 rounded-full">
                           <Icon name="send" className="size-3" />
                         </Button>
                       </div>
@@ -1851,13 +2080,15 @@ export function IdeationDashboard() {
                       </Badge>
                       <h3 className="font-serif text-2xl font-semibold tracking-tight">Din conversație în documentație</h3>
                       <p className="text-[13px] leading-relaxed text-muted-foreground">
-                        Aici validăm că discuția dintre oameni și AI produce imediat următorul artefact logic.
+                        Aici validăm că un singur chat general produce documentația completă, atât pe business, cât și pe tehnologie.
                       </p>
                     </div>
                     <div className="space-y-3 text-[13px]">
                       <div className="rounded-[12px] border border-border/40 bg-background/70 p-3">
                         <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Current objective</div>
-                        <p className="leading-relaxed text-foreground/85">{brief.objective}</p>
+                        <p className="leading-relaxed text-foreground/85">
+                          {brief.objective || "Definește obiectivul principal și transformăm brief-ul în artefacte reale din backend."}
+                        </p>
                       </div>
                       <div className="rounded-[12px] border border-border/40 bg-background/70 p-3">
                         <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">Next artifact</div>
@@ -1902,7 +2133,7 @@ export function IdeationDashboard() {
                       <div id="overview" className="space-y-3">
                         <Textarea
                           value={brief.title}
-                          onChange={(event) => setBrief({ ...brief, title: event.target.value })}
+                          onChange={(event) => updateBriefDraft((current) => ({ ...current, title: event.target.value }))}
                           rows={1}
                           className="min-h-0 resize-none border-none bg-transparent p-0 text-[40px] font-bold leading-tight tracking-tight text-foreground shadow-none outline-none placeholder:text-muted-foreground/30 focus-visible:ring-0 sm:text-[54px]"
                         />
@@ -1945,7 +2176,7 @@ export function IdeationDashboard() {
                             <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Objective</div>
                             <Textarea
                               value={brief.objective}
-                              onChange={(event) => setBrief({ ...brief, objective: event.target.value })}
+                              onChange={(event) => updateBriefDraft((current) => ({ ...current, objective: event.target.value }))}
                               className="min-h-[140px] resize-none border-none bg-transparent p-0 text-[16px] leading-8 text-foreground/90 shadow-none outline-none focus-visible:ring-0"
                               placeholder="What is the main goal of this product?"
                             />
@@ -1989,7 +2220,7 @@ export function IdeationDashboard() {
                             <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Architecture</div>
                             <Textarea
                               value={brief.architecture}
-                              onChange={(event) => setBrief({ ...brief, architecture: event.target.value })}
+                              onChange={(event) => updateBriefDraft((current) => ({ ...current, architecture: event.target.value }))}
                               className="min-h-[180px] resize-none border-none bg-transparent p-0 text-[16px] leading-8 text-foreground/90 shadow-none outline-none focus-visible:ring-0"
                               placeholder="Describe how the components interact..."
                             />
@@ -2025,7 +2256,7 @@ export function IdeationDashboard() {
                                 <h3 className="text-[24px] font-semibold tracking-tight text-foreground">Tech Stack</h3>
                                 <p className="mt-1 text-[14px] leading-7 text-muted-foreground">Componentele de bază ale implementării.</p>
                               </div>
-                              <Button size="icon-sm" variant="ghost" onClick={() => setBrief({ ...brief, techStack: [...brief.techStack, ""] })} className="rounded-md">
+                              <Button size="icon-sm" variant="ghost" onClick={() => updateBriefDraft((current) => ({ ...current, techStack: [...current.techStack, ""] }))} className="rounded-md">
                                 <Icon name="plus" className="size-3.5" />
                               </Button>
                             </div>
@@ -2039,7 +2270,7 @@ export function IdeationDashboard() {
                                     onChange={(event) => {
                                       const next = [...brief.techStack]
                                       next[index] = event.target.value
-                                      setBrief({ ...brief, techStack: next })
+                                      updateBriefDraft((current) => ({ ...current, techStack: next }))
                                     }}
                                     className="h-11 rounded-lg border-border/30 bg-transparent px-0 font-mono text-[15px] shadow-none focus-visible:ring-0"
                                     placeholder="Add stack component..."
@@ -2062,7 +2293,7 @@ export function IdeationDashboard() {
                                 </div>
                                 <Textarea
                                   value={brief.dbSchema}
-                                  onChange={(event) => setBrief({ ...brief, dbSchema: event.target.value })}
+                                  onChange={(event) => updateBriefDraft((current) => ({ ...current, dbSchema: event.target.value }))}
                                   className="min-h-[320px] resize-none border-none bg-transparent p-4 font-mono text-[13px] leading-7 text-foreground/88 shadow-none focus-visible:ring-0"
                                   placeholder="model User { ... }"
                                 />
@@ -2121,11 +2352,90 @@ export function IdeationDashboard() {
                     <div className="flex items-center justify-between gap-4 pb-8">
                       <p className="text-[13px] text-muted-foreground">Ready to move this page into feature generation.</p>
                       <Button onClick={approveDocumentation} size="sm" className="h-10 rounded-md bg-primary px-5 text-[12px] font-medium text-primary-foreground transition-all hover:bg-primary/90">
-                        Generate Features <Icon name="play" className="size-3" />
+                        {isGeneratingRequirements ? "Generating requirements..." : <>Generate Requirements <Icon name="play" className="size-3" /></>}
                       </Button>
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "Requirements" && (
+            <div className="flex h-full flex-col">
+              <IDEHeader
+                title="Requirements Review"
+                icon="target"
+                rightNode={
+                  <Button size="sm" variant="ghost" onClick={moveToFeatures} disabled={isGeneratingFeatures} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
+                    {isGeneratingFeatures ? "Generating..." : "Generate Features"}
+                  </Button>
+                }
+              />
+              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1.1fr_0.9fr] xl:p-6">
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Derived Requirements
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Approval-ready requirement set</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      Requirements-urile sunt extrase din brief și pot fi folosite ca sursă stabilă pentru feature planning și user stories.
+                    </p>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {hasRequirements ? (
+                      requirementsView.map((requirement) => (
+                        <div key={requirement.id} className="rounded-[14px] border border-border/40 bg-background/70 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-primary">{requirement.id}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+                                {requirement.kind}
+                              </Badge>
+                              <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-foreground/80">
+                                {requirement.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          <h4 className="mt-2 text-[15px] font-semibold text-foreground/90">{requirement.title}</h4>
+                          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{requirement.detail}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-[14px] border border-dashed border-border/40 bg-background/70 px-4 py-6 text-[13px] text-muted-foreground">
+                        Generează requirements din documentație pentru a continua flow-ul.
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Handoff
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">From brief to feature backlog</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      După ce requirement set-ul este acceptat, orchestratorul poate produce feature backlog-ul și dependențele inițiale.
+                    </p>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      <span className="mb-1 block text-[10px] font-mono uppercase tracking-widest text-primary">Coverage</span>
+                      {requirementsView.filter((item) => item.kind === "functional").length} functional requirements ·{" "}
+                      {requirementsView.filter((item) => item.kind === "non-functional").length} non-functional requirements
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Feature generation will stay grounded in the approved requirement set instead of reading only the brief fields.
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <Button onClick={moveToFeatures} className="w-full" disabled={!hasRequirements || isGeneratingFeatures}>
+                      {isGeneratingFeatures ? "Generating features..." : "Generate Feature Backlog"}
+                    </Button>
+                  </div>
+                </Card>
               </div>
             </div>
           )}
@@ -2136,81 +2446,238 @@ export function IdeationDashboard() {
                 title="Features & Variations"
                 icon="layout"
                 rightNode={
-                  <Button size="sm" variant="ghost" onClick={moveToUserStories} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
-                    Generate User Stories
+                  <Button size="sm" variant="ghost" onClick={moveToUserStories} disabled={isGeneratingStories} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
+                    {isGeneratingStories ? "Generating..." : "Generate User Stories"}
                   </Button>
                 }
               />
               <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1.2fr_0.8fr] xl:p-6">
                 <div className="grid content-start gap-4 lg:grid-cols-2">
-                  {features.map((feature) => {
-                    const active = selectedFeature.id === feature.id
-                    return (
-                      <Card
-                        key={feature.id}
-                        className={cn(
-                          "flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5 transition-all",
-                          active && "border-primary/50 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
-                        )}
-                      >
-                        <div className="mb-4 flex items-center justify-between">
-                          <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                            {feature.id}
-                          </Badge>
-                          <span className="text-[11px] text-muted-foreground">{feature.preview}</span>
-                        </div>
-                        <h3 className="mb-2 text-[18px] font-semibold leading-snug text-foreground/90">{feature.title}</h3>
-                        <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">{feature.summary}</p>
-                        
-                        {/* Variations generated by AI */}
-                        <div className="space-y-2 border-t border-border/30 pt-4">
-                          <span className="text-[10px] font-mono text-primary/70 uppercase">Variations (AI Recommended)</span>
-                          {feature.variations.map((criterion) => (
-                            <div key={criterion} className="rounded-[10px] bg-background/60 px-3 py-2 text-[12px] text-foreground/85 border-l-[1.5px] border-primary/40">
-                              {criterion}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-auto flex gap-2 pt-5">
-                          <Button onClick={() => openFeature(feature.id)} className="flex-1 text-[12px] h-9">
-                            {active ? "Focus Enabled" : "Select Feature"}
-                          </Button>
-                        </div>
+                  {hasFeatures ? (
+                    filteredFeatures.length > 0 ? (
+                    filteredFeatures.map((feature) => {
+                      const active = selectedFeature?.id === feature.id
+                      return (
+                        <Card
+                          key={feature.id}
+                          className={cn(
+                            "flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5 transition-all",
+                            active && "border-primary/50 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
+                          )}
+                        >
+                          <div className="mb-4 flex items-center justify-between">
+                            <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                              {feature.id}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground">{feature.preview}</span>
+                          </div>
+                          <h3 className="mb-2 text-[18px] font-semibold leading-snug text-foreground/90">{feature.title}</h3>
+                          <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">{feature.summary}</p>
+
+                          <div className="mb-4 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-foreground/80">
+                              Estimate {feature.estimate}
+                            </Badge>
+                            {feature.dependencyIds.length > 0 ? (
+                              <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+                                Depends on {feature.dependencyIds.join(", ")}
+                              </Badge>
+                            ) : null}
+                          </div>
+
+                          <div className="mb-4 rounded-[10px] border border-border/40 bg-background/50 px-3 py-2 text-[12px] text-muted-foreground">
+                            {feature.complexityNote}
+                          </div>
+
+                          <div className="space-y-2 border-t border-border/30 pt-4">
+                            <span className="text-[10px] font-mono text-primary/70 uppercase">Variations (AI Recommended)</span>
+                            {feature.variations.map((criterion) => (
+                              <div key={criterion} className="rounded-[10px] border-l-[1.5px] border-primary/40 bg-background/60 px-3 py-2 text-[12px] text-foreground/85">
+                                {criterion}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-auto flex gap-2 pt-5">
+                            <Button onClick={() => openFeature(feature.id)} className="h-9 flex-1 text-[12px]">
+                              {active ? "Focus Enabled" : "Select Feature"}
+                            </Button>
+                          </div>
+                        </Card>
+                      )
+                    })
+                    ) : (
+                      <Card className="col-span-full rounded-[16px] border-dashed border-border/50 bg-card/60 p-6">
+                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                          Filter active
+                        </Badge>
+                        <h3 className="mt-4 text-[22px] font-semibold tracking-tight">Niciun feature nu se potrivește requirement-ului selectat</h3>
+                        <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+                          Încearcă alt requirement sau resetează filtrul pentru a reveni la tot backlog-ul de features.
+                        </p>
+                        <Button onClick={() => setFeatureRequirementFilterId("")} className="mt-5">
+                          Clear requirement filter
+                        </Button>
                       </Card>
                     )
-                  })}
+                  ) : (
+                    <Card className="col-span-full rounded-[16px] border-dashed border-border/50 bg-card/60 p-6">
+                      <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                        No generated features
+                      </Badge>
+                      <h3 className="mt-4 text-[22px] font-semibold tracking-tight">Generează feature-urile din brief-ul aprobat</h3>
+                      <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+                        Etapa aceasta nu mai vine pre-populată. Backend-ul generează feature-uri doar după ce brief-ul este completat și aprobat.
+                      </p>
+                      <Button onClick={moveToFeatures} className="mt-5" disabled={isGeneratingFeatures}>
+                        {isGeneratingFeatures ? "Generating features..." : "Generate Features"}
+                      </Button>
+                    </Card>
+                  )}
                 </div>
 
-                <Card className="flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5">
-                  <div className="space-y-2">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
-                      Selected Feature
-                    </Badge>
-                    <h3 className="font-serif text-2xl font-semibold tracking-tight">{selectedFeature.title}</h3>
-                    <p className="text-[13px] leading-relaxed text-muted-foreground">
-                      Din acest modul vor fi extrase User Stories. Bifează implementarea tehnică dorită.
-                    </p>
-                  </div>
-                  <div className="mt-5 rounded-[18px] border border-border/40 bg-background/80 p-5">
-                    <div className="mb-3 text-[10px] font-mono uppercase tracking-widest text-primary">{selectedFeature.preview}</div>
-                    <div className="space-y-3">
-                      <div className="rounded-[12px] bg-primary/10 p-4 text-sm font-medium text-foreground/90">
-                        Mapare logică: {selectedFeature.summary}
+                <div className="flex flex-col gap-4">
+                  <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                    <div className="space-y-2">
+                      <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                        Requirements + Estimation
+                      </Badge>
+                      <h3 className="font-serif text-2xl font-semibold tracking-tight">Delivery Intelligence</h3>
+                      <p className="text-[13px] leading-relaxed text-muted-foreground">
+                        Cerințele derivate din brief, estimările agregate și dependențele de feature sunt centralizate aici.
+                      </p>
+                    </div>
+                    <div className="mt-5">
+                      <TraceBreadcrumb segments={traceSegments.slice(0, 2)} />
+                    </div>
+                    {activeFeatureRequirement ? (
+                      <div className="mt-5 flex items-center justify-between gap-3 rounded-[14px] border border-primary/20 bg-primary/5 px-4 py-3">
+                        <div>
+                          <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Requirement Filter</div>
+                          <p className="mt-1 text-[12px] text-foreground/85">{activeFeatureRequirement.title}</p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setFeatureRequirementFilterId("")}>
+                          Clear
+                        </Button>
                       </div>
-                      <div className="rounded-[12px] border border-dashed border-border/50 p-4 text-[12px] leading-relaxed text-muted-foreground">
-                        Acceptance Criteria base:
-                        <ul className="list-disc pl-5 mt-2 space-y-1 text-foreground/80">
-                           {selectedFeature.acceptance.map(acc => <li key={acc}>{acc}</li>)}
-                        </ul>
+                    ) : null}
+                    <div className="mt-5 grid grid-cols-4 gap-2">
+                      {featureEstimateSummary.map((entry) => (
+                        <div key={entry.size} className="rounded-[12px] border border-border/40 bg-background/70 p-3">
+                          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{entry.size}</div>
+                          <div className="mt-1 text-[18px] font-semibold text-foreground/90">{entry.count}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-5 space-y-2">
+                      {requirementsView.slice(0, 6).map((requirement) => (
+                        (() => {
+                          const isFiltered = activeFeatureRequirement?.id === requirement.id
+                          const isHighlighted = highlightedFeatureRequirementIds.has(requirement.id)
+                          return (
+                        <button
+                          key={requirement.id}
+                          type="button"
+                          onClick={() => toggleRequirementFilter("features", requirement.id)}
+                          className={cn(
+                            "w-full rounded-[12px] border bg-background/65 p-3 text-left transition-all",
+                            isFiltered
+                              ? "border-primary/40 bg-primary/5 shadow-[0_0_0_1px_rgba(16,185,129,0.12)]"
+                              : isHighlighted
+                                ? "border-chart-2/40 bg-chart-2/10 shadow-[0_0_0_1px_rgba(234,179,8,0.12)]"
+                                : "border-border/40 hover:border-primary/20 hover:bg-background/80"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-primary">{requirement.id}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{requirement.kind}</span>
+                              {isHighlighted && !isFiltered ? (
+                                <span className="text-[10px] uppercase tracking-widest text-chart-2">linked</span>
+                              ) : null}
+                              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                                {requirement.featureIds.length} features
+                              </span>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-[12px] font-semibold text-foreground/90">{requirement.title}</p>
+                          <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{requirement.detail}</p>
+                        </button>
+                          )
+                        })()
+                      ))}
+                    </div>
+                    <div className="mt-5 overflow-hidden rounded-xl border border-border/40 bg-background/60">
+                      <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+                        <span className="text-[11px] text-muted-foreground">Feature dependency graph</span>
+                        <span className="text-[11px] text-muted-foreground">{featureDependencyGraph.edges.length} links</span>
+                      </div>
+                      <div className="relative h-[280px] overflow-hidden">
+                        <div style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                          <ReactFlow
+                            style={{ width: "100%", height: "100%" }}
+                            nodes={featureDependencyGraph.nodes}
+                            edges={featureDependencyGraph.edges}
+                            onNodeClick={handleDependencyNodeClick}
+                            fitView
+                            fitViewOptions={{ padding: 0.25 }}
+                            zoomOnScroll
+                            panOnScroll={false}
+                            selectionOnDrag={false}
+                          >
+                            <Background gap={18} size={1} color="rgba(25,22,21,0.08)" />
+                            <Controls showInteractive={false} className="fill-foreground border-border/40 bg-card" />
+                          </ReactFlow>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-auto pt-6">
-                    <Button onClick={moveToUserStories} className="w-full">
-                      Generează Pipeline Agile (Stories)
-                    </Button>
-                  </div>
-                </Card>
+                  </Card>
+
+                  <Card className="flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5">
+                    {selectedFeature ? (
+                      <>
+                        <div className="space-y-2">
+                          <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                            Selected Feature
+                          </Badge>
+                          <h3 className="font-serif text-2xl font-semibold tracking-tight">{selectedFeature.title}</h3>
+                          <p className="text-[13px] leading-relaxed text-muted-foreground">
+                            Din acest modul vor fi extrase User Stories. Bifează implementarea tehnică dorită.
+                          </p>
+                        </div>
+                        <div className="mt-5 rounded-[18px] border border-border/40 bg-background/80 p-5">
+                          <div className="mb-3 text-[10px] font-mono uppercase tracking-widest text-primary">{selectedFeature.preview}</div>
+                          <div className="space-y-3">
+                            <div className="rounded-[12px] bg-primary/10 p-4 text-sm font-medium text-foreground/90">
+                              Mapare logică: {selectedFeature.summary}
+                            </div>
+                            <div className="rounded-[12px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-primary/70">Estimate</span>
+                              {selectedFeature.estimate} · {selectedFeature.complexityNote}
+                              {selectedFeature.dependencyIds.length > 0 ? ` · Depends on ${selectedFeature.dependencyIds.join(", ")}` : ""}
+                            </div>
+                            <div className="rounded-[12px] border border-dashed border-border/50 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                              Acceptance Criteria base:
+                              <ul className="mt-2 list-disc space-y-1 pl-5 text-foreground/80">
+                                {selectedFeature.acceptance.map((acc) => (
+                                  <li key={acc}>{acc}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-[18px] border border-dashed border-border/50 bg-background/50 p-5 text-[13px] leading-relaxed text-muted-foreground">
+                        Selectează sau generează un feature pentru a debloca etapa următoare.
+                      </div>
+                    )}
+                    <div className="mt-auto pt-6">
+                      <Button onClick={moveToUserStories} className="w-full" disabled={!selectedFeature || isGeneratingStories}>
+                        {isGeneratingStories ? "Generating stories..." : "Generează Pipeline Agile (Stories)"}
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
               </div>
             </div>
           )}
@@ -2221,58 +2688,388 @@ export function IdeationDashboard() {
                 title="Agile User Stories Dashboard"
                 icon="branch"
                 rightNode={
-                  <Button size="sm" variant="ghost" onClick={approveStory} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
-                    Open final code
+                  <Button size="sm" variant="ghost" onClick={moveToPlanning} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
+                    Open planning
                   </Button>
                 }
               />
-              <div className="grid flex-1 gap-4 overflow-y-auto p-4 lg:grid-cols-3 lg:p-6">
-                {userStories.map((story) => {
-                  const active = selectedStory.id === story.id
-                  return (
-                    <Card
-                      key={story.id}
-                      className={cn(
-                        "flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5 transition-all",
-                        active && "border-primary/50 shadow-[0_0_0_1px_rgba(16,185,129,0.22)]"
-                      )}
-                    >
-                      <div className="mb-4 flex items-center justify-between">
-                        <Badge variant="outline" className={cn("uppercase", active ? "border-primary/20 bg-primary/10 text-primary" : "text-muted-foreground")}>
-                          {story.id}
-                        </Badge>
-                        <span className="text-[11px] text-muted-foreground">{story.stack}</span>
-                      </div>
-                      <h3 className="mb-2 text-[19px] font-semibold">{story.title}</h3>
-                      <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">{story.summary}</p>
-                      
-                      <div className="rounded-[14px] border border-border/40 bg-background/70 p-4">
-                        <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">{story.previewTitle}</div>
-                        <p className="text-[12px] leading-relaxed text-foreground/85">{story.previewDescription}</p>
-                      </div>
-                      <div className="mt-3 rounded-[14px] border border-dashed border-border/40 bg-background/60 p-4 text-[12px] leading-relaxed text-muted-foreground">
-                        <span className="text-primary/70 font-semibold block mb-1 text-[10px] uppercase">Tradeoff Analysis:</span>
-                        {story.tradeoff}
-                      </div>
-
-                      <div className="mt-auto flex flex-col gap-2 pt-5">
-                        <Button onClick={() => chooseStory(story.id)}>
-                          {active ? "Scaffold Pinned" : "Select Story Scaffold"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            chooseStory(story.id)
-                            resetWorkspace(brief, selectedFeature, story)
-                            moveToStage("Final Code", "Codul final a fost generat din User Story-ul ales.")
-                          }}
+              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1.25fr_0.75fr] lg:p-6">
+                <div className="grid content-start gap-4 lg:grid-cols-2">
+                  {hasStories ? (
+                    filteredStories.length > 0 ? (
+                    filteredStories.map((story) => {
+                      const active = selectedStory?.id === story.id
+                      return (
+                        <Card
+                          key={story.id}
+                          className={cn(
+                            "flex flex-col rounded-[16px] border-border/40 bg-card/70 p-5 transition-all",
+                            active && "border-primary/50 shadow-[0_0_0_1px_rgba(16,185,129,0.22)]"
+                          )}
                         >
-                          Generate Code
+                          <div className="mb-4 flex items-center justify-between">
+                            <Badge variant="outline" className={cn("uppercase", active ? "border-primary/20 bg-primary/10 text-primary" : "text-muted-foreground")}>
+                              {story.id}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground">{story.stack}</span>
+                          </div>
+                          <h3 className="mb-2 text-[19px] font-semibold">{story.title}</h3>
+                          <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">{story.summary}</p>
+
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-foreground/80">
+                              Estimate {story.estimate}
+                            </Badge>
+                            {story.dependencyIds.length > 0 ? (
+                              <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+                                Depends on {story.dependencyIds.join(", ")}
+                              </Badge>
+                            ) : null}
+                          </div>
+
+                          <div className="rounded-[14px] border border-border/40 bg-background/70 p-4">
+                            <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">{story.previewTitle}</div>
+                            <p className="text-[12px] leading-relaxed text-foreground/85">{story.previewDescription}</p>
+                          </div>
+                          <div className="mt-3 rounded-[14px] border border-dashed border-border/40 bg-background/60 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase text-primary/70">Tradeoff Analysis:</span>
+                            {story.tradeoff}
+                          </div>
+                          <div className="mt-3 rounded-[14px] border border-border/40 bg-background/60 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                            <span className="mb-1 block text-[10px] font-semibold uppercase text-primary/70">Complexity / Estimate</span>
+                            {story.complexityNote}
+                          </div>
+                          <div className="mt-3 rounded-[14px] border border-border/40 bg-background/60 p-4">
+                            <div className="mb-3 text-[10px] font-mono uppercase tracking-widest text-primary">Triple Variant</div>
+                            <div className="space-y-2">
+                              {story.variants.map((variant) => {
+                                const variantActive = story.selectedVariantId === variant.id
+                                return (
+                                  <button
+                                    key={variant.id}
+                                    type="button"
+                                    onClick={() => chooseVariant(story.id, variant.id)}
+                                    className={cn(
+                                      "w-full rounded-[12px] border px-3 py-3 text-left transition-all",
+                                      variantActive
+                                        ? "border-primary/35 bg-primary/8 shadow-[0_0_0_1px_rgba(16,185,129,0.12)]"
+                                        : "border-border/40 bg-background/80 hover:border-primary/20"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div>
+                                        <div className="text-[10px] font-mono uppercase tracking-widest text-primary">{variant.label}</div>
+                                        <div className="mt-1 text-[12px] font-semibold text-foreground/90">{variant.teamName}</div>
+                                      </div>
+                                      {variantActive ? (
+                                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                                          Selected
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                    <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{variant.focus}</p>
+                                    <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/80">{variant.architecture}</p>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="mt-auto flex flex-col gap-2 pt-5">
+                            <Button onClick={() => chooseStory(story.id)}>
+                              {active ? "Scaffold Pinned" : "Select Story Scaffold"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              disabled={isGeneratingCode}
+                              onClick={() => generateCodeForStory(story.id)}
+                            >
+                              {isGeneratingCode && active ? "Generating..." : "Generate Code"}
+                            </Button>
+                          </div>
+                        </Card>
+                      )
+                    })
+                    ) : (
+                      <Card className="col-span-full rounded-[16px] border-dashed border-border/50 bg-card/60 p-6">
+                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                          Filter active
+                        </Badge>
+                        <h3 className="mt-4 text-[22px] font-semibold tracking-tight">Niciun user story nu se potrivește requirement-ului selectat</h3>
+                        <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+                          Schimbă requirement-ul activ sau golește filtrul pentru a vedea din nou întregul story set.
+                        </p>
+                        <Button onClick={() => setStoryRequirementFilterId("")} className="mt-5">
+                          Clear requirement filter
                         </Button>
-                      </div>
+                      </Card>
+                    )
+                  ) : (
+                    <Card className="col-span-full rounded-[16px] border-dashed border-border/50 bg-card/60 p-6">
+                      <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                        No generated stories
+                      </Badge>
+                      <h3 className="mt-4 text-[22px] font-semibold tracking-tight">Generează user stories pentru feature-ul selectat</h3>
+                      <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+                        Story-urile nu mai apar implicit din seed-ul inițial. Sunt generate la cerere din feature-ul activ.
+                      </p>
+                      <Button onClick={moveToUserStories} className="mt-5" disabled={!selectedFeature || isGeneratingStories}>
+                        {isGeneratingStories ? "Generating stories..." : "Generate User Stories"}
+                      </Button>
                     </Card>
-                  )
-                })}
+                  )}
+                </div>
+
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Requirements + Dependencies
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Planning Console</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      Panou dedicat pentru requirements derivate, estimările backlog-ului și graful de dependențe dintre stories.
+                    </p>
+                  </div>
+                  <div className="mt-5">
+                    <TraceBreadcrumb segments={traceSegments.slice(0, 3)} />
+                  </div>
+                  {activeStoryRequirement ? (
+                    <div className="mt-5 flex items-center justify-between gap-3 rounded-[14px] border border-primary/20 bg-primary/5 px-4 py-3">
+                      <div>
+                        <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Requirement Filter</div>
+                        <p className="mt-1 text-[12px] text-foreground/85">{activeStoryRequirement.title}</p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setStoryRequirementFilterId("")}>
+                        Clear
+                      </Button>
+                    </div>
+                  ) : null}
+                  {selectedStory ? (
+                    <div className="mt-5 rounded-[16px] border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Focused Story</div>
+                          <h4 className="mt-1 text-[16px] font-semibold text-foreground/90">{selectedStory.title}</h4>
+                        </div>
+                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                          {selectedStory.id}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{selectedStory.summary}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-foreground/80">
+                          Estimate {selectedStory.estimate}
+                        </Badge>
+                        {selectedStory.dependencyIds.length > 0 ? (
+                          <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Depends on {selectedStory.dependencyIds.join(", ")}
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="mt-5 grid grid-cols-4 gap-2">
+                    {storyEstimateSummary.map((entry) => (
+                      <div key={entry.size} className="rounded-[12px] border border-border/40 bg-background/70 p-3">
+                        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{entry.size}</div>
+                        <div className="mt-1 text-[18px] font-semibold text-foreground/90">{entry.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 space-y-2">
+                    {requirementsView.map((requirement) => (
+                      (() => {
+                        const isFiltered = activeStoryRequirement?.id === requirement.id
+                        const isHighlighted = highlightedStoryRequirementIds.has(requirement.id)
+                        return (
+                      <button
+                        key={requirement.id}
+                        type="button"
+                        onClick={() => toggleRequirementFilter("stories", requirement.id)}
+                        className={cn(
+                          "w-full rounded-[12px] border bg-background/65 p-3 text-left transition-all",
+                          isFiltered
+                            ? "border-primary/40 bg-primary/5 shadow-[0_0_0_1px_rgba(16,185,129,0.12)]"
+                            : isHighlighted
+                              ? "border-chart-2/40 bg-chart-2/10 shadow-[0_0_0_1px_rgba(234,179,8,0.12)]"
+                              : "border-border/40 hover:border-primary/20 hover:bg-background/80"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-primary">{requirement.id}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{requirement.status}</span>
+                            {isHighlighted && !isFiltered ? (
+                              <span className="text-[10px] uppercase tracking-widest text-chart-2">linked</span>
+                            ) : null}
+                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                              {requirement.storyIds.length} stories
+                            </span>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-[12px] font-semibold text-foreground/90">{requirement.title}</p>
+                        <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{requirement.detail}</p>
+                      </button>
+                        )
+                      })()
+                    ))}
+                  </div>
+                  <div className="mt-5 overflow-hidden rounded-xl border border-border/40 bg-background/60">
+                    <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+                      <span className="text-[11px] text-muted-foreground">Story dependency graph</span>
+                      <span className="text-[11px] text-muted-foreground">{storyDependencyGraph.edges.length} links</span>
+                    </div>
+                    <div className="relative h-[320px] overflow-hidden">
+                      <div style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                        <ReactFlow
+                          style={{ width: "100%", height: "100%" }}
+                          nodes={storyDependencyGraph.nodes}
+                          edges={storyDependencyGraph.edges}
+                          onNodeClick={handleDependencyNodeClick}
+                          fitView
+                          fitViewOptions={{ padding: 0.25 }}
+                          zoomOnScroll
+                          panOnScroll={false}
+                          selectionOnDrag={false}
+                        >
+                          <Background gap={18} size={1} color="rgba(25,22,21,0.08)" />
+                          <Controls showInteractive={false} className="fill-foreground border-border/40 bg-card" />
+                        </ReactFlow>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "Planning" && (
+            <div className="flex h-full flex-col">
+              <IDEHeader
+                title="Assignment & Planning"
+                icon="pulse"
+                rightNode={
+                  <Button size="sm" variant="ghost" onClick={approveStory} disabled={isGeneratingCode} className="h-[26px] text-[11px] text-primary hover:bg-primary/10">
+                    {isGeneratingCode ? "Generating..." : "Open final code"}
+                  </Button>
+                }
+              />
+              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1fr_380px] xl:p-6">
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Orchestrator Handoff
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Implementation planning board</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      Etapa de planning consolidează requirement trace-ul, story-ul activ și dependențele înainte de generarea codului.
+                    </p>
+                  </div>
+                  <div className="mt-5">
+                    <TraceBreadcrumb segments={traceSegments.slice(0, 3)} />
+                  </div>
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-[16px] border border-border/40 bg-background/70 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Selected story</div>
+                      <h4 className="mt-2 text-[18px] font-semibold text-foreground/90">{selectedStory?.title ?? "No story selected"}</h4>
+                      <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                        {selectedStory?.summary ?? "Selectează o story din etapa anterioară pentru a continua către implementare."}
+                      </p>
+                      {selectedStory ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-foreground/80">
+                            Estimate {selectedStory.estimate}
+                          </Badge>
+                          <Badge variant="outline" className="border-border/50 bg-background/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+                            {selectedStory.stack}
+                          </Badge>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="rounded-[16px] border border-border/40 bg-background/70 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Chosen variant</div>
+                      <h4 className="mt-2 text-[18px] font-semibold text-foreground/90">{selectedVariant?.label ?? "No variant selected"}</h4>
+                      <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                        {selectedVariant?.focus ?? "Alege o variantă din cele 3 echipe paralele pentru a continua către implementare."}
+                      </p>
+                      {selectedVariant ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="rounded-[12px] border border-border/30 bg-background/70 px-3 py-2 text-[12px] text-foreground/85">
+                            {selectedVariant.teamName}
+                          </div>
+                          <div className="rounded-[12px] border border-border/30 bg-background/70 px-3 py-2 text-[12px] text-muted-foreground">
+                            {selectedVariant.architecture}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="rounded-[16px] border border-border/40 bg-background/70 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Dependencies</div>
+                      <div className="mt-3 space-y-2">
+                        {selectedStory?.dependencyIds.length ? (
+                          selectedStory.dependencyIds.map((dependencyId) => (
+                            <div key={dependencyId} className="rounded-[12px] border border-border/30 bg-background/70 px-3 py-2 text-[12px] text-foreground/85">
+                              {dependencyId}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-[12px] border border-dashed border-border/40 px-3 py-3 text-[12px] text-muted-foreground">
+                            Story-ul activ nu are dependențe explicite.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-5 overflow-hidden rounded-xl border border-border/40 bg-background/60">
+                    <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+                      <span className="text-[11px] text-muted-foreground">Story dependency graph</span>
+                      <span className="text-[11px] text-muted-foreground">{storyDependencyGraph.edges.length} links</span>
+                    </div>
+                    <div className="relative h-[320px] overflow-hidden">
+                      <div style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                        <ReactFlow
+                          style={{ width: "100%", height: "100%" }}
+                          nodes={storyDependencyGraph.nodes}
+                          edges={storyDependencyGraph.edges}
+                          onNodeClick={handleDependencyNodeClick}
+                          fitView
+                          fitViewOptions={{ padding: 0.25 }}
+                          zoomOnScroll
+                          panOnScroll={false}
+                          selectionOnDrag={false}
+                        >
+                          <Background gap={18} size={1} color="rgba(25,22,21,0.08)" />
+                          <Controls showInteractive={false} className="fill-foreground border-border/40 bg-card" />
+                        </ReactFlow>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Ready for implementation
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Final handoff</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      Când planificarea este acceptată, putem deschide etapa Final Code pentru scaffold și editare asistată.
+                    </p>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Requirement trace: {traceRequirement?.id ?? "none"} {traceRequirement ? `· ${traceRequirement.title}` : ""}
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Selected feature: {selectedFeature?.id ?? "none"} {selectedFeature ? `· ${selectedFeature.title}` : ""}
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <Button onClick={approveStory} className="w-full" disabled={!selectedStory || isGeneratingCode}>
+                      {isGeneratingCode ? "Generating code..." : "Generate final code scaffold"}
+                    </Button>
+                  </div>
+                </Card>
               </div>
             </div>
           )}
@@ -2288,8 +3085,8 @@ export function IdeationDashboard() {
                       <Button size="sm" variant="ghost" onClick={regenerateCode} className="h-[22px] px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
                         Regenerate code
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={generateApplication} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
-                        Generate app preview
+                      <Button size="sm" variant="ghost" onClick={runSecurityReviewStage} disabled={isGeneratingSecurityReview} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
+                        {isGeneratingSecurityReview ? "Reviewing..." : "Run security review"}
                       </Button>
                     </div>
                   }
@@ -2357,6 +3154,29 @@ export function IdeationDashboard() {
                   
                   {/* Editor Frame */}
                   <div className="relative flex-1 flex flex-col min-w-0 border-r border-border/40">
+                    <div className="border-b border-border/30 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3 rounded-[12px] border border-border/40 bg-background/60 px-3 py-2">
+                        <div>
+                          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-primary">Code Generation</div>
+                          <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{codeGenerationStatus.detail}</p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "rounded-full text-[9px] uppercase tracking-[0.14em]",
+                            codeGenerationStatus.stage === "running" && "border-primary/20 bg-primary/10 text-primary",
+                            codeGenerationStatus.stage === "completed" && "border-chart-2/20 bg-chart-2/10 text-chart-2",
+                            codeGenerationStatus.stage === "failed" && "border-destructive/20 bg-destructive/10 text-destructive",
+                            codeGenerationStatus.stage === "idle" && "border-border/60 bg-background/60 text-muted-foreground"
+                          )}
+                        >
+                          {codeGenerationStatus.stage}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="border-b border-border/30 px-3 py-2">
+                      <TraceBreadcrumb segments={traceSegments} />
+                    </div>
                     <div className="flex bg-muted/20 border-b border-border/40 overflow-x-auto no-scrollbar">
                       {workspaceFiles.map((file) => (
                         <button
@@ -2384,7 +3204,7 @@ export function IdeationDashboard() {
                             <div>
                               <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-primary">AI Slash Edit</div>
                               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                                Scrie o instrucțiune scurtă pentru agentul AI direct în cod.
+                                Scrie exact ce vrei să modifice în aplicație pe fișierul activ.
                               </p>
                             </div>
                             <Button size="icon-xs" variant="ghost" onClick={closeSlashMenu} className="shrink-0">
@@ -2423,29 +3243,49 @@ export function IdeationDashboard() {
                                 applySlashCommand()
                               }
                             }}
-                            placeholder="Ex: extract logic in helper + add loading state"
+                            placeholder="Ex: schimbă hero-ul, adaugă buton de delete produs, fă cardurile mai mari"
                             className="h-10 rounded-xl border-border/50 bg-background/70 text-[12px]"
                             autoFocus
                           />
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <span className="text-[10px] text-muted-foreground">
-                              Enter aplică mock editarea AI pe fișierul activ.
+                              Enter aplică o schiță de editare AI pe fișierul activ.
                             </span>
                             <Button size="sm" onClick={applySlashCommand} className="h-8 px-3 text-[11px]">
-                              Apply AI edit
+                              Apply requested edit
                             </Button>
                           </div>
                         </div>
                       ) : null}
-                      <Textarea
-                        ref={editorRef}
-                        value={activeFile?.content ?? ""}
-                        onChange={(event) => updateActiveFileContent(event.target.value)}
-                        onKeyDown={handleEditorKeyDown}
-                        className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 pt-12 font-mono text-[13px] leading-[1.6] text-foreground/90 shadow-none focus-visible:ring-0"
-                        spellCheck={false}
-                      />
+                      {hasWorkspaceFiles ? (
+                        <Textarea
+                          ref={editorRef}
+                          value={activeFile?.content ?? ""}
+                          onChange={(event) => updateActiveFileContent(event.target.value)}
+                          onKeyDown={handleEditorKeyDown}
+                          className="absolute inset-0 h-full w-full resize-none rounded-none border-none bg-transparent p-4 pt-12 font-mono text-[13px] leading-[1.6] text-foreground/90 shadow-none focus-visible:ring-0"
+                          spellCheck={false}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 grid place-items-center p-8">
+                          <div className="max-w-md rounded-[18px] border border-dashed border-border/50 bg-background/60 p-6 text-center">
+                            <div className="text-[11px] font-mono uppercase tracking-[0.16em] text-primary">Workspace Empty</div>
+                            <h3 className="mt-3 text-[22px] font-semibold tracking-tight">Generează primul scaffold din story-ul selectat</h3>
+                            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+                              Editorul este acum complet backend-driven și pornește gol. Poți genera cod sau crea manual fișiere și foldere.
+                            </p>
+                            <div className="mt-5 flex justify-center gap-2">
+                              <Button onClick={approveStory} disabled={!selectedStory || isGeneratingCode}>
+                                {isGeneratingCode ? "Generating..." : "Generate Code"}
+                              </Button>
+                              <Button variant="outline" onClick={() => startWorkspaceCreation("file")}>
+                                Create File
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Terminal pane underneath editor */}
@@ -2457,7 +3297,19 @@ export function IdeationDashboard() {
                       </div>
                       <div className="relative flex-1 overflow-y-auto p-3 space-y-1 w-full bg-background/20 font-medium">
                         {terminalHistory.map((line, i) => (
-                          <div key={i} className={cn("whitespace-pre-wrap leading-relaxed", line.type === 'error' ? 'text-destructive' : line.type === 'cmd' ? 'text-foreground font-bold' : 'text-chart-2/90')}>
+                          <div
+                            key={i}
+                            className={cn(
+                              "whitespace-pre-wrap leading-relaxed",
+                              line.type === "error"
+                                ? "text-destructive"
+                                : line.type === "cmd"
+                                  ? "text-foreground font-bold"
+                                  : line.type === "trace"
+                                    ? "rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-2 text-[10.5px] text-primary/90"
+                                    : "text-chart-2/90"
+                            )}
+                          >
                             {line.text}
                           </div>
                         ))}
@@ -2530,6 +3382,259 @@ export function IdeationDashboard() {
             </div>
           )}
 
+          {currentStage === "Security Review" && (
+            <div className="flex h-full flex-col">
+              <IDEHeader
+                title="Security Review"
+                icon="shield"
+                rightNode={
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => transitionToStage("Final Code", "S-a revenit la cod pentru remediere înainte de merge.")} className="h-[22px] px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
+                      Back to code
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={approveSecurityAndMerge} disabled={securityReport.status !== "reviewed" || isRunningMerge} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
+                      {isRunningMerge ? "Merging..." : "Approve and merge"}
+                    </Button>
+                  </div>
+                }
+              />
+              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1fr_360px] xl:p-6">
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Security Agent
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Security findings before merge</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      Raportul leagă story-ul activ de riscurile detectate automat și cere aprobare umană înainte de integrare.
+                    </p>
+                  </div>
+                  <div className="mt-5">
+                    <TraceBreadcrumb segments={traceSegments.slice(0, 4)} />
+                  </div>
+                  <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-[14px] border border-destructive/20 bg-destructive/8 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-destructive">High</div>
+                      <div className="mt-2 text-2xl font-semibold">{securityCounts.high}</div>
+                    </div>
+                    <div className="rounded-[14px] border border-chart-3/20 bg-chart-3/8 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-chart-3">Medium</div>
+                      <div className="mt-2 text-2xl font-semibold">{securityCounts.medium}</div>
+                    </div>
+                    <div className="rounded-[14px] border border-primary/20 bg-primary/8 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Low</div>
+                      <div className="mt-2 text-2xl font-semibold">{securityCounts.low}</div>
+                    </div>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {securityReport.issues.map((issue) => (
+                      <div key={issue.id} className="rounded-[16px] border border-border/40 bg-background/70 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] font-mono uppercase tracking-widest text-primary">{issue.id}</div>
+                            <h4 className="mt-1 text-[16px] font-semibold text-foreground/90">{issue.title}</h4>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "uppercase tracking-widest",
+                              issue.severity === "high" && "border-destructive/25 bg-destructive/10 text-destructive",
+                              issue.severity === "medium" && "border-chart-3/25 bg-chart-3/10 text-chart-3",
+                              issue.severity === "low" && "border-primary/25 bg-primary/10 text-primary"
+                            )}
+                          >
+                            {issue.severity}
+                          </Badge>
+                        </div>
+                        <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">{issue.detail}</p>
+                        <div className="mt-3 rounded-[12px] border border-border/30 bg-background/80 px-3 py-2 text-[12px] text-foreground/85">
+                          Remediation: {issue.remediation}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Human gate
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Approve for merge</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">{securityReport.summary}</p>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Status: {securityReport.status}
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Reviewed at: {securityReport.reviewedAt ?? "pending"}
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Approved at: {securityReport.approvedAt ?? "waiting for approval"}
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <Button onClick={approveSecurityAndMerge} className="w-full" disabled={securityReport.status !== "reviewed" || isRunningMerge}>
+                      {isRunningMerge ? "Approving and merging..." : "Approve fixes and continue to merge"}
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "Merge" && (
+            <div className="flex h-full flex-col">
+              <IDEHeader
+                title="Merge & Integration"
+                icon="branch"
+                rightNode={
+                  <Button size="sm" variant="ghost" onClick={runProjectReviewStage} disabled={mergeReport.status !== "completed" || isGeneratingProjectReview} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
+                    {isGeneratingProjectReview ? "Reviewing..." : "Generate project review"}
+                  </Button>
+                }
+              />
+              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1fr_360px] xl:p-6">
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Merge Agent
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Integrated changelog</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">{mergeReport.summary}</p>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {mergeReport.changelog.length > 0 ? (
+                      mergeReport.changelog.map((entry, index) => (
+                        <div key={`${entry}-${index}`} className="rounded-[14px] border border-border/40 bg-background/70 px-4 py-3 text-[12px] leading-relaxed text-foreground/85">
+                          {entry}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-[14px] border border-dashed border-border/40 px-4 py-4 text-[12px] text-muted-foreground">
+                        Merge-ul nu a fost rulat încă pentru story-ul curent.
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Merge status
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Readiness</h3>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Status: {mergeReport.status}
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Stories merged: {mergeReport.mergedStoryIds.length}
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Merged at: {mergeReport.mergedAt ?? "pending"}
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <Button onClick={runProjectReviewStage} className="w-full" disabled={mergeReport.status !== "completed" || isGeneratingProjectReview}>
+                      {isGeneratingProjectReview ? "Generating review..." : "Continue to project review"}
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {currentStage === "Project Review" && (
+            <div className="flex h-full flex-col">
+              <IDEHeader
+                title="Project Review"
+                icon="chart"
+                rightNode={
+                  <Button size="sm" variant="ghost" onClick={generateApplication} disabled={projectHealth.status !== "completed" || isGeneratingPreview} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
+                    {isGeneratingPreview ? "Generating preview..." : "Generate app preview"}
+                  </Button>
+                }
+              />
+              <div className="grid flex-1 gap-4 overflow-y-auto p-4 xl:grid-cols-[1fr_360px] xl:p-6">
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Project Review Agent
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Project health summary</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">{projectHealth.summary}</p>
+                  </div>
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-[14px] border border-primary/20 bg-primary/8 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Progress</div>
+                      <div className="mt-2 text-2xl font-semibold">{projectHealth.progress}%</div>
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Coverage</div>
+                      <div className="mt-2 text-[12px] leading-relaxed text-foreground/85">{projectHealth.coverage}</div>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-[16px] border border-border/40 bg-background/70 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Technical debt</div>
+                      <div className="mt-3 space-y-2">
+                        {projectHealth.technicalDebt.length > 0 ? (
+                          projectHealth.technicalDebt.map((item, index) => (
+                            <div key={`${item}-${index}`} className="rounded-[12px] border border-border/30 bg-background/80 px-3 py-2 text-[12px] text-muted-foreground">
+                              {item}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-[12px] border border-dashed border-border/40 px-3 py-3 text-[12px] text-muted-foreground">
+                            Nu există datorie tehnică semnalată de review-ul automat.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-[16px] border border-border/40 bg-background/70 p-4">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-primary">Next actions</div>
+                      <div className="mt-3 space-y-2">
+                        {projectHealth.nextActions.map((item, index) => (
+                          <div key={`${item}-${index}`} className="rounded-[12px] border border-border/30 bg-background/80 px-3 py-2 text-[12px] text-muted-foreground">
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="rounded-[16px] border-border/40 bg-card/70 p-5">
+                  <div className="space-y-2">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      Preview handoff
+                    </Badge>
+                    <h3 className="font-serif text-2xl font-semibold tracking-tight">Final gate</h3>
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      După project review, preview-ul devine ultimul pas pentru validarea experienței finale.
+                    </p>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Review status: {projectHealth.status}
+                    </div>
+                    <div className="rounded-[14px] border border-border/40 bg-background/70 p-4 text-[12px] leading-relaxed text-muted-foreground">
+                      Generated at: {projectHealth.generatedAt ?? "pending"}
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <Button onClick={generateApplication} className="w-full" disabled={projectHealth.status !== "completed" || isGeneratingPreview}>
+                      {isGeneratingPreview ? "Generating preview..." : "Generate preview from reviewed merge"}
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
           {currentStage === "Preview" && (
             <div className="flex h-full flex-col">
               <IDEHeader
@@ -2537,11 +3642,11 @@ export function IdeationDashboard() {
                 icon="play"
                 rightNode={
                   <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={openPreviewWindow} className="h-[22px] px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
+                    <Button size="sm" variant="ghost" onClick={openPreviewWindow} disabled={isGeneratingPreview} className="h-[22px] px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground">
                       {previewOpened ? "Preview active" : "Open preview"}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => moveToStage("Final Code", "S-a revenit la codul final pentru ajustări.")} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
-                      Back to code
+                    <Button size="sm" variant="ghost" onClick={() => transitionToStage("Project Review", "S-a revenit la raportul de proiect pentru ajustări înainte de preview.")} className="h-[22px] border border-primary/20 bg-primary/10 px-2 text-[10px] text-primary hover:bg-primary/20">
+                      Back to review
                     </Button>
                   </div>
                 }
@@ -2561,17 +3666,24 @@ export function IdeationDashboard() {
                   </div>
                   
                   <div className="flex-1 bg-white relative w-full h-full">
-                     {appGenerated ? (
+                     {isGeneratingPreview ? (
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-card text-muted-foreground text-center px-8">
+                         <Icon name="play" className="size-12 opacity-20 mb-4" />
+                         <p className="font-medium text-foreground/85">Generez preview-ul din workspace-ul curent...</p>
+                         <p className="mt-2 max-w-md text-[12px] leading-relaxed">
+                           Așteaptă puțin. Construiesc runtime-ul și pregătesc iframe-ul cu ultima versiune a codului.
+                         </p>
+                       </div>
+                     ) : appGenerated ? (
                        <iframe 
-                         srcDoc={previewDocument}
+                         src={withProjectQuery(`/api/preview?v=${encodeURIComponent(projectVersion)}`, currentProjectId)}
                          className="absolute inset-0 w-full h-full border-none bg-background"
                          title="App Preview"
-                         sandbox="allow-scripts"
                        />
                      ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-card text-muted-foreground">
                          <Icon name="terminal" className="size-12 opacity-20 mb-4" />
-                         <p>Apasă `Generate app preview` sau rulează `npm run dev` pentru a deschide preview-ul live din codul scris în `Final Code`.</p>
+                         <p>Apasă `Generate app preview` după ce workspace-ul a fost generat, pentru a deschide preview-ul din codul curent.</p>
                        </div>
                      )}
                   </div>
@@ -2584,15 +3696,19 @@ export function IdeationDashboard() {
                     </Badge>
                     <h3 className="font-serif text-2xl font-semibold tracking-tight">Tot userflow-ul este conectat</h3>
                     <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-                      {previewOpened ? "Preview-ul este alimentat live din conținutul workspace-ului Final Code." : "Deschide preview-ul pentru a vedea instant modificările făcute în workspace."}
+                      {isGeneratingPreview
+                        ? "Preview-ul se generează acum din workspace-ul Final Code."
+                        : previewOpened
+                          ? "Preview-ul este alimentat live din conținutul workspace-ului Final Code."
+                          : "Deschide preview-ul pentru a vedea instant modificările făcute în workspace."}
                     </p>
                   </div>
                   <div className="mt-5 space-y-3">
                     {stages.map((stage) => (
                       <div key={stage} className="rounded-[12px] border border-border/40 bg-background/70 p-3">
-                        <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">{stageNumbers[stage]}</div>
-                        <div className="text-[13px] font-semibold text-foreground/90">{stage}</div>
-                        <div className="text-[12px] leading-relaxed text-muted-foreground">{stageDescriptions[stage]}</div>
+                      <div className="mb-1 text-[10px] font-mono uppercase tracking-widest text-primary">{stageNumbers[stage]}</div>
+                        <div className="text-[13px] font-semibold text-foreground/90">{isHydrated ? stage : ""}</div>
+                        <div className="text-[12px] leading-relaxed text-muted-foreground">{isHydrated ? stageDescriptions[stage] : ""}</div>
                       </div>
                     ))}
                   </div>
@@ -2614,7 +3730,7 @@ export function IdeationDashboard() {
                 Active Peers
               </h4>
               <div className="space-y-3.5">
-                {collaborators.map((collaborator) => (
+                {collaboratorsState.map((collaborator) => (
                   <div key={collaborator.name} className="group flex items-start gap-3 rounded-[8px] border border-transparent p-1.5 transition-colors hover:border-border/30 hover:bg-muted/40">
                     <div className="grid size-8 shrink-0 place-items-center rounded-full border border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 text-[11px] font-bold text-primary shadow-sm transition-transform group-hover:scale-105">
                       {collaborator.initials}
@@ -2657,7 +3773,7 @@ export function IdeationDashboard() {
                 Subagents
               </h4>
               <div className="space-y-3">
-                {subagents.map((agent) => (
+                {subagentsState.map((agent) => (
                   <div key={agent.id} className="rounded-[12px] border border-border/40 bg-background/65 p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -2684,6 +3800,38 @@ export function IdeationDashboard() {
               </div>
             </div>
             <Separator />
+            <div className="space-y-4">
+              <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
+                <div className="size-1.5 rounded-full bg-chart-3 shadow-sm" />
+                Orchestration Trace
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-[12px] border border-border/40 bg-background/65 p-3">
+                  <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">Runs</div>
+                  <div className="mt-1 text-[18px] font-semibold text-foreground/90">{agentRunsState.length}</div>
+                </div>
+                <div className="rounded-[12px] border border-border/40 bg-background/65 p-3">
+                  <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">Artifacts</div>
+                  <div className="mt-1 text-[18px] font-semibold text-foreground/90">{artifactsState.length}</div>
+                </div>
+              </div>
+              {agentRunsState[0] ? (
+                <div className="rounded-[12px] border border-border/40 bg-background/60 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[12px] font-semibold text-foreground/90">{agentRunsState[0].agentName}</p>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-primary/80">{agentRunsState[0].status}</span>
+                  </div>
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{agentRunsState[0].summary}</p>
+                </div>
+              ) : null}
+              {artifactsState[0] ? (
+                <div className="rounded-[12px] border border-border/40 bg-background/60 p-3">
+                  <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">Latest artifact</div>
+                  <p className="mt-1 text-[12px] font-semibold text-foreground/90">{artifactsState[0].title}</p>
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{artifactsState[0].summary}</p>
+                </div>
+              ) : null}
+            </div>
             <div className="space-y-4 min-h-0">
               <h4 className="flex items-center gap-2 text-[10px] font-mono font-semibold uppercase tracking-widest text-muted-foreground/80">
                 <div className="size-1.5 rounded-full bg-chart-4 shadow-sm" />
