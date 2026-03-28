@@ -3,6 +3,7 @@ import type {
   AgentState,
   BriefState,
   Collaborator,
+  Message,
   MergeReport,
   ProjectState,
   ProjectHealthReport,
@@ -19,6 +20,14 @@ function nowIso() {
 
 function stampId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function getMessageOrderValue(id: string, fallbackIndex: number) {
+  const match = id.match(/-(\d+)-/)
+  if (!match) return fallbackIndex
+
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) ? parsed : fallbackIndex
 }
 
 function toSentenceLabel(value: string, fallback: string) {
@@ -168,17 +177,17 @@ export function createDefaultRequirements(): Requirement[] {
 export function createDefaultAgents(): AgentState[] {
   return [
     {
-      id: "agent-business",
-      name: "Business AI",
-      specialty: "Brief synthesis",
+      id: "agent-discovery",
+      name: "Client Discovery AI",
+      specialty: "Client interview and brief synthesis",
       stage: "Conversation",
       status: "standby",
-      goal: "Clarify business scope and generate approval-ready artifacts.",
-      lastRunSummary: "Așteaptă brief-ul inițial.",
+      goal: "Clarify the client need, uncover the right product, and produce an approval-ready brief.",
+      lastRunSummary: "Așteaptă prima discuție cu clientul.",
     },
     {
       id: "agent-tech",
-      name: "Tech AI",
+      name: "Solution Architect AI",
       specialty: "Architecture planning",
       stage: "Documentation",
       status: "standby",
@@ -279,8 +288,7 @@ export function createDefaultProjectState(projectId: string): ProjectState {
     userStories: [],
     selectedStoryId: "",
     messages: {
-      business: [],
-      tech: [],
+      general: [],
     },
     collaborators: createDefaultCollaborators(),
     agents: createDefaultAgents(),
@@ -317,13 +325,40 @@ function looksLikeLegacyDemo(project: ProjectState) {
       file.content.includes("Team Sprint Board") ||
       file.content.includes("A mocked test app for checking how code changes flow into the integrated preview.")
   )
-  const hasLegacyMessages = [...project.messages.business, ...project.messages.tech].some(
+  const legacyMessages = [
+    ...(project.messages?.general ?? []),
+    ...(((project.messages as { business?: Message[] })?.business ?? [])),
+    ...(((project.messages as { tech?: Message[] })?.tech ?? [])),
+  ]
+  const hasLegacyMessages = legacyMessages.some(
     (message) =>
       message.text.includes("agențiile enterprise") ||
       message.text.includes("delay minim pe live-sync")
   )
 
   return project.id === "project-demo" || hasLegacyFeature || hasLegacyPreviewFile || hasLegacyMessages
+}
+
+function mergeConversationMessages(project: ProjectState, fallbackMessages: Message[]) {
+  const buckets = [
+    project.messages?.general ?? [],
+    ((project.messages as { business?: Message[] })?.business ?? []),
+    ((project.messages as { tech?: Message[] })?.tech ?? []),
+  ]
+  const deduped = new Map<string, Message>()
+
+  for (const bucket of buckets) {
+    for (const message of bucket) {
+      if (!message?.id) continue
+      deduped.set(message.id, message)
+    }
+  }
+
+  const merged = [...deduped.values()].sort(
+    (left, right) => getMessageOrderValue(left.id, 0) - getMessageOrderValue(right.id, 0)
+  )
+
+  return merged.length > 0 ? merged : fallbackMessages
 }
 
 export function normalizeProjectState(project: ProjectState, projectId: string): ProjectState {
@@ -341,8 +376,7 @@ export function normalizeProjectState(project: ProjectState, projectId: string):
       userStories: normalizeUserStories(project.userStories ?? fresh.userStories),
       selectedStoryId: project.selectedStoryId ?? fresh.selectedStoryId,
       messages: {
-        business: project.messages?.business ?? fresh.messages.business,
-        tech: project.messages?.tech ?? fresh.messages.tech,
+        general: mergeConversationMessages(project, fresh.messages.general),
       },
       collaborators: project.collaborators ?? fresh.collaborators,
       agents: project.agents ?? fresh.agents,
@@ -385,6 +419,9 @@ export function normalizeProjectState(project: ProjectState, projectId: string):
     search: project.search ?? "",
     brief: project.brief ?? fresh.brief,
     requirements: project.requirements ?? fresh.requirements,
+    messages: {
+      general: mergeConversationMessages(project, fresh.messages.general),
+    },
     userStories: normalizeUserStories(project.userStories ?? fresh.userStories),
     collaborators: project.collaborators ?? fresh.collaborators,
     agents: (project.agents ?? []).length > 0 ? project.agents : fresh.agents,

@@ -35,7 +35,7 @@ export async function readJsonBody(request: NextRequest) {
 }
 
 export function isMessageChannel(value: unknown): value is MessageChannel {
-  return value === "business" || value === "tech"
+  return value === "general"
 }
 
 export function isStageKey(value: unknown): value is StageKey {

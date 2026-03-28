@@ -220,8 +220,7 @@ export type ProjectState = {
   userStories: UserStory[]
   selectedStoryId: string
   messages: {
-    business: Message[]
-    tech: Message[]
+    general: Message[]
   }
   collaborators: Collaborator[]
   agents: AgentState[]
@@ -235,4 +234,4 @@ export type ProjectState = {
   preview: PreviewState
 }
 
-export type MessageChannel = "business" | "tech"
+export type MessageChannel = "general"

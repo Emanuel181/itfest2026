@@ -412,10 +412,10 @@ function canStageBeOpened(project: ProjectState, stage: StageKey) {
 }
 
 const orchestrationAgents = {
-  requirementGeneration: { agentId: "agent-business", agentName: "Business AI" },
-  featureGeneration: { agentId: "agent-business", agentName: "Business AI" },
+  requirementGeneration: { agentId: "agent-discovery", agentName: "Client Discovery AI" },
+  featureGeneration: { agentId: "agent-discovery", agentName: "Client Discovery AI" },
   storyGeneration: { agentId: "agent-orchestrator", agentName: "Orchestrator Agent" },
-  workspaceGeneration: { agentId: "agent-tech", agentName: "Tech AI" },
+  workspaceGeneration: { agentId: "agent-tech", agentName: "Solution Architect AI" },
   securityReview: { agentId: "agent-security", agentName: "Security Agent" },
   projectReview: { agentId: "agent-review", agentName: "Project Review Agent" },
   previewGeneration: { agentId: "agent-merge", agentName: "Merge Agent" },
@@ -544,8 +544,7 @@ export async function generateDocumentationFromConversation(projectId: string) {
   const project = await getProject(projectId)
   const nextBrief = await generateBriefFromConversation({
     currentBrief: project.brief,
-    businessMessages: project.messages.business,
-    techMessages: project.messages.tech,
+    conversationMessages: project.messages.general,
   })
 
   return updateProjectState(projectId, async (current) => {
@@ -557,7 +556,7 @@ export async function generateDocumentationFromConversation(projectId: string) {
     return appendActivity(
       next,
       "Documentation generated",
-      "Brief-ul a fost generat automat din conversațiile de business și tech."
+      "Brief-ul a fost generat automat din conversația unificată cu clientul."
     )
   })
 }
@@ -1344,7 +1343,7 @@ export async function appendConversationMessage(input: {
   await updateProjectState(input.projectId, async (project) => {
     const nextMessages = {
       ...project.messages,
-      [input.channel]: [...project.messages[input.channel], humanMessage],
+      general: [...project.messages.general, humanMessage],
     }
 
     const next = touch({
@@ -1358,20 +1357,18 @@ export async function appendConversationMessage(input: {
   const project = await getProject(input.projectId)
   const evolvedBrief = await generateBriefFromConversation({
     currentBrief: project.brief,
-    businessMessages: project.messages.business,
-    techMessages: project.messages.tech,
+    conversationMessages: project.messages.general,
   })
   const aiReply = await generateOpenAIReply({
-    channel: input.channel,
     author: input.author,
     message: normalized,
     brief: evolvedBrief,
-    history: [...project.messages.business, ...project.messages.tech],
+    history: project.messages.general,
   })
 
   const aiMessage: Message = {
     id: stampId("msg"),
-    author: "General AI",
+    author: "Client Discovery AI",
     role: "ai",
     text: aiReply,
   }
@@ -1382,11 +1379,11 @@ export async function appendConversationMessage(input: {
       brief: evolvedBrief,
       messages: {
         ...current.messages,
-        [input.channel]: [...current.messages[input.channel], aiMessage],
+        general: [...current.messages.general, aiMessage],
       },
     })
 
-    return appendActivity(next, "General AI", "A actualizat brief-ul și a continuat conversația.")
+    return appendActivity(next, "Client Discovery AI", "A actualizat brief-ul și a continuat conversația.")
   })
 }
 

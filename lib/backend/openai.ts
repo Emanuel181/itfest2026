@@ -4,7 +4,6 @@ import type {
   BriefState,
   Feature,
   Message,
-  MessageChannel,
   StoryVariant,
   UserStory,
   WorkspaceFile,
@@ -151,7 +150,7 @@ function hasEnoughDiscoveryContext(brief: BriefState) {
   )
 }
 
-function nextFallbackQuestion(channel: MessageChannel, brief: BriefState) {
+function nextFallbackQuestion(brief: BriefState) {
   if (!brief.title.trim()) return "Cum se numește produsul sau website-ul?"
   if (!brief.objective.trim()) return "Care este obiectivul principal al website-ului în producție?"
   if (brief.audience.length === 0) return "Cine sunt utilizatorii principali și ce rol au?"
@@ -159,54 +158,43 @@ function nextFallbackQuestion(channel: MessageChannel, brief: BriefState) {
   if (brief.deliverables.length === 0) return "Ce rezultat concret vrei să livreze website-ul după lansare?"
   if (!brief.architecture.trim()) return "Dacă nu ai preferință tehnică, e ok să-ți propun eu o arhitectură simplă pentru producție?"
   if (brief.techStack.length === 0) return "Dacă nu ai stack decis, preferi să-ți recomand eu o variantă potrivită pentru producție?"
-  if (!brief.dbSchema.trim()) return "Ce entități principale trebuie să existe în baza de date?"
-  if (brief.risks.length === 0) return "Ce risc tehnic sau operațional vrei să prevenim din start?"
-  if (channel === "tech") {
-    return "Ai nevoie de auth, roluri sau integrări externe din prima versiune?"
-  }
-
-  if (channel === "business") {
-    return "Există o regulă de business sau un flux critic pe care vrei să-l clarificăm acum?"
-  }
-
+  if (!brief.dbSchema.trim()) return "Ce date esențiale trebuie să păstreze produsul, chiar și într-o primă versiune?"
+  if (brief.risks.length === 0) return "Există un risc important sau o constrângere pe care vrei să o prevenim din start?"
   return "Ai nevoie de auth, roluri sau integrări externe din prima versiune?"
 }
 
-function fallbackReply(channel: MessageChannel, message: string, brief: BriefState) {
+function fallbackReply(message: string, brief: BriefState) {
   const normalized = message.trim()
   if (!normalized) return "Continuăm."
 
   if (hasEnoughDiscoveryContext(brief)) {
-    return `Am destul context ca să construiesc documentația completă pentru website. Avem deja obiectivul, audiența, scope-ul și recomandările tehnice de bază. Dacă ești ok, mergem mai departe și generez brief-ul complet din conversația noastră.`
+    return "Am deja context suficient ca să construiesc documentația completă. Avem obiectivul, publicul, scope-ul și o bază tehnică bună. Dacă vrei, merg direct mai departe și generez brief-ul complet din conversația noastră."
   }
 
-  const question = nextFallbackQuestion(channel, brief)
-  return `Am notat direcția: "${normalized}". O folosesc pentru documentația website-ului. ${brief.architecture.trim() ? "" : "Dacă nu îmi dai preferințe tehnice, îți recomand eu stack-ul și arhitectura. "}Spune-mi simplu: ${question}`
+  const question = nextFallbackQuestion(brief)
+  return `Am notat direcția: "${normalized}". O folosesc ca să definesc produsul și ce trebuie construit. ${brief.architecture.trim() ? "" : "Dacă nu îmi dai preferințe tehnice, îți propun eu stack-ul și arhitectura. "}Spune-mi simplu: ${question}`
 }
 
-function fallbackBriefFromConversation(
-  currentBrief: BriefState,
-  businessMessages: Message[],
-  techMessages: Message[]
-) {
-  const businessHuman = businessMessages.filter((message) => message.role === "human").map((message) => normalizeText(message.text)).filter(Boolean)
-  const techHuman = techMessages.filter((message) => message.role === "human").map((message) => normalizeText(message.text)).filter(Boolean)
+function fallbackBriefFromConversation(currentBrief: BriefState, conversationMessages: Message[]) {
+  const humanMessages = conversationMessages
+    .filter((message) => message.role === "human")
+    .map((message) => normalizeText(message.text))
+    .filter(Boolean)
 
   const title =
     currentBrief.title.trim() ||
-    toSentenceLabel(businessHuman[0] || techHuman[0] || "Production Website", "Production Website")
+    toSentenceLabel(humanMessages[0] || "Production Website", "Production Website")
 
   const objective =
     currentBrief.objective.trim() ||
-    businessHuman[0] ||
-    techHuman[0] ||
+    humanMessages[0] ||
     "Launch a production-ready website with clear business goals and technical delivery constraints."
 
   return {
     title,
     objective,
-    audience: normalizeList(currentBrief.audience.length > 0 ? currentBrief.audience : businessHuman.slice(1, 4)),
-    scope: normalizeList(currentBrief.scope.length > 0 ? currentBrief.scope : businessHuman.slice(0, 4)),
+    audience: normalizeList(currentBrief.audience.length > 0 ? currentBrief.audience : humanMessages.slice(1, 4)),
+    scope: normalizeList(currentBrief.scope.length > 0 ? currentBrief.scope : humanMessages.slice(0, 4)),
     deliverables: normalizeList(
       currentBrief.deliverables.length > 0
         ? currentBrief.deliverables
@@ -216,18 +204,18 @@ function fallbackBriefFromConversation(
             "Traceable feature and story backlog",
           ]
     ),
-    risks: normalizeList(currentBrief.risks.length > 0 ? currentBrief.risks : techHuman.slice(0, 4)),
+    risks: normalizeList(currentBrief.risks.length > 0 ? currentBrief.risks : humanMessages.slice(2, 6)),
     techStack: normalizeList(
       currentBrief.techStack.length > 0 ? currentBrief.techStack : ["Next.js", "OpenAI", "PostgreSQL", "Vercel"]
     ),
     dbSchema:
       currentBrief.dbSchema.trim() ||
-      (techHuman[0]
-        ? `// Derived from technical conversation\n// ${techHuman[0]}`
+      (humanMessages[1]
+        ? `// Derived from client discovery conversation\n// ${humanMessages[1]}`
         : ""),
     architecture:
       currentBrief.architecture.trim() ||
-      techHuman.join(" ") ||
+      humanMessages.join(" ") ||
       "Next.js application prepared for production deployment, persistence, and AI-assisted workflows.",
   }
 }
@@ -518,8 +506,8 @@ function fallbackWorkspaceScaffold(options: {
       path: "src/components/agent-status.tsx",
       content: `export const agentStatuses = ${JSON.stringify(
         [
-          { name: "Business AI", status: "brief-ready" },
-          { name: "Tech AI", status: "architecture-ready" },
+          { name: "Client Discovery AI", status: "brief-ready" },
+          { name: "Solution Architect AI", status: "architecture-ready" },
           { name: "Orchestrator Agent", status: variant?.label ? `selected-${variant.label.toLowerCase().replace(/\s+/g, "-")}` : "story-selected" },
           { name: "Merge Agent", status: "awaiting-approval" },
         ],
@@ -561,13 +549,12 @@ async function requestJsonArray<T>(instructions: string, input: string): Promise
 }
 
 export async function generateOpenAIReply(options: {
-  channel: MessageChannel
   author: string
   message: string
   brief: BriefState
   history: Message[]
 }) {
-  const fallback = fallbackReply(options.channel, options.message, options.brief)
+  const fallback = fallbackReply(options.message, options.brief)
   const client = getOpenAIClient()
 
   if (!client) return fallback
@@ -576,11 +563,10 @@ export async function generateOpenAIReply(options: {
     const response = await client.responses.create({
       model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
       instructions:
-        "You are a general AI discovery assistant inside an AI-native SDLC IDE. The user is defining a production website. Reply in Romanian, in 2-4 short sentences. First confirm what you understood. Ask at most one simple follow-up question only if essential information is still missing for documentation. If enough information already exists, stop asking repetitive questions and instead briefly summarize what is now clear and say you can generate the documentation. If the user did not provide technical guidance, proactively recommend a suitable production stack and architecture. Keep the tone practical and concise.",
+        "You are the client discovery AI inside an AI-native SDLC IDE. Your job is to communicate like a senior product consultant who is excellent with clients and knows how to uncover what product should be built. Reply in Romanian, in 2-4 short sentences. First reflect back what you understood in plain language. Then ask at most one sharp follow-up question only if it helps clarify users, problem, workflow, success criteria, constraints, or scope. Avoid sounding robotic or generic. Do not split business and technical discussion; combine them naturally in one conversation. If the client does not know the technical side, confidently propose a sensible production approach without overwhelming them. If enough information already exists, stop interrogating and say clearly that you can generate the brief.",
       input: `Project title: ${options.brief.title}
 Project objective: ${options.brief.objective}
 Speaker: ${options.author}
-Channel: ${options.channel}
 Recent conversation:
 ${recentHumanMessages(options.history)}
 
@@ -595,10 +581,9 @@ User message: ${options.message}`,
 
 export async function generateBriefFromConversation(options: {
   currentBrief: BriefState
-  businessMessages: Message[]
-  techMessages: Message[]
+  conversationMessages: Message[]
 }) {
-  const fallback = fallbackBriefFromConversation(options.currentBrief, options.businessMessages, options.techMessages)
+  const fallback = fallbackBriefFromConversation(options.currentBrief, options.conversationMessages)
   const client = getOpenAIClient()
   if (!client) return fallback
 
@@ -606,15 +591,10 @@ export async function generateBriefFromConversation(options: {
     const response = await client.responses.create({
       model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
       instructions:
-        "You turn a project discovery conversation into production-ready documentation for a website. Return ONLY valid JSON with the keys: title, objective, audience, scope, deliverables, risks, techStack, dbSchema, architecture. audience, scope, deliverables, risks, techStack must be arrays of short strings. Keep the content concise, specific, and usable for implementation planning. Prefer Romanian. If technical instructions are missing, proactively recommend a sensible production setup instead of leaving fields empty. Do not add markdown fences.",
+        "You turn a single client discovery conversation into production-ready documentation for a product team. Return ONLY valid JSON with the keys: title, objective, audience, scope, deliverables, risks, techStack, dbSchema, architecture. audience, scope, deliverables, risks, techStack must be arrays of short strings. Keep the content concise, specific, and directly usable for implementation planning. Prefer Romanian. Infer the likely product, workflow, and delivery goals from the conversation. If technical instructions are missing, proactively recommend a sensible production setup instead of leaving fields empty. Do not add markdown fences.",
       input: JSON.stringify({
         currentBrief: options.currentBrief,
-        businessConversation: options.businessMessages.map((message) => ({
-          role: message.role,
-          author: message.author,
-          text: message.text,
-        })),
-        technicalConversation: options.techMessages.map((message) => ({
+        conversation: options.conversationMessages.map((message) => ({
           role: message.role,
           author: message.author,
           text: message.text,

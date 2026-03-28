@@ -114,7 +114,7 @@ const stageNumbers: Record<StageKey, string> = {
 }
 
 const stageDescriptions: Record<StageKey, string> = {
-  Conversation: "Oamenii discută pe ramuri separate: Business și Tech",
+  Conversation: "Un singur chat de discovery unde AI-ul clarifică produsul și recomandă soluția.",
   Documentation: "Generare scheme tehnice și brief de produs.",
   Requirements: "Derivare și aprobare requirements funcționale și non-funcționale.",
   Features: "Selecție a modulelor și variațiilor recomandate.",
@@ -173,8 +173,8 @@ const initialArchNodes = [
   { id: '5', position: { x: 100, y: 160 }, data: { label: '🧠 AI Orchestrator' } },
   { id: '6', position: { x: -80, y: 160 }, data: { label: '🐘 PostgreSQL DB' } },
   { id: '7', position: { x: 280, y: 200 }, data: { label: '🛡️ Security Agent' } },
-  { id: '8', position: { x: 0, y: 250 }, data: { label: '📈 Business AI' } },
-  { id: '9', position: { x: 180, y: 250 }, data: { label: '⚙️ Technical AI' } },
+  { id: '8', position: { x: 0, y: 250 }, data: { label: '🗣️ Client Discovery AI' } },
+  { id: '9', position: { x: 180, y: 250 }, data: { label: '🏗️ Solution Architect AI' } },
   { id: '10', position: { x: 100, y: 350 }, data: { label: '☁️ AWS Bedrock' }, type: 'output' },
 ]
 
@@ -196,14 +196,6 @@ const initialArchEdges = [
 function getWorkspaceParentPath(path: string) {
   const parts = path.split("/").filter(Boolean)
   return parts.slice(0, -1).join("/")
-}
-
-function getMessageOrderValue(id: string, fallbackIndex: number) {
-  const match = id.match(/-(\d+)-/)
-  if (!match) return fallbackIndex
-
-  const parsed = Number(match[1])
-  return Number.isFinite(parsed) ? parsed : fallbackIndex
 }
 
 function createAiEditedContent(file: WorkspaceFile, action: SlashAction, instruction: string) {
@@ -754,10 +746,8 @@ export function IdeationDashboard({
   const [currentStage, setCurrentStage] = useState<StageKey>(initialProject.currentStage)
   const [search, setSearch] = useState(initialProject.search)
   const [brief, setBrief] = useState(initialProject.brief)
-  const [businessMessages, setBusinessMessages] = useState(initialProject.messages.business)
-  const [techMessages, setTechMessages] = useState(initialProject.messages.tech)
+  const [generalMessages, setGeneralMessages] = useState(initialProject.messages?.general ?? [])
   const [composer, setComposer] = useState("")
-  const [composerChannel, setComposerChannel] = useState<"business" | "tech">("business")
   const [activity, setActivity] = useState(initialProject.activity)
   const [currentProjectId] = useState(initialProjectId)
   const [requirements, setRequirements] = useState<RequirementView[]>((initialProject as BackendProjectState & { requirements?: RequirementView[] }).requirements ?? [])
@@ -785,6 +775,7 @@ export function IdeationDashboard({
   const [isGeneratingStories, setIsGeneratingStories] = useState(false)
   const [isGeneratingCode, setIsGeneratingCode] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isAiThinking, setIsAiThinking] = useState(false)
   const [isGeneratingSecurityReview, setIsGeneratingSecurityReview] = useState(false)
   const [isRunningMerge, setIsRunningMerge] = useState(false)
   const [isGeneratingProjectReview, setIsGeneratingProjectReview] = useState(false)
@@ -976,14 +967,6 @@ export function IdeationDashboard({
     const filled = checks.filter(Boolean).length
     return Math.round((filled / checks.length) * 100)
   }, [brief])
-  const generalMessages = useMemo(
-    () =>
-      [...businessMessages, ...techMessages].sort(
-        (left, right) =>
-          getMessageOrderValue(left.id, 0) - getMessageOrderValue(right.id, 0)
-      ),
-    [businessMessages, techMessages]
-  )
   const traceSegments = useMemo(() => {
     const segments: TraceSegment[] = []
 
@@ -1047,8 +1030,7 @@ export function IdeationDashboard({
     setSelectedFeatureId(project.selectedFeatureId ?? "")
     setUserStories(project.userStories ?? [])
     setSelectedStoryId(project.selectedStoryId ?? "")
-    setBusinessMessages(project.messages?.business ?? [])
-    setTechMessages(project.messages?.tech ?? [])
+    setGeneralMessages(project.messages?.general ?? [])
     setCollaboratorsState(project.collaborators ?? [])
     setSubagentsState(project.agents ?? [])
     setAgentRunsState(project.agentRuns ?? [])
@@ -1064,6 +1046,7 @@ export function IdeationDashboard({
     setAppGenerated(project.preview?.appGenerated ?? false)
     setPreviewOpened(project.preview?.previewOpened ?? false)
     setProjectVersion(project.updatedAt)
+    setIsAiThinking(false)
   }
 
   async function requestProjectUpdate(url: string, init?: RequestInit) {
@@ -1355,25 +1338,21 @@ export function IdeationDashboard({
 
     setComposer("")
     setIsSendingMessage(true)
-    setBusinessMessages((current) =>
-      composerChannel === "business" ? [...current, optimisticMessage] : current
-    )
-    setTechMessages((current) =>
-      composerChannel === "tech" ? [...current, optimisticMessage] : current
-    )
+    setIsAiThinking(true)
+    setGeneralMessages((current) => [...current, optimisticMessage])
 
     try {
       await requestProjectUpdate("/api/messages", {
         method: "POST",
         body: JSON.stringify({
-          channel: composerChannel,
+          channel: "general",
           author: "Alex",
           text: trimmed,
         }),
       })
     } catch (error) {
-      setBusinessMessages((current) => current.filter((message) => message.id !== optimisticMessage.id))
-      setTechMessages((current) => current.filter((message) => message.id !== optimisticMessage.id))
+      setGeneralMessages((current) => current.filter((message) => message.id !== optimisticMessage.id))
+      setIsAiThinking(false)
       setComposer(trimmed)
       throw error
     } finally {
@@ -1841,6 +1820,40 @@ export function IdeationDashboard({
 
   const filteredStages = stages.filter((stage) => stage.toLowerCase().includes(search.toLowerCase()))
 
+  if (!isHydrated) {
+    return (
+      <div className="flex h-screen w-full flex-col overflow-hidden bg-background font-sans text-sm text-foreground selection:bg-primary/20">
+        <header className="relative z-50 flex h-14 w-full shrink-0 items-center justify-between border-b border-border/40 bg-card/80 px-4 shadow-sm backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+          <div className="flex items-center gap-2.5">
+            <div className="grid size-7 place-items-center rounded-[8px] border border-primary/20 bg-gradient-to-br from-primary to-primary/80 shadow-[0_2px_10px_rgba(16,185,129,0.25)]">
+              <Icon name="spark" className="size-4 text-primary-foreground" />
+            </div>
+            <span className="font-brand text-[15px] font-semibold tracking-tight text-foreground">Luminescent</span>
+          </div>
+        </header>
+        <div className="flex flex-1 items-center justify-center bg-background/60">
+          <div className="w-full max-w-xl rounded-[24px] border border-border/40 bg-card/70 p-8 shadow-sm">
+            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-primary">Loading Workspace</div>
+            <div className="mt-3 text-[20px] font-semibold tracking-tight text-foreground">Pregătim dashboard-ul colaborativ</div>
+            <div className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+              Sincronizăm conversația, etapele SDLC și starea proiectului înainte să afișăm interfața completă.
+            </div>
+            <div className="mt-5 flex items-center gap-2">
+              {[0, 1, 2].map((dot) => (
+                <span
+                  key={dot}
+                  className="inline-block size-2 rounded-full bg-primary/80 animate-pulse"
+                  style={{ animationDelay: `${dot * 180}ms` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background font-sans text-sm text-foreground selection:bg-primary/20">
       <header className="relative z-50 flex h-14 w-full shrink-0 items-center justify-between border-b border-border/40 bg-card/80 px-4 shadow-sm backdrop-blur-xl">
@@ -1982,35 +1995,16 @@ export function IdeationDashboard({
                     <div className="border-b border-border/40 px-4 py-3 flex flex-wrap gap-4 items-center justify-between">
                       <div>
                         <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-primary">
-                          General Discovery AI · {composerChannel}
+                          Client Discovery AI
                         </div>
                         <p className="mt-1 text-[12px] text-muted-foreground">
-                          Un singur chat pentru business + tehnologie. Dacă nu dai detalii tehnice, AI-ul vine cu recomandări de producție.
+                          Un singur chat pentru client discovery. AI-ul comunică precum un consultant senior, pune întrebări bune și propune soluția tehnică atunci când lipsește.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="inline-flex rounded-full border border-border/50 bg-background/60 p-1">
-                          <button
-                            type="button"
-                            onClick={() => setComposerChannel("business")}
-                            className={cn(
-                              "rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors",
-                              composerChannel === "business" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                            )}
-                          >
-                            Business
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setComposerChannel("tech")}
-                            className={cn(
-                              "rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors",
-                              composerChannel === "tech" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-                            )}
-                          >
-                            Tech
-                          </button>
-                        </div>
+                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                          Product + Tech in one flow
+                        </Badge>
                         <Button size="sm" variant="outline" onClick={restartFlow} className="h-7 rounded-md text-[11px]">
                           Reset project
                         </Button>
@@ -2039,6 +2033,28 @@ export function IdeationDashboard({
                       ) : (
                         <div className="rounded-[16px] border border-dashed border-border/40 bg-background/50 px-4 py-6 text-[13px] leading-relaxed text-muted-foreground">
                           Conversația este goală. Spune pe scurt ce website vrei să construiești, pentru cine este și ce trebuie să facă. AI-ul continuă cu întrebări simple și recomandări tehnice dacă lipsesc.
+                        </div>
+                      )}
+                      {isAiThinking && (
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="px-1 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/60">Client Discovery AI</span>
+                          <div className="max-w-[90%] rounded-[16px] rounded-tl-[4px] border border-primary/20 bg-primary/5 px-3.5 py-3 text-[12px] text-foreground/85 shadow-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-medium text-primary">AI analizează răspunsul</span>
+                              {[0, 1, 2].map((dot) => (
+                                <span
+                                  key={dot}
+                                  className="inline-block size-1.5 rounded-full bg-primary/80 animate-pulse"
+                                  style={{ animationDelay: `${dot * 180}ms` }}
+                                />
+                              ))}
+                            </div>
+                            <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+                              <div>• clarifică produsul dorit</div>
+                              <div>• extrage funcționalități și constrângeri</div>
+                              <div>• pregătește brief-ul pentru livrare</div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2080,7 +2096,7 @@ export function IdeationDashboard({
                       </Badge>
                       <h3 className="font-serif text-2xl font-semibold tracking-tight">Din conversație în documentație</h3>
                       <p className="text-[13px] leading-relaxed text-muted-foreground">
-                        Aici validăm că un singur chat general produce documentația completă, atât pe business, cât și pe tehnologie.
+                        Aici validăm că un singur chat bun produce documentația completă, atât pentru produs, cât și pentru partea tehnică.
                       </p>
                     </div>
                     <div className="space-y-3 text-[13px]">
