@@ -1,4 +1,5 @@
 import path from "node:path"
+import OpenAI from "openai"
 
 import type { ProjectState, WorkspaceFile } from "@/lib/backend/types"
 
@@ -36,6 +37,558 @@ type PreviewBundle = {
 
 const previewCache = new Map<string, string>()
 const PREVIEW_CACHE_VERSION = "browser-runtime-v1"
+let cachedPreviewClient: OpenAI | null = null
+
+function getPreviewOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return null
+
+  if (!cachedPreviewClient) {
+    cachedPreviewClient = new OpenAI({ apiKey })
+  }
+
+  return cachedPreviewClient
+}
+
+function normalizePreviewText(value: string) {
+  return value.trim().replace(/\s+/g, " ")
+}
+
+function safeJsonParse<T>(value: string): T | null {
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    const objectMatch = value.match(/\{[\s\S]*\}|\[[\s\S]*\]/)
+    if (!objectMatch) return null
+
+    try {
+      return JSON.parse(objectMatch[0]) as T
+    } catch {
+      return null
+    }
+  }
+}
+
+function detectPreviewExperience(project: ProjectState) {
+  const source = [
+    project.brief.title,
+    project.brief.objective,
+    project.brief.architecture,
+    ...project.brief.scope,
+    ...project.brief.deliverables,
+  ]
+    .join(" ")
+    .toLowerCase()
+
+  if (/(magazin|shop|store|commerce|checkout|catalog|stripe|cart|produs|produse)/.test(source)) return "commerce"
+  if (/(prezentare|landing|portfolio|servicii|showcase|brand|firma|company)/.test(source)) return "presentation"
+  if (/(dashboard|admin|analytics|raport|backoffice|kpi|metrics)/.test(source)) return "dashboard"
+  return "platform"
+}
+
+function synthesizePreviewWorkspaceFiles(project: ProjectState): WorkspaceFile[] {
+  const selectedStory =
+    project.userStories.find((story) => story.id === project.selectedStoryId) ??
+    project.userStories[0]
+  const selectedVariant =
+    selectedStory?.variants.find((variant) => variant.id === selectedStory.selectedVariantId) ??
+    selectedStory?.variants[0]
+  const experience = detectPreviewExperience(project)
+
+  const title = project.brief.title.trim() || selectedStory?.title || "Generated Website"
+  const objective =
+    project.brief.objective.trim() ||
+    selectedStory?.summary ||
+    "A generated application preview based on the current project brief."
+  const audience = project.brief.audience.filter(Boolean)
+  const scope = project.brief.scope.filter(Boolean)
+  const deliverables = project.brief.deliverables.filter(Boolean)
+  const techStack = project.brief.techStack.filter(Boolean)
+  const architecture = project.brief.architecture.trim() || selectedVariant?.architecture || "Preview generated from the current brief and implementation context."
+  const previewLabel =
+    experience === "presentation"
+      ? "Presentation website preview"
+      : experience === "dashboard"
+        ? "Dashboard preview"
+        : experience === "commerce"
+          ? "Commerce preview"
+          : "Platform preview"
+  const navItems =
+    experience === "presentation"
+      ? ["Acasa", "Despre", "Servicii", "Portofoliu", "Contact"]
+      : experience === "dashboard"
+        ? ["Overview", "Analytics", "Workflows", "Users", "Settings"]
+        : experience === "commerce"
+          ? ["Acasa", "Catalog", "Checkout", "Admin", "AI Support"]
+          : ["Acasa", "Produs", "Module", "Admin", "Support"]
+  const products = [
+    {
+      name: "Set cuburi creative",
+      price: "79 RON",
+      badge: "Best seller",
+      detail: scope[0] || "Filtrare rapida pe categorii si varsta.",
+      rating: "4.9",
+      seller: "ToyCraft Studio",
+      stock: "24 in stoc",
+    },
+    {
+      name: "Joc educativ STEM",
+      price: "129 RON",
+      badge: "Nou",
+      detail: scope[1] || "Checkout simplu cu plata securizata.",
+      rating: "4.8",
+      seller: "Micul Inventator",
+      stock: "11 in stoc",
+    },
+    {
+      name: "Puzzle premium",
+      price: "59 RON",
+      badge: "Livrare 24h",
+      detail: scope[2] || "Panou admin pentru stoc si comenzi.",
+      rating: "4.7",
+      seller: "Puzzle Atelier",
+      stock: "58 in stoc",
+    },
+  ]
+  const categories =
+    experience === "presentation"
+      ? ["Hero", "Servicii", "Beneficii", "Testimoniale", "FAQ", "Contact"]
+      : ["0-3 ani", "STEM", "Puzzle", "Jocuri educative", "Lemn premium", "Cadouri"]
+  const stats = [
+    { label: "Comenzi azi", value: "148" },
+    { label: "Vanzatori activi", value: "42" },
+    { label: "Conversie checkout", value: "5.4%" },
+    { label: "Timp raspuns AI", value: "12 sec" },
+  ]
+  const cartItems =
+    experience === "presentation"
+      ? [
+          { name: "Cerere demo", qty: 1, price: "Lead" },
+          { name: "Consultatie", qty: 1, price: "CTA" },
+        ]
+      : [
+          { name: "Set cuburi creative", qty: 1, price: "79 RON" },
+          { name: "Joc educativ STEM", qty: 1, price: "129 RON" },
+        ]
+  const adminMetrics =
+    experience === "presentation"
+      ? [
+          { label: "Sectiuni", value: "6" },
+          { label: "CTA-uri", value: "3" },
+          { label: "Testimoniale", value: "4" },
+          { label: "Lead forms", value: "2" },
+        ]
+      : [
+          { label: "Produse publicate", value: "312" },
+          { label: "Comenzi in procesare", value: "27" },
+          { label: "Rute livrare", value: "8" },
+          { label: "Abandon checkout", value: "11%" },
+        ]
+  const supportTopics =
+    experience === "presentation"
+      ? ["Hero messaging", "Beneficii", "Dovada sociala", "Lead capture"]
+      : ["Disponibilitate si timp de livrare", "Recomandari de jucarii pe varsta", "Retur si garantie", "Comenzi corporate / pachete cadou"]
+
+  const layoutContent = `export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ro">
+      <body style={{ margin: 0, background: "#fff8f1", color: "#1f2937", fontFamily: "\\"Space Grotesk\\", \\"Segoe UI\\", sans-serif" }}>
+        {children}
+      </body>
+    </html>
+  )
+}
+`
+
+  const pageContent = `const audience = ${JSON.stringify(audience, null, 2)}
+const products = ${JSON.stringify(products, null, 2)}
+const categories = ${JSON.stringify(categories, null, 2)}
+const techStack = ${JSON.stringify(techStack, null, 2)}
+const deliverables = ${JSON.stringify(deliverables, null, 2)}
+const stats = ${JSON.stringify(stats, null, 2)}
+const cartItems = ${JSON.stringify(cartItems, null, 2)}
+const adminMetrics = ${JSON.stringify(adminMetrics, null, 2)}
+const supportTopics = ${JSON.stringify(supportTopics, null, 2)}
+
+const shell = {
+  minHeight: "100vh",
+  padding: "24px 18px 48px",
+  background: "linear-gradient(180deg, #fff8f1 0%, #fffdf9 50%, #ffffff 100%)",
+}
+
+const card = {
+  borderRadius: 28,
+  background: "white",
+  border: "1px solid rgba(251, 146, 60, 0.18)",
+  boxShadow: "0 20px 45px rgba(15, 23, 42, 0.08)",
+}
+
+const chip = {
+  borderRadius: 999,
+  padding: "8px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+}
+
+export default function Page() {
+  return (
+    <main style={shell}>
+      <div style={{ maxWidth: 1240, margin: "0 auto" }}>
+        <header
+          style={{
+            ...card,
+            padding: "14px 18px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 18,
+            position: "sticky",
+            top: 14,
+            zIndex: 10,
+            backdropFilter: "blur(14px)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: "#c2410c" }}>${JSON.stringify(previewLabel)}</div>
+            <strong style={{ display: "block", marginTop: 4, fontSize: 20 }}>${JSON.stringify(title)}</strong>
+          </div>
+          <nav style={{ display: "flex", flexWrap: "wrap", gap: 10, color: "#6b7280", fontSize: 14 }}>
+            {${JSON.stringify(navItems, null, 2)}.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </nav>
+        </header>
+
+        <section
+          style={{
+            ...card,
+            marginTop: 18,
+            padding: 28,
+            background: "linear-gradient(135deg, #ea580c 0%, #f97316 48%, #fb7185 100%)",
+            color: "white",
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
+          <div style={{ position: "absolute", right: -50, top: -30, width: 220, height: 220, borderRadius: 999, background: "rgba(255,255,255,0.12)" }} />
+          <div style={{ position: "relative", display: "grid", gap: 18, gridTemplateColumns: "1.15fr 0.85fr" }}>
+            <div>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", opacity: 0.82 }}>
+                ${experience === "presentation" ? "Marketing website" : experience === "dashboard" ? "Operational dashboard" : experience === "commerce" ? "Marketplace MVP" : "Product platform"}
+              </div>
+              <h1 style={{ margin: "14px 0 0", fontSize: 48, lineHeight: 1.02, maxWidth: 760 }}>
+                ${JSON.stringify(title)}
+              </h1>
+              <p style={{ margin: "14px 0 0", maxWidth: 760, fontSize: 16, lineHeight: 1.75 }}>
+                ${JSON.stringify(objective)}
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }}>
+                {audience.map((item) => (
+                  <span key={item} style={{ ...chip, background: "rgba(255,255,255,0.16)" }}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
+                <button style={{ border: 0, borderRadius: 999, background: "#ffffff", color: "#c2410c", fontWeight: 700, padding: "12px 18px" }}>
+                  ${experience === "presentation" ? "Solicita oferta" : experience === "dashboard" ? "Open workspace" : experience === "commerce" ? "Incepe sa vinzi" : "Explore product"}
+                </button>
+                <button style={{ borderRadius: 999, background: "transparent", color: "white", border: "1px solid rgba(255,255,255,0.35)", padding: "12px 18px" }}>
+                  ${experience === "presentation" ? "Vezi demo" : experience === "dashboard" ? "View reports" : "Vezi dashboard admin"}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ ...card, padding: 16, background: "rgba(255,255,255,0.16)", color: "white", border: "1px solid rgba(255,255,255,0.18)" }}>
+                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.14em", opacity: 0.8 }}>Launch snapshot</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+                  {stats.map((stat) => (
+                    <div key={stat.label} style={{ borderRadius: 18, background: "rgba(255,255,255,0.12)", padding: 14 }}>
+                      <div style={{ fontSize: 11, opacity: 0.8 }}>{stat.label}</div>
+                      <strong style={{ display: "block", marginTop: 8, fontSize: 24 }}>{stat.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section style={{ display: "grid", gap: 18, gridTemplateColumns: "1fr 320px", marginTop: 18 }}>
+          <article style={{ ...card, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: "#c2410c" }}>
+                  ${experience === "presentation" ? "Presentation flow" : experience === "dashboard" ? "Operations surface" : experience === "commerce" ? "Catalog experience" : "Product experience"}
+                </div>
+                <h2 style={{ margin: "10px 0 0", fontSize: 28 }}>
+                  ${JSON.stringify(
+                    experience === "presentation"
+                      ? "Un website de prezentare adaptat specificatiilor utilizatorului"
+                      : experience === "dashboard"
+                        ? "Suprafata operationala si modulele principale ale produsului"
+                        : experience === "commerce"
+                          ? "Descopera jucarii vandute de comercianti individuali"
+                          : "Fluxuri cheie ale produsului"
+                  )}
+                </h2>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {categories.map((item, index) => (
+                  <span key={item} style={{ ...chip, background: index === 0 ? "#ffedd5" : "#f8fafc", color: index === 0 ? "#c2410c" : "#475569" }}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 16, marginTop: 18 }}>
+              {products.map((product) => (
+                <div
+                  key={product.name}
+                  style={{
+                    borderRadius: 24,
+                    border: "1px solid rgba(148, 163, 184, 0.18)",
+                    background: "#fffaf5",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div style={{ height: 180, background: "linear-gradient(135deg, #fed7aa 0%, #fdba74 50%, #fb7185 100%)", position: "relative" }}>
+                    <div style={{ position: "absolute", top: 14, left: 14, ...chip, background: "rgba(255,255,255,0.88)", color: "#9a3412" }}>
+                      {product.badge}
+                    </div>
+                  </div>
+                  <div style={{ padding: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <strong style={{ fontSize: 18 }}>{product.name}</strong>
+                      <span style={{ color: "#c2410c", fontWeight: 700 }}>{product.price}</span>
+                    </div>
+                    <div style={{ marginTop: 8, color: "#6b7280", lineHeight: 1.6 }}>{product.detail}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 14, color: "#64748b", fontSize: 13 }}>
+                      <span>{product.seller}</span>
+                      <span>{product.rating} ★</span>
+                    </div>
+                    <div style={{ marginTop: 8, color: "#9a3412", fontSize: 13 }}>{product.stock}</div>
+                    <button style={{ width: "100%", marginTop: 14, border: 0, borderRadius: 16, background: "#111827", color: "white", padding: "12px 14px", fontWeight: 700 }}>
+                      Adauga in cos
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <aside style={{ display: "grid", gap: 18 }}>
+            <article style={{ ...card, padding: 22 }}>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: "#c2410c" }}>
+                ${experience === "presentation" ? "Contact & conversion" : experience === "dashboard" ? "Alerts & tasks" : experience === "commerce" ? "Cos & checkout" : "Primary workflow"}
+              </div>
+              <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+                {cartItems.map((item) => (
+                  <div key={item.name} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid rgba(148,163,184,0.14)", paddingBottom: 12 }}>
+                    <div>
+                      <strong style={{ display: "block" }}>{item.name}</strong>
+                      <span style={{ color: "#64748b", fontSize: 13 }}>Cantitate: {item.qty}</span>
+                    </div>
+                    <span style={{ color: "#c2410c", fontWeight: 700 }}>{item.price}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 16, borderRadius: 18, background: "#fff7ed", padding: 14, color: "#7c2d12", lineHeight: 1.7 }}>
+                ${JSON.stringify(
+                  experience === "presentation"
+                    ? "Formular de contact, CTA-uri, proof si structura de conversie pentru un site de prezentare."
+                    : experience === "dashboard"
+                      ? "Lista de task-uri, alerte si actiuni operationale derivate din brief."
+                      : experience === "commerce"
+                        ? "Stripe Checkout, livrare nationala, sumar TVA si date GDPR pentru consimtamant."
+                        : "Fluxul principal este generat direct din specificatiile proiectului."
+                )}
+              </div>
+              <button style={{ width: "100%", marginTop: 16, border: 0, borderRadius: 16, background: "#ea580c", color: "white", padding: "12px 14px", fontWeight: 700 }}>
+                ${experience === "presentation" ? "Trimite cererea" : experience === "dashboard" ? "Open queue" : experience === "commerce" ? "Continua spre plata" : "Continue"}
+              </button>
+            </article>
+
+            <article style={{ ...card, padding: 22, background: "#0f172a", color: "#e2e8f0" }}>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: "#fb923c" }}>
+                ${experience === "presentation" ? "Content strategy" : experience === "dashboard" ? "Operational intelligence" : "AI customer support"}
+              </div>
+              <p style={{ margin: "14px 0 0", color: "#cbd5e1", lineHeight: 1.7 }}>
+                ${JSON.stringify(
+                  experience === "presentation"
+                    ? "Preview-ul poate deveni un site de prezentare real, nu doar un magazin online. Structura vine din brief si din cerintele utilizatorului."
+                    : experience === "dashboard"
+                      ? "Preview-ul poate reprezenta un dashboard sau un produs operational, nu doar o pagina de ecommerce."
+                      : "Asistentul poate recomanda jucarii pe intervale de varsta, explica livrarea si preia intrebari despre retur."
+                )}
+              </p>
+              <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+                {supportTopics.map((topic) => (
+                  <div key={topic} style={{ borderRadius: 16, background: "rgba(255,255,255,0.08)", padding: "12px 14px" }}>
+                    {topic}
+                  </div>
+                ))}
+              </div>
+            </article>
+          </aside>
+        </section>
+
+        <section style={{ display: "grid", gap: 18, gridTemplateColumns: "0.95fr 1.05fr", marginTop: 18 }}>
+          <article style={{ ...card, padding: 24 }}>
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: "#c2410c" }}>
+              ${experience === "presentation" ? "Conversion sections" : "Admin operations"}
+            </div>
+            <h2 style={{ margin: "10px 0 0", fontSize: 28 }}>
+              ${JSON.stringify(
+                experience === "presentation" ? "Blocuri de continut si conversie pentru website-ul de prezentare" : "Panou pentru administrare si operatiuni"
+              )}
+            </h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14, marginTop: 18 }}>
+              {adminMetrics.map((metric) => (
+                <div key={metric.label} style={{ borderRadius: 20, background: "#fffaf5", padding: 18, border: "1px solid rgba(148,163,184,0.16)" }}>
+                  <div style={{ color: "#64748b", fontSize: 13 }}>{metric.label}</div>
+                  <strong style={{ display: "block", marginTop: 8, fontSize: 28 }}>{metric.value}</strong>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
+              {(deliverables.length > 0 ? deliverables : [
+                ${experience === "presentation"
+                  ? '"Hero section", "Servicii si capabilitati", "Testimoniale si proof", "Lead capture si contact"'
+                  : '"Management produse", "Monitorizare comenzi", "Configurare livrare", "Analytics si campanii"'}
+              ]).map((item) => (
+                <div key={item} style={{ borderRadius: 16, border: "1px solid rgba(148,163,184,0.16)", padding: "14px 16px" }}>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article style={{ ...card, padding: 24 }}>
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: "#c2410c" }}>Platform blueprint</div>
+            <h2 style={{ margin: "10px 0 0", fontSize: 28 }}>
+              ${JSON.stringify(experience === "presentation" ? "Structura livrabila pentru website-ul de prezentare" : "Fluxuri principale in MVP")}
+            </h2>
+            <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+              {${JSON.stringify(
+                experience === "presentation"
+                  ? [
+                      "Hero section cu value proposition clara",
+                      "Sectiuni de servicii si beneficii",
+                      "Testimoniale, proof si CTA-uri",
+                      "Lead form si date de contact",
+                      "SEO copy si structura de lansare",
+                    ]
+                  : experience === "dashboard"
+                    ? [
+                        "Overview KPI si operational health",
+                        "Task queues si alerte prioritare",
+                        "Analytics, funnels si statusuri",
+                        "Management utilizatori si permisiuni",
+                        "Workflow-uri configurabile",
+                      ]
+                    : [
+                        "Catalog + filtrare + SEO landing pages",
+                        "Autentificare utilizator, profil si istoric comenzi",
+                        "Checkout cu Stripe si confirmare automata",
+                        "Livrare cu status, cost estimat si acoperire nationala",
+                        "Admin pentru stoc, comenzi, promotii si seller onboarding",
+                      ],
+                null,
+                2
+              )}.map((item) => (
+                <div key={item} style={{ borderRadius: 18, background: "#f8fafc", padding: "14px 16px", color: "#334155" }}>
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 18, borderRadius: 20, background: "#111827", color: "#e2e8f0", padding: 18 }}>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: "#fb923c" }}>Architecture</div>
+              <p style={{ margin: "10px 0 0", lineHeight: 1.75 }}>
+                ${JSON.stringify(architecture)}
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+                {techStack.map((item) => (
+                  <span key={item} style={{ ...chip, background: "rgba(255,255,255,0.08)", color: "#f8fafc" }}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </main>
+  )
+}
+`
+
+  return [
+    { id: "virtual-layout", name: "layout.tsx", path: "src/app/layout.tsx", content: layoutContent },
+    { id: "virtual-page", name: "page.tsx", path: "src/app/page.tsx", content: pageContent },
+  ]
+}
+
+async function buildAiPreviewWorkspaceFiles(project: ProjectState): Promise<WorkspaceFile[] | null> {
+  const client = getPreviewOpenAIClient()
+  if (!client) return null
+
+  const selectedStory =
+    project.userStories.find((story) => story.id === project.selectedStoryId) ??
+    project.userStories[0]
+  const selectedVariant =
+    selectedStory?.variants.find((variant) => variant.id === selectedStory.selectedVariantId) ??
+    selectedStory?.variants[0]
+
+  try {
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
+      instructions:
+        "You generate a realistic Next.js App Router preview from user specifications. Return ONLY valid JSON with keys layoutTsx and pageTsx. The code must be valid TSX, use no external imports, use inline styles only, and reflect the user's requested product type. If the brief describes a presentation website, generate a marketing/presentation site. If it describes commerce, generate a storefront. If it describes admin/dashboard, generate a dashboard. Make it rich and complete, not a tiny mock.",
+      input: JSON.stringify({
+        brief: project.brief,
+        selectedStory,
+        selectedVariant,
+        currentStage: project.currentStage,
+      }),
+    })
+
+    const parsed = safeJsonParse<{ layoutTsx?: string; pageTsx?: string }>(response.output_text)
+    const layoutTsx = parsed?.layoutTsx?.trim() ?? ""
+    const pageTsx = parsed?.pageTsx?.trim() ?? ""
+
+    if (!normalizePreviewText(layoutTsx) || !normalizePreviewText(pageTsx)) return null
+
+    return [
+      { id: "virtual-layout", name: "layout.tsx", path: "src/app/layout.tsx", content: layoutTsx },
+      { id: "virtual-page", name: "page.tsx", path: "src/app/page.tsx", content: pageTsx },
+    ]
+  } catch {
+    return null
+  }
+}
+
+async function resolvePreviewProject(project: ProjectState): Promise<ProjectState> {
+  const files = Array.isArray(project.workspace.files) ? project.workspace.files : []
+  if (files.length > 0) return project
+
+  const synthesizedFiles = (await buildAiPreviewWorkspaceFiles(project)) ?? synthesizePreviewWorkspaceFiles(project)
+  const runtimeEntrypoints =
+    Array.isArray(project.workspace.runtimeEntrypoints) && project.workspace.runtimeEntrypoints.length > 0
+      ? project.workspace.runtimeEntrypoints
+      : ["src/app/layout.tsx", "src/app/page.tsx"]
+
+  return {
+    ...project,
+    workspace: {
+      ...project.workspace,
+      files: synthesizedFiles,
+      runtimeEntrypoints,
+      selectedFileId: project.workspace.selectedFileId || synthesizedFiles[1]?.id || synthesizedFiles[0]?.id || "",
+    },
+  }
+}
 
 function resolveProjectPackageFile(packageName: string, relativePath: string) {
   return path.resolve(process.cwd(), "node_modules", packageName, relativePath)
@@ -193,7 +746,8 @@ function getWorkspaceFolders(project: ProjectState) {
 }
 
 function getWorkspaceFiles(project: ProjectState) {
-  return Array.isArray(project.workspace.files) ? project.workspace.files : []
+  const files = Array.isArray(project.workspace.files) ? project.workspace.files : []
+  return files.length > 0 ? files : synthesizePreviewWorkspaceFiles(project)
 }
 
 function getRuntimeEntrypoints(project: ProjectState) {
@@ -873,24 +1427,26 @@ function formatPreviewBuildError(error: unknown) {
 }
 
 export async function buildProjectPreviewDocument(project: ProjectState) {
-  const cacheKey = `${PREVIEW_CACHE_VERSION}:${project.updatedAt}:${getWorkspaceFiles(project).length}:${getRuntimeEntrypoints(project).join(",")}`
+  const previewProject = await resolvePreviewProject(project)
+  const cacheKey = `${PREVIEW_CACHE_VERSION}:${previewProject.updatedAt}:${getWorkspaceFiles(previewProject).length}:${getRuntimeEntrypoints(previewProject).join(",")}`
   const cached = previewCache.get(cacheKey)
   if (cached) {
     return cached
   }
 
   try {
-    const bundle = await buildPreviewBundle(project)
-    const html = renderRuntimeShell(project, bundle)
+    const bundle = await buildPreviewBundle(previewProject)
+    const html = renderRuntimeShell(previewProject, bundle)
     previewCache.set(cacheKey, html)
     return html
   } catch (error) {
-    const html = renderPreviewErrorShell(project, formatPreviewBuildError(error))
+    const html = renderPreviewErrorShell(previewProject, formatPreviewBuildError(error))
     previewCache.set(cacheKey, html)
     return html
   }
 }
 
 export async function validateProjectPreview(project: ProjectState) {
-  await buildPreviewBundle(project)
+  const previewProject = await resolvePreviewProject(project)
+  await buildPreviewBundle(previewProject)
 }

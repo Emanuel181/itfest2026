@@ -14,18 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import type { ProjectState as BackendProjectState } from "@/lib/backend/types"
 import { cn } from "@/lib/utils"
 
-type StageKey =
-  | "Conversation"
-  | "Documentation"
-  | "Requirements"
-  | "Features"
-  | "User Stories"
-  | "Planning"
-  | "Final Code"
-  | "Security Review"
-  | "Merge"
-  | "Project Review"
-  | "Preview"
+type StageKey = BackendProjectState["currentStage"]
 
 type BriefState = {
   title: string
@@ -99,7 +88,7 @@ const stages: StageKey[] = [
   "Preview",
 ]
 
-const stageNumbers: Record<StageKey, string> = {
+const stageNumbers: Partial<Record<StageKey, string>> = {
   Conversation: "01",
   Documentation: "02",
   Requirements: "03",
@@ -113,7 +102,7 @@ const stageNumbers: Record<StageKey, string> = {
   Preview: "11",
 }
 
-const stageDescriptions: Record<StageKey, string> = {
+const stageDescriptions: Partial<Record<StageKey, string>> = {
   Conversation: "Un singur chat de discovery unde AI-ul clarifică produsul și recomandă soluția.",
   Documentation: "Generare scheme tehnice și brief de produs.",
   Requirements: "Derivare și aprobare requirements funcționale și non-funcționale.",

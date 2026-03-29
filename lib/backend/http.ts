@@ -35,21 +35,16 @@ export async function readJsonBody(request: NextRequest) {
 }
 
 export function isMessageChannel(value: unknown): value is MessageChannel {
-  return value === "general"
+  return value === "product" || value === "technical"
 }
 
 export function isStageKey(value: unknown): value is StageKey {
   return (
-    value === "Conversation" ||
-    value === "Documentation" ||
-    value === "Requirements" ||
-    value === "Features" ||
-    value === "User Stories" ||
     value === "Planning" ||
-    value === "Final Code" ||
-    value === "Security Review" ||
-    value === "Merge" ||
-    value === "Project Review" ||
-    value === "Preview"
+    value === "Analysis" ||
+    value === "Design" ||
+    value === "Implementation" ||
+    value === "Testing & Integration" ||
+    value === "Maintenance"
   )
 }

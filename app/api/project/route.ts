@@ -7,28 +7,20 @@ import {
   readJsonBody,
 } from "@/lib/backend/http"
 import {
-  approveSecurityReview,
-  generateRequirements,
-  generateFeatures,
+  generateBacklog,
   generateDocumentationFromConversation,
-  generateCode,
-  generateProjectReview,
-  generateSecurityReview,
-  runFullPipeline,
-  runMerge,
-  generateUserStories,
+  generateMaintenanceReview,
+  generateRequirements,
   getProject,
-  markPreviewGenerated,
-  openPreviewWindow,
-  regenerateWorkspace,
   resetProject,
-  selectFeature,
-  selectStory,
+  runMerge,
+  saveStoryPlanning,
+  saveStoryVariants,
   selectStoryVariant,
   transitionStage,
   updateBrief,
 } from "@/lib/backend/service"
-import type { BriefState, StageKey } from "@/lib/backend/types"
+import type { BriefState, StageKey, StoryVariant } from "@/lib/backend/types"
 
 export const runtime = "nodejs"
 
@@ -51,20 +43,12 @@ export async function PATCH(request: NextRequest) {
     | { type: "update-brief"; brief: BriefState }
     | { type: "generate-documentation-from-conversation" }
     | { type: "generate-requirements" }
-    | { type: "generate-features" }
-    | { type: "run-full-pipeline" }
-    | { type: "select-feature"; featureId: string }
-    | { type: "generate-user-stories" }
-    | { type: "select-story"; storyId: string }
+    | { type: "generate-backlog" }
+    | { type: "save-story-planning"; storyId: string; storyPoints: number; pokerHistory: string[]; pokerConsensus: string }
+    | { type: "save-story-variants"; storyId: string; variants: StoryVariant[] }
     | { type: "select-variant"; storyId: string; variantId: string }
-    | { type: "generate-code"; storyId?: string }
-    | { type: "generate-security-review" }
-    | { type: "approve-security-review" }
     | { type: "run-merge" }
-    | { type: "generate-project-review" }
-    | { type: "regenerate-workspace" }
-    | { type: "generate-preview" }
-    | { type: "open-preview" }
+    | { type: "generate-maintenance-review" }
     | { type: "reset-project" }
 
   switch (body.type) {
@@ -79,22 +63,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(await generateDocumentationFromConversation(projectId))
     case "generate-requirements":
       return NextResponse.json(await generateRequirements(projectId))
-    case "generate-features":
-      return NextResponse.json(await generateFeatures(projectId))
-    case "run-full-pipeline":
-      return NextResponse.json(await runFullPipeline(projectId))
-    case "select-feature":
-      if (typeof body.featureId !== "string" || !body.featureId.trim()) {
-        return NextResponse.json({ error: "featureId is required." }, { status: 400 })
-      }
-      return NextResponse.json(await selectFeature(projectId, body.featureId))
-    case "generate-user-stories":
-      return NextResponse.json(await generateUserStories(projectId))
-    case "select-story":
-      if (typeof body.storyId !== "string" || !body.storyId.trim()) {
-        return NextResponse.json({ error: "storyId is required." }, { status: 400 })
-      }
-      return NextResponse.json(await selectStory(projectId, body.storyId))
+    case "generate-backlog":
+      return NextResponse.json(await generateBacklog(projectId))
+    case "save-story-planning":
+      return NextResponse.json(
+        await saveStoryPlanning(projectId, body.storyId, body.storyPoints, body.pokerHistory, body.pokerConsensus)
+      )
+    case "save-story-variants":
+      return NextResponse.json(await saveStoryVariants(projectId, body.storyId, body.variants))
     case "select-variant":
       if (typeof body.storyId !== "string" || !body.storyId.trim()) {
         return NextResponse.json({ error: "storyId is required." }, { status: 400 })
@@ -103,22 +79,10 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "variantId is required." }, { status: 400 })
       }
       return NextResponse.json(await selectStoryVariant(projectId, body.storyId, body.variantId))
-    case "generate-code":
-      return NextResponse.json(await generateCode(projectId, body.storyId))
-    case "generate-security-review":
-      return NextResponse.json(await generateSecurityReview(projectId))
-    case "approve-security-review":
-      return NextResponse.json(await approveSecurityReview(projectId))
     case "run-merge":
       return NextResponse.json(await runMerge(projectId))
-    case "generate-project-review":
-      return NextResponse.json(await generateProjectReview(projectId))
-    case "regenerate-workspace":
-      return NextResponse.json(await regenerateWorkspace(projectId))
-    case "generate-preview":
-      return NextResponse.json(await markPreviewGenerated(projectId))
-    case "open-preview":
-      return NextResponse.json(await openPreviewWindow(projectId))
+    case "generate-maintenance-review":
+      return NextResponse.json(await generateMaintenanceReview(projectId))
     case "reset-project":
       return NextResponse.json(await resetProject(projectId))
     default:

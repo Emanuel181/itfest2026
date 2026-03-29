@@ -4,9 +4,11 @@ import {
   createDefaultProjectState,
 } from "@/lib/backend/defaults"
 import {
+  generateBacklogFromRequirements,
   generateFeaturesFromBrief,
   generateBriefFromConversation,
   generateOpenAIReply,
+  generateRequirementsFromDocumentation,
   generateStoriesFromFeature,
   generateWorkspaceScaffold,
 } from "@/lib/backend/openai"
@@ -21,7 +23,6 @@ import type {
   OrchestrationArtifact,
   ProjectState,
   ProjectHealthReport,
-  Requirement,
   SecurityIssue,
   StageKey,
   WorkspaceFile,
@@ -133,40 +134,6 @@ function ensureFolders(paths: string[], existingFolders: WorkspaceFolder[]) {
 
 function isBriefReadyForFeatureGeneration(brief: BriefState) {
   return Boolean(brief.title.trim() && brief.objective.trim())
-}
-
-function createRequirementsFromBrief(brief: BriefState): Requirement[] {
-  const scopedRequirements: Requirement[] = brief.scope.map((item, index) => ({
-    id: `REQ-F-${String(index + 1).padStart(2, "0")}`,
-    title: item || `Functional requirement ${index + 1}`,
-    detail: "Derived from the approved product scope.",
-    kind: "functional",
-    status: "approved",
-    featureIds: [],
-    storyIds: [],
-  }))
-
-  const deliveryRequirements: Requirement[] = brief.deliverables.map((item, index) => ({
-    id: `REQ-D-${String(index + 1).padStart(2, "0")}`,
-    title: item || `Deliverable requirement ${index + 1}`,
-    detail: "Must produce a reviewable implementation artifact.",
-    kind: "functional",
-    status: "derived",
-    featureIds: [],
-    storyIds: [],
-  }))
-
-  const riskRequirements: Requirement[] = brief.risks.map((item, index) => ({
-    id: `REQ-NF-${String(index + 1).padStart(2, "0")}`,
-    title: item || `Non-functional requirement ${index + 1}`,
-    detail: "Tracked as a quality or delivery risk that affects implementation planning.",
-    kind: "non-functional",
-    status: "draft",
-    featureIds: [],
-    storyIds: [],
-  }))
-
-  return [...scopedRequirements, ...deliveryRequirements, ...riskRequirements]
 }
 
 function createSecurityIssues(project: ProjectState): SecurityIssue[] {
@@ -485,6 +452,273 @@ function mergeWorkspace(
   }
 }
 
+function createImplementationWorkspace(project: ProjectState, story: ProjectState["userStories"][number], variant: ProjectState["userStories"][number]["variants"][number]) {
+  const highlights = [
+    ...project.brief.scope.slice(0, 3),
+    ...project.brief.deliverables.slice(0, 2),
+  ].filter(Boolean)
+  const securityFindings = variant.securityFindings ?? []
+  const frontendCode = variant.frontendCode?.trim() || variant.code || "// Frontend code not generated yet."
+  const backendCode = variant.backendCode?.trim() || variant.code || "// Backend code not generated yet."
+  const orchestration = variant.orchestration?.trim() || "No orchestration notes available yet."
+  const reasoning = variant.reasoning?.trim() || "No reasoning trace available yet."
+  const securitySummary = variant.securitySummary?.trim() || "No security summary generated yet."
+
+  const pageContent = `const productHighlights = ${JSON.stringify(highlights, null, 2)}
+const technicalStack = ${JSON.stringify(project.brief.techStack, null, 2)}
+const securityFindings = ${JSON.stringify(
+    securityFindings.map((item) => `${item.severity.toUpperCase()} · ${item.title}: ${item.detail}`),
+    null,
+    2
+  )}
+const fallbackRisks = ${JSON.stringify(
+    project.brief.risks.filter(Boolean).map((risk) => `MEDIUM · Risk: ${risk}`),
+    null,
+    2
+  )}
+
+export default function Page() {
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(180deg, #fff7ed 0%, #fffbeb 45%, #ffffff 100%)",
+        color: "#1f2937",
+        fontFamily: "\"Space Grotesk\", \"Segoe UI\", sans-serif",
+        padding: "32px 20px 48px",
+      }}
+    >
+      <section
+        style={{
+          maxWidth: 1180,
+          margin: "0 auto",
+          borderRadius: 32,
+          padding: 28,
+          background: "linear-gradient(135deg, #ea580c 0%, #f97316 44%, #fb7185 100%)",
+          color: "white",
+          boxShadow: "0 24px 70px rgba(234, 88, 12, 0.2)",
+        }}
+      >
+        <div style={{ fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.82 }}>
+          Generated SDLC preview · ${story.id} · ${variant.label}
+        </div>
+        <h1 style={{ margin: "14px 0 0", fontSize: 44, lineHeight: 1.02 }}>
+          ${JSON.stringify(project.brief.title || story.title)}
+        </h1>
+        <p style={{ margin: "14px 0 0", maxWidth: 760, fontSize: 16, lineHeight: 1.7 }}>
+          ${JSON.stringify(project.brief.objective || story.summary)}
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }}>
+          <span style={{ borderRadius: 999, background: "rgba(255,255,255,0.16)", padding: "8px 12px", fontSize: 12 }}>
+            ${variant.teamName}
+          </span>
+          <span style={{ borderRadius: 999, background: "rgba(255,255,255,0.16)", padding: "8px 12px", fontSize: 12 }}>
+            ${story.storyPoints ? `${story.storyPoints} story points` : story.estimate}
+          </span>
+        </div>
+      </section>
+
+      <section
+        style={{
+          maxWidth: 1180,
+          margin: "20px auto 0",
+          display: "grid",
+          gap: 18,
+          gridTemplateColumns: "1.2fr 0.8fr",
+        }}
+      >
+        <div style={{ display: "grid", gap: 18 }}>
+          <article
+            style={{
+              borderRadius: 26,
+              background: "white",
+              border: "1px solid rgba(251, 146, 60, 0.2)",
+              padding: 24,
+              boxShadow: "0 18px 48px rgba(15, 23, 42, 0.08)",
+            }}
+          >
+            <div style={{ fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "#c2410c" }}>
+              Product direction
+            </div>
+            <h2 style={{ margin: "12px 0 0", fontSize: 24 }}>${JSON.stringify(story.title)}</h2>
+            <p style={{ margin: "10px 0 0", lineHeight: 1.7, color: "#4b5563" }}>
+              ${JSON.stringify(story.summary)}
+            </p>
+            <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              {productHighlights.map((item) => (
+                <div
+                  key={item}
+                  style={{
+                    borderRadius: 18,
+                    border: "1px solid rgba(251, 146, 60, 0.18)",
+                    background: "#fffaf5",
+                    padding: "14px 16px",
+                  }}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article
+            style={{
+              borderRadius: 26,
+              background: "white",
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+              padding: 24,
+              boxShadow: "0 18px 48px rgba(15, 23, 42, 0.08)",
+            }}
+          >
+            <div style={{ fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "#c2410c" }}>
+              Technical direction
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+              {technicalStack.map((item) => (
+                <span
+                  key={item}
+                  style={{
+                    borderRadius: 999,
+                    background: "#fff7ed",
+                    color: "#9a3412",
+                    padding: "8px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+            <p style={{ margin: "16px 0 0", lineHeight: 1.7, color: "#4b5563" }}>
+              ${JSON.stringify(project.brief.architecture || variant.architecture || "Architecture notes will appear here.")}
+            </p>
+            <div
+              style={{
+                marginTop: 16,
+                borderRadius: 18,
+                background: "#111827",
+                color: "#e5e7eb",
+                padding: 16,
+                fontSize: 13,
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              ${JSON.stringify(orchestration)}
+            </div>
+          </article>
+        </div>
+
+        <div style={{ display: "grid", gap: 18 }}>
+          <article
+            style={{
+              borderRadius: 26,
+              background: "white",
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+              padding: 24,
+              boxShadow: "0 18px 48px rgba(15, 23, 42, 0.08)",
+            }}
+          >
+            <div style={{ fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "#c2410c" }}>
+              Variant notes
+            </div>
+            <p style={{ margin: "12px 0 0", lineHeight: 1.7, color: "#4b5563" }}>
+              ${JSON.stringify(variant.focus || variant.tradeoff)}
+            </p>
+            <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+              {(securityFindings.length > 0 ? securityFindings : fallbackRisks).map((item, index) => (
+                <div
+                  key={String(index)}
+                  style={{
+                    borderRadius: 18,
+                    border: "1px solid rgba(244, 63, 94, 0.18)",
+                    background: "#fff1f2",
+                    padding: "14px 16px",
+                  }}
+                >
+                  <strong style={{ display: "block" }}>{typeof item === "string" ? item.split(":")[0] : item}</strong>
+                  <div style={{ marginTop: 6, color: "#7f1d1d", lineHeight: 1.6 }}>{typeof item === "string" ? item.split(":").slice(1).join(":").trim() : item}</div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article
+            style={{
+              borderRadius: 26,
+              background: "#0f172a",
+              color: "#e2e8f0",
+              padding: 24,
+              boxShadow: "0 18px 48px rgba(15, 23, 42, 0.24)",
+            }}
+          >
+            <div style={{ fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "#fb923c" }}>
+              AI reasoning
+            </div>
+            <pre style={{ margin: "12px 0 0", whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.65 }}>
+              ${JSON.stringify(reasoning)}
+            </pre>
+          </article>
+        </div>
+      </section>
+    </main>
+  )
+}
+`
+
+  const layoutContent = `export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body style={{ margin: 0, background: "#fffaf5" }}>{children}</body>
+    </html>
+  )
+}
+`
+
+  const files: WorkspaceFile[] = [
+    {
+      id: stampId("file"),
+      name: "layout.tsx",
+      path: "src/app/layout.tsx",
+      content: layoutContent,
+    },
+    {
+      id: stampId("file"),
+      name: "page.tsx",
+      path: "src/app/page.tsx",
+      content: pageContent,
+    },
+    {
+      id: stampId("file"),
+      name: `${story.id.toLowerCase()}-frontend.tsx`,
+      path: `docs/generated/${story.id.toLowerCase()}-frontend.tsx`,
+      content: frontendCode,
+    },
+    {
+      id: stampId("file"),
+      name: `${story.id.toLowerCase()}-backend.ts`,
+      path: `docs/generated/${story.id.toLowerCase()}-backend.ts`,
+      content: backendCode,
+    },
+    {
+      id: stampId("file"),
+      name: `${story.id.toLowerCase()}-orchestration.md`,
+      path: `docs/generated/${story.id.toLowerCase()}-orchestration.md`,
+      content: `# ${story.title} · ${variant.label}\n\n## Reasoning\n${reasoning}\n\n## Orchestration\n${orchestration}\n\n## Security\n${securitySummary}\n`,
+    },
+  ]
+
+  return {
+    folders: [
+      ...buildWorkspaceFolders(),
+      { id: stampId("folder"), name: "generated", path: "docs/generated" },
+    ],
+    files,
+    runtimeEntrypoints: ["src/app/layout.tsx", "src/app/page.tsx"],
+  }
+}
+
 function applyGeneratedWorkspace(
   project: ProjectState,
   generated: Awaited<ReturnType<typeof generateWorkspaceScaffold>>,
@@ -544,7 +778,8 @@ export async function generateDocumentationFromConversation(projectId: string) {
   const project = await getProject(projectId)
   const nextBrief = await generateBriefFromConversation({
     currentBrief: project.brief,
-    conversationMessages: project.messages.general,
+    productMessages: project.messages.product,
+    technicalMessages: project.messages.technical,
   })
 
   return updateProjectState(projectId, async (current) => {
@@ -556,7 +791,7 @@ export async function generateDocumentationFromConversation(projectId: string) {
     return appendActivity(
       next,
       "Documentation generated",
-      "Brief-ul a fost generat automat din conversația unificată cu clientul."
+      "Brief-ul a fost generat automat din canalele de planning product și technical."
     )
   })
 }
@@ -569,7 +804,7 @@ export async function generateRequirements(projectId: string) {
       const blocked = recordAgentRun(current, {
         agentId: orchestrationAgents.requirementGeneration.agentId,
         agentName: orchestrationAgents.requirementGeneration.agentName,
-        stage: "Requirements",
+        stage: "Analysis",
         action: "generate-requirements",
         status: "blocked",
         summary: "Requirement generation blocked because the brief is incomplete.",
@@ -580,14 +815,14 @@ export async function generateRequirements(projectId: string) {
     })
   }
 
-  const nextRequirements = createRequirementsFromBrief(project.brief)
+  const nextRequirements = await generateRequirementsFromDocumentation(project.brief)
 
   return updateProjectState(projectId, async (current) => {
     if (nextRequirements.length === 0) {
       const failed = recordAgentRun(current, {
         agentId: orchestrationAgents.requirementGeneration.agentId,
         agentName: orchestrationAgents.requirementGeneration.agentName,
-        stage: "Requirements",
+        stage: "Analysis",
         action: "generate-requirements",
         status: "failed",
         summary: "Requirement generator returned no requirements.",
@@ -601,13 +836,13 @@ export async function generateRequirements(projectId: string) {
     const recorded = recordAgentRun(current, {
       agentId: orchestrationAgents.requirementGeneration.agentId,
       agentName: orchestrationAgents.requirementGeneration.agentName,
-      stage: "Requirements",
+      stage: "Analysis",
       action: "generate-requirements",
       status: "completed",
       summary,
       artifact: {
         kind: "requirement-set",
-        stage: "Requirements",
+        stage: "Analysis",
         title: "Derived requirements",
         summary: `Requirements extracted from ${current.brief.title || "the current brief"}.`,
         sourceIds: nextRequirements.map((requirement) => requirement.id),
@@ -617,7 +852,7 @@ export async function generateRequirements(projectId: string) {
 
     const next = touch({
       ...resetReviewState(recorded.project),
-      currentStage: "Requirements",
+      currentStage: "Analysis",
       requirements: nextRequirements,
       features: [],
       selectedFeatureId: "",
@@ -871,8 +1106,14 @@ export async function selectStoryVariant(projectId: string, storyId: string, var
       return appendActivity(project, "Variant unavailable", `Varianta ${variantId} nu există pentru ${storyId}.`)
     }
 
+    const generatedWorkspace = createImplementationWorkspace(project, story, variant)
+    const mergedWorkspace = mergeWorkspace(project, generatedWorkspace.folders, generatedWorkspace.files, {
+      replaceExistingFiles: true,
+      preferredSelectedPath: "src/app/page.tsx",
+    })
+
     const next = touch({
-      ...project,
+      ...mergedWorkspace.project,
       selectedStoryId: storyId,
       userStories: project.userStories.map((item) =>
         item.id === storyId
@@ -884,8 +1125,13 @@ export async function selectStoryVariant(projectId: string, storyId: string, var
       ),
       preview: {
         ...project.preview,
-        appGenerated: false,
-        previewOpened: false,
+        appGenerated: true,
+        previewOpened: true,
+      },
+      currentStage: "Implementation",
+      workspace: {
+        ...mergedWorkspace.project.workspace,
+        runtimeEntrypoints: generatedWorkspace.runtimeEntrypoints,
       },
     })
 
@@ -1343,7 +1589,8 @@ export async function appendConversationMessage(input: {
   await updateProjectState(input.projectId, async (project) => {
     const nextMessages = {
       ...project.messages,
-      general: [...project.messages.general, humanMessage],
+      [input.channel]: [...project.messages[input.channel], humanMessage],
+      general: [...(project.messages.general ?? []), humanMessage],
     }
 
     const next = touch({
@@ -1351,24 +1598,26 @@ export async function appendConversationMessage(input: {
       messages: nextMessages,
     })
 
-    return appendActivity(next, humanMessage.author, "A trimis un mesaj în conversația generală.")
+    return appendActivity(next, humanMessage.author, `A trimis un mesaj în canalul ${input.channel}.`)
   })
 
   const project = await getProject(input.projectId)
   const evolvedBrief = await generateBriefFromConversation({
     currentBrief: project.brief,
-    conversationMessages: project.messages.general,
+    productMessages: project.messages.product,
+    technicalMessages: project.messages.technical,
   })
   const aiReply = await generateOpenAIReply({
+    channel: input.channel,
     author: input.author,
     message: normalized,
     brief: evolvedBrief,
-    history: project.messages.general,
+    history: project.messages[input.channel],
   })
 
   const aiMessage: Message = {
     id: stampId("msg"),
-    author: "Client Discovery AI",
+    author: input.channel === "product" ? "Creative Product AI" : "Technical Documentation AI",
     role: "ai",
     text: aiReply,
   }
@@ -1379,11 +1628,12 @@ export async function appendConversationMessage(input: {
       brief: evolvedBrief,
       messages: {
         ...current.messages,
-        general: [...current.messages.general, aiMessage],
+        [input.channel]: [...current.messages[input.channel], aiMessage],
+        general: [...(current.messages.general ?? []), aiMessage],
       },
     })
 
-    return appendActivity(next, "Client Discovery AI", "A actualizat brief-ul și a continuat conversația.")
+    return appendActivity(next, aiMessage.author, "A actualizat documentația și a continuat conversația.")
   })
 }
 
@@ -1660,6 +1910,81 @@ export async function openPreviewWindow(projectId: string) {
   })
 }
 
+export async function generateBacklog(projectId: string) {
+  const project = await getProject(projectId)
+  if (project.requirements.length === 0) {
+    return updateProjectState(projectId, async (current) =>
+      appendActivity(current, "Backlog unavailable", "Generează mai întâi requirements în etapa Analysis.")
+    )
+  }
+
+  const requirementText = project.requirements.map((item) => `${item.title}: ${item.detail}`).join("\n")
+  const stories = await generateBacklogFromRequirements(project.brief, requirementText)
+
+  return updateProjectState(projectId, async (current) => {
+    const next = touch({
+      ...current,
+      currentStage: "Design",
+      userStories: stories,
+      selectedStoryId: stories[0]?.id ?? "",
+    })
+
+    return appendActivity(next, "Backlog generated", `Au fost generate ${stories.length} user stories din requirements.`)
+  })
+}
+
+export async function saveStoryPlanning(
+  projectId: string,
+  storyId: string,
+  storyPoints: number,
+  pokerHistory: string[],
+  pokerConsensus: string
+) {
+  return updateProjectState(projectId, async (project) => {
+    const nextStories = project.userStories.map((story) =>
+      story.id === storyId ? { ...story, storyPoints, pokerHistory, pokerConsensus } : story
+    )
+
+    return appendActivity(
+      touch({ ...project, userStories: nextStories }),
+      "Planning saved",
+      `${storyId} a primit ${storyPoints} story points.`
+    )
+  })
+}
+
+export async function saveStoryVariants(projectId: string, storyId: string, variants: ProjectState["userStories"][number]["variants"]) {
+  return updateProjectState(projectId, async (project) => {
+    const nextStories = project.userStories.map((story) =>
+      story.id === storyId ? { ...story, variants } : story
+    )
+
+    return appendActivity(
+      touch({ ...project, currentStage: "Implementation", userStories: nextStories }),
+      "Implementation saved",
+      `${storyId} are acum variantele A/B/C persistate în backend.`
+    )
+  })
+}
+
+export async function generateMaintenanceReview(projectId: string) {
+  return updateProjectState(projectId, async (project) => {
+    const issues = createSecurityIssues(project)
+    const next = touch({
+      ...project,
+      currentStage: "Maintenance",
+      securityReport: {
+        status: "reviewed",
+        summary: `Security maintenance scan completed with ${issues.length} findings.`,
+        reviewedAt: nowIso(),
+        issues,
+      },
+    })
+
+    return appendActivity(next, "Maintenance review", "Security agent a verificat proiectul integrat pentru mentenanță.")
+  })
+}
+
 export async function resetProject(projectId: string) {
   return updateProjectState(projectId, async () => createDefaultProjectState(projectId))
 }
@@ -1671,7 +1996,7 @@ export async function getHealth(projectId: string) {
     ok: true,
     projectId: project.id,
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    openaiModel: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+    openaiModel: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
     runtime: "nodejs",
   }
 }

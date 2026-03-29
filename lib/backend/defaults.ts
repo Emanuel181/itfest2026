@@ -189,7 +189,7 @@ export function createDefaultAgents(): AgentState[] {
       id: "agent-tech",
       name: "Solution Architect AI",
       specialty: "Architecture planning",
-      stage: "Documentation",
+      stage: "Planning",
       status: "standby",
       goal: "Translate approved requirements into implementation paths.",
       lastRunSummary: "Așteaptă detalii tehnice.",
@@ -288,6 +288,8 @@ export function createDefaultProjectState(projectId: string): ProjectState {
     userStories: [],
     selectedStoryId: "",
     messages: {
+      product: [],
+      technical: [],
       general: [],
     },
     collaborators: createDefaultCollaborators(),
@@ -361,6 +363,26 @@ function mergeConversationMessages(project: ProjectState, fallbackMessages: Mess
   return merged.length > 0 ? merged : fallbackMessages
 }
 
+function normalizeProductMessages(project: ProjectState, fallbackMessages: Message[]) {
+  const product = ((project.messages as { product?: Message[] })?.product ?? [])
+  if (product.length > 0) return product
+
+  const legacyBusiness = ((project.messages as { business?: Message[] })?.business ?? [])
+  if (legacyBusiness.length > 0) return legacyBusiness
+
+  return project.messages?.general ?? fallbackMessages
+}
+
+function normalizeTechnicalMessages(project: ProjectState, fallbackMessages: Message[]) {
+  const technical = ((project.messages as { technical?: Message[] })?.technical ?? [])
+  if (technical.length > 0) return technical
+
+  const legacyTech = ((project.messages as { tech?: Message[] })?.tech ?? [])
+  if (legacyTech.length > 0) return legacyTech
+
+  return fallbackMessages
+}
+
 export function normalizeProjectState(project: ProjectState, projectId: string): ProjectState {
   if (!looksLikeLegacyDemo(project)) {
     const fresh = createDefaultProjectState(projectId)
@@ -376,7 +398,9 @@ export function normalizeProjectState(project: ProjectState, projectId: string):
       userStories: normalizeUserStories(project.userStories ?? fresh.userStories),
       selectedStoryId: project.selectedStoryId ?? fresh.selectedStoryId,
       messages: {
-        general: mergeConversationMessages(project, fresh.messages.general),
+        product: normalizeProductMessages(project, fresh.messages.product),
+        technical: normalizeTechnicalMessages(project, fresh.messages.technical),
+        general: mergeConversationMessages(project, fresh.messages.general ?? []),
       },
       collaborators: project.collaborators ?? fresh.collaborators,
       agents: project.agents ?? fresh.agents,
@@ -420,7 +444,9 @@ export function normalizeProjectState(project: ProjectState, projectId: string):
     brief: project.brief ?? fresh.brief,
     requirements: project.requirements ?? fresh.requirements,
     messages: {
-      general: mergeConversationMessages(project, fresh.messages.general),
+      product: normalizeProductMessages(project, fresh.messages.product),
+      technical: normalizeTechnicalMessages(project, fresh.messages.technical),
+      general: mergeConversationMessages(project, fresh.messages.general ?? []),
     },
     userStories: normalizeUserStories(project.userStories ?? fresh.userStories),
     collaborators: project.collaborators ?? fresh.collaborators,

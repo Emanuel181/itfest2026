@@ -10,6 +10,11 @@ export type StageKey =
   | "Merge"
   | "Project Review"
   | "Preview"
+  | "Analysis"
+  | "Design"
+  | "Implementation"
+  | "Testing & Integration"
+  | "Maintenance"
 
 export type Message = {
   id: string
@@ -63,7 +68,11 @@ export type AgentRun = {
   agentName: string
   stage: StageKey
   action:
+    | "generate-planning-docs"
     | "generate-requirements"
+    | "generate-backlog"
+    | "run-poker"
+    | "save-implementation"
     | "generate-features"
     | "generate-user-stories"
     | "regenerate-workspace"
@@ -72,6 +81,7 @@ export type AgentRun = {
     | "run-merge"
     | "generate-project-review"
     | "generate-preview"
+    | "maintenance-review"
   status: "queued" | "running" | "completed" | "blocked" | "failed"
   summary: string
   artifactIds: string[]
@@ -111,6 +121,16 @@ export type StoryVariant = {
   cons: string[]
   tradeoff: string
   code: string
+  reasoning?: string
+  orchestration?: string
+  backendCode?: string
+  frontendCode?: string
+  securitySummary?: string
+  securityFindings?: {
+    severity: "low" | "medium" | "high"
+    title: string
+    detail: string
+  }[]
 }
 
 export type UserStory = {
@@ -127,6 +147,9 @@ export type UserStory = {
   code: string
   variants: StoryVariant[]
   selectedVariantId: string
+  storyPoints?: number
+  pokerHistory?: string[]
+  pokerConsensus?: string
 }
 
 export type WorkspaceFile = {
@@ -220,7 +243,9 @@ export type ProjectState = {
   userStories: UserStory[]
   selectedStoryId: string
   messages: {
-    general: Message[]
+    product: Message[]
+    technical: Message[]
+    general?: Message[]
   }
   collaborators: Collaborator[]
   agents: AgentState[]
@@ -234,4 +259,4 @@ export type ProjectState = {
   preview: PreviewState
 }
 
-export type MessageChannel = "general"
+export type MessageChannel = "product" | "technical"

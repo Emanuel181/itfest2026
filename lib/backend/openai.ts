@@ -4,6 +4,7 @@ import type {
   BriefState,
   Feature,
   Message,
+  Requirement,
   StoryVariant,
   UserStory,
   WorkspaceFile,
@@ -150,20 +151,26 @@ function hasEnoughDiscoveryContext(brief: BriefState) {
   )
 }
 
-function nextFallbackQuestion(brief: BriefState) {
+function nextProductFallbackQuestion(brief: BriefState) {
   if (!brief.title.trim()) return "Cum se numește produsul sau website-ul?"
-  if (!brief.objective.trim()) return "Care este obiectivul principal al website-ului în producție?"
+  if (!brief.objective.trim()) return "Ce problemă rezolvă produsul pentru client și ce rezultat vrei să obții?"
   if (brief.audience.length === 0) return "Cine sunt utilizatorii principali și ce rol au?"
   if (brief.scope.length === 0) return "Care sunt cele mai importante 3 funcționalități din MVP?"
-  if (brief.deliverables.length === 0) return "Ce rezultat concret vrei să livreze website-ul după lansare?"
+  if (brief.deliverables.length === 0) return "Ce rezultat concret trebuie să poată livra produsul în prima versiune?"
+  if (brief.risks.length === 0) return "Există o constrângere de business, timp sau lansare pe care trebuie să o respectăm?"
+  return "Ce alt detaliu de produs sau flux critic vrei să clarificăm înainte de documentație?"
+}
+
+function nextTechnicalFallbackQuestion(brief: BriefState) {
+  if (!brief.architecture.trim()) return "Ce tip de arhitectură sau integrare știi deja că ai nevoie?"
+  if (brief.techStack.length === 0) return "Ai un stack preferat sau vrei să propun eu unul potrivit pentru producție?"
   if (!brief.architecture.trim()) return "Dacă nu ai preferință tehnică, e ok să-ți propun eu o arhitectură simplă pentru producție?"
   if (brief.techStack.length === 0) return "Dacă nu ai stack decis, preferi să-ți recomand eu o variantă potrivită pentru producție?"
   if (!brief.dbSchema.trim()) return "Ce date esențiale trebuie să păstreze produsul, chiar și într-o primă versiune?"
-  if (brief.risks.length === 0) return "Există un risc important sau o constrângere pe care vrei să o prevenim din start?"
   return "Ai nevoie de auth, roluri sau integrări externe din prima versiune?"
 }
 
-function fallbackReply(message: string, brief: BriefState) {
+function fallbackReply(channel: "product" | "technical", message: string, brief: BriefState) {
   const normalized = message.trim()
   if (!normalized) return "Continuăm."
 
@@ -171,30 +178,30 @@ function fallbackReply(message: string, brief: BriefState) {
     return "Am deja context suficient ca să construiesc documentația completă. Avem obiectivul, publicul, scope-ul și o bază tehnică bună. Dacă vrei, merg direct mai departe și generez brief-ul complet din conversația noastră."
   }
 
-  const question = nextFallbackQuestion(brief)
-  return `Am notat direcția: "${normalized}". O folosesc ca să definesc produsul și ce trebuie construit. ${brief.architecture.trim() ? "" : "Dacă nu îmi dai preferințe tehnice, îți propun eu stack-ul și arhitectura. "}Spune-mi simplu: ${question}`
+  const question = channel === "product" ? nextProductFallbackQuestion(brief) : nextTechnicalFallbackQuestion(brief)
+  return channel === "product"
+    ? `Am notat direcția: "${normalized}". O folosesc ca să definesc produsul și valoarea lui pentru client. Spune-mi simplu: ${question}`
+    : `Am notat direcția tehnică: "${normalized}". O folosesc ca să rafinez documentația tehnică. ${brief.architecture.trim() ? "" : "Dacă nu ai un stack decis, îți propun eu o variantă de producție. "}Spune-mi simplu: ${question}`
 }
 
-function fallbackBriefFromConversation(currentBrief: BriefState, conversationMessages: Message[]) {
-  const humanMessages = conversationMessages
-    .filter((message) => message.role === "human")
-    .map((message) => normalizeText(message.text))
-    .filter(Boolean)
+function fallbackBriefFromConversation(currentBrief: BriefState, productMessages: Message[], technicalMessages: Message[]) {
+  const productHuman = productMessages.filter((message) => message.role === "human").map((message) => normalizeText(message.text)).filter(Boolean)
+  const technicalHuman = technicalMessages.filter((message) => message.role === "human").map((message) => normalizeText(message.text)).filter(Boolean)
 
   const title =
     currentBrief.title.trim() ||
-    toSentenceLabel(humanMessages[0] || "Production Website", "Production Website")
+    toSentenceLabel(productHuman[0] || technicalHuman[0] || "Production Website", "Production Website")
 
   const objective =
     currentBrief.objective.trim() ||
-    humanMessages[0] ||
+    productHuman[0] ||
     "Launch a production-ready website with clear business goals and technical delivery constraints."
 
   return {
     title,
     objective,
-    audience: normalizeList(currentBrief.audience.length > 0 ? currentBrief.audience : humanMessages.slice(1, 4)),
-    scope: normalizeList(currentBrief.scope.length > 0 ? currentBrief.scope : humanMessages.slice(0, 4)),
+    audience: normalizeList(currentBrief.audience.length > 0 ? currentBrief.audience : productHuman.slice(1, 4)),
+    scope: normalizeList(currentBrief.scope.length > 0 ? currentBrief.scope : productHuman.slice(0, 4)),
     deliverables: normalizeList(
       currentBrief.deliverables.length > 0
         ? currentBrief.deliverables
@@ -204,18 +211,18 @@ function fallbackBriefFromConversation(currentBrief: BriefState, conversationMes
             "Traceable feature and story backlog",
           ]
     ),
-    risks: normalizeList(currentBrief.risks.length > 0 ? currentBrief.risks : humanMessages.slice(2, 6)),
+    risks: normalizeList(currentBrief.risks.length > 0 ? currentBrief.risks : [...productHuman.slice(2, 5), ...technicalHuman.slice(0, 2)]),
     techStack: normalizeList(
-      currentBrief.techStack.length > 0 ? currentBrief.techStack : ["Next.js", "OpenAI", "PostgreSQL", "Vercel"]
+      currentBrief.techStack.length > 0 ? currentBrief.techStack : ["Next.js", "OpenAI", "PostgreSQL"]
     ),
     dbSchema:
       currentBrief.dbSchema.trim() ||
-      (humanMessages[1]
-        ? `// Derived from client discovery conversation\n// ${humanMessages[1]}`
+      (technicalHuman[0]
+        ? `// Derived from technical discovery conversation\n// ${technicalHuman[0]}`
         : ""),
     architecture:
       currentBrief.architecture.trim() ||
-      humanMessages.join(" ") ||
+      technicalHuman.join(" ") ||
       "Next.js application prepared for production deployment, persistence, and AI-assisted workflows.",
   }
 }
@@ -536,7 +543,7 @@ async function requestJsonArray<T>(instructions: string, input: string): Promise
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
       instructions,
       input,
     })
@@ -549,21 +556,24 @@ async function requestJsonArray<T>(instructions: string, input: string): Promise
 }
 
 export async function generateOpenAIReply(options: {
+  channel: "product" | "technical"
   author: string
   message: string
   brief: BriefState
   history: Message[]
 }) {
-  const fallback = fallbackReply(options.message, options.brief)
+  const fallback = fallbackReply(options.channel, options.message, options.brief)
   const client = getOpenAIClient()
 
   if (!client) return fallback
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
       instructions:
-        "You are the client discovery AI inside an AI-native SDLC IDE. Your job is to communicate like a senior product consultant who is excellent with clients and knows how to uncover what product should be built. Reply in Romanian, in 2-4 short sentences. First reflect back what you understood in plain language. Then ask at most one sharp follow-up question only if it helps clarify users, problem, workflow, success criteria, constraints, or scope. Avoid sounding robotic or generic. Do not split business and technical discussion; combine them naturally in one conversation. If the client does not know the technical side, confidently propose a sensible production approach without overwhelming them. If enough information already exists, stop interrogating and say clearly that you can generate the brief.",
+        options.channel === "product"
+          ? "You are a creative product discovery LLM inside an AI-native SDLC IDE. Speak in Romanian like a sharp senior product strategist. Help the user ideatize, sharpen the value proposition, identify users, clarify the MVP, and surface missing business details. Reply in 2-4 short sentences. First confirm what you understood. Then ask at most one high-value follow-up question. Keep the tone creative but practical."
+          : "You are a technical documentation LLM inside an AI-native SDLC IDE. Speak in Romanian like a senior solution architect. Help the user clarify architecture, integrations, auth, data model, non-functional constraints, and production tradeoffs. Reply in 2-4 short sentences. First confirm what you understood. Then ask at most one useful follow-up question. If the user is unsure, proactively propose a sensible technical direction.",
       input: `Project title: ${options.brief.title}
 Project objective: ${options.brief.objective}
 Speaker: ${options.author}
@@ -581,20 +591,26 @@ User message: ${options.message}`,
 
 export async function generateBriefFromConversation(options: {
   currentBrief: BriefState
-  conversationMessages: Message[]
+  productMessages: Message[]
+  technicalMessages: Message[]
 }) {
-  const fallback = fallbackBriefFromConversation(options.currentBrief, options.conversationMessages)
+  const fallback = fallbackBriefFromConversation(options.currentBrief, options.productMessages, options.technicalMessages)
   const client = getOpenAIClient()
   if (!client) return fallback
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
       instructions:
-        "You turn a single client discovery conversation into production-ready documentation for a product team. Return ONLY valid JSON with the keys: title, objective, audience, scope, deliverables, risks, techStack, dbSchema, architecture. audience, scope, deliverables, risks, techStack must be arrays of short strings. Keep the content concise, specific, and directly usable for implementation planning. Prefer Romanian. Infer the likely product, workflow, and delivery goals from the conversation. If technical instructions are missing, proactively recommend a sensible production setup instead of leaving fields empty. Do not add markdown fences.",
+        "You turn two planning conversations into live SDLC documentation: one product conversation and one technical conversation. Return ONLY valid JSON with the keys: title, objective, audience, scope, deliverables, risks, techStack, dbSchema, architecture. audience, scope, deliverables, risks, techStack must be arrays of short strings. Prefer Romanian. Product chat should drive title, objective, audience, scope and deliverables. Technical chat should drive techStack, dbSchema and architecture. Fill gaps with sensible production recommendations. Do not add markdown fences.",
       input: JSON.stringify({
         currentBrief: options.currentBrief,
-        conversation: options.conversationMessages.map((message) => ({
+        productConversation: options.productMessages.map((message) => ({
+          role: message.role,
+          author: message.author,
+          text: message.text,
+        })),
+        technicalConversation: options.technicalMessages.map((message) => ({
           role: message.role,
           author: message.author,
           text: message.text,
@@ -619,6 +635,91 @@ export async function generateBriefFromConversation(options: {
           ? parsed.architecture.trim()
           : fallback.architecture,
     }
+  } catch {
+    return fallback
+  }
+}
+
+export async function generateRequirementsFromDocumentation(brief: BriefState): Promise<Requirement[]> {
+  const client = getOpenAIClient()
+  const fallback = [
+    { id: "REQ-01", title: "Core product workflow", detail: brief.objective || "Deliver the core product workflow.", kind: "functional" as const, status: "approved" as const, featureIds: [], storyIds: [] },
+    { id: "REQ-02", title: "Technical architecture", detail: brief.architecture || "Define a production-ready architecture.", kind: "non-functional" as const, status: "approved" as const, featureIds: [], storyIds: [] },
+  ]
+  if (!client) return fallback
+
+  try {
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
+      instructions:
+        "Generate a concise requirement set from product and technical documentation. Return ONLY valid JSON array. Each item must have: title, detail, kind (functional|non-functional), status (draft|approved). Prefer Romanian. Requirements must be implementation-ready and traceable.",
+      input: JSON.stringify(brief),
+    })
+
+    const parsed = safeJsonParse<Array<{ title?: string; detail?: string; kind?: string; status?: string }>>(response.output_text)
+    if (!parsed?.length) return fallback
+
+    return parsed.slice(0, 8).map((item, index) => ({
+      id: `REQ-${String(index + 1).padStart(2, "0")}`,
+      title: normalizeText(item.title || "") || fallback[index]?.title || `Requirement ${index + 1}`,
+      detail: normalizeText(item.detail || "") || fallback[index]?.detail || "",
+      kind: item.kind === "non-functional" ? "non-functional" : "functional",
+      status: item.status === "draft" ? "draft" : "approved",
+      featureIds: [],
+      storyIds: [],
+    }))
+  } catch {
+    return fallback
+  }
+}
+
+export async function generateBacklogFromRequirements(brief: BriefState, requirementText: string): Promise<UserStory[]> {
+  const fallback = fallbackStories(
+    {
+      id: "FEAT-01",
+      title: brief.title || "Product Backlog",
+      summary: brief.objective || "Backlog generated from requirements.",
+      preview: "Planning",
+      estimate: "M",
+      complexityNote: "",
+      dependencyIds: [],
+      variations: [],
+      acceptance: [],
+    },
+    brief
+  )
+  const client = getOpenAIClient()
+  if (!client) return fallback
+
+  try {
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
+      instructions:
+        "Generate a product backlog as user stories from the provided requirements. Return ONLY valid JSON array. Each item must include: title, summary, tradeoff, estimate, complexityNote, previewTitle, previewDescription, code, variants. Use 2-5 stories. Each story title should read like a backlog item and summary should describe the user story in product terms.",
+      input: JSON.stringify({ brief, requirementText }),
+    })
+
+    const parsed = safeJsonParse<Array<Record<string, unknown>>>(response.output_text)
+    if (!parsed?.length) return fallback
+
+    return parsed.slice(0, 5).map((item, index) => ({
+      id: `US-${String(index + 1).padStart(2, "0")}`,
+      title: normalizeText(String(item.title ?? "")) || fallback[index]?.title || `User Story ${index + 1}`,
+      stack: normalizeText(String(item.stack ?? "")) || "Next.js + OpenAI",
+      summary: normalizeText(String(item.summary ?? "")) || fallback[index]?.summary || "",
+      tradeoff: normalizeText(String(item.tradeoff ?? "")) || fallback[index]?.tradeoff || "",
+      estimate: ["S", "M", "L", "XL"].includes(String(item.estimate ?? "")) ? (String(item.estimate) as "S" | "M" | "L" | "XL") : "M",
+      complexityNote: normalizeText(String(item.complexityNote ?? "")),
+      dependencyIds: [],
+      previewTitle: normalizeText(String(item.previewTitle ?? "")) || "Preview",
+      previewDescription: normalizeText(String(item.previewDescription ?? "")),
+      code: "",
+      variants: fallback[index]?.variants ?? [],
+      selectedVariantId: fallback[index]?.selectedVariantId ?? `US-${String(index + 1).padStart(2, "0")}-VAR-02`,
+      storyPoints: undefined,
+      pokerHistory: [],
+      pokerConsensus: "",
+    }))
   } catch {
     return fallback
   }
@@ -725,7 +826,7 @@ export async function generateWorkspaceScaffold(options: {
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1-nano",
       instructions:
         "You are a senior AI-native IDE scaffold generator. Return ONLY valid JSON for a workspace scaffold. The JSON object must have folders, files, and runtimeEntrypoints arrays. Each folder needs id, name, path. Each file needs id, name, path, content. Use TypeScript or TSX for source files. The workspace should represent a small but real Next.js app with readable code and no markdown fences. Keep paths consistent and include src/app/layout.tsx, src/app/page.tsx, src/components/agent-status.tsx, and src/lib/preview-data.ts whenever possible. Never concatenate multiple virtual files into one file. Never include markers like // File:. Keep src/lib/preview-data.ts as plain data exports only.",
       input: JSON.stringify({
