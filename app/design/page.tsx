@@ -130,37 +130,19 @@ function DesignPageInner() {
   })
   const totalPoints = stories.reduce((acc, s) => acc + (pokerSessions[s.id]?.consensusEstimate ?? 0), 0)
 
-  // Load from localStorage
+  // Hydrate from project state
   useEffect(() => {
     let cancelled = false
 
     async function hydratePage() {
       try {
-        const existingState = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-        const existingPoker = JSON.parse(localStorage.getItem("itfest_poker") || "{}")
         const dbSnapshot = await hydrateLegacySnapshots(projectId)
 
-        const nextState = {
-          ...existingState,
-          ...(dbSnapshot?.legacyState ?? {}),
-          requirements: dbSnapshot?.requirements ?? existingState.requirements,
-          stories: Array.isArray(dbSnapshot?.userStories) && dbSnapshot?.userStories.length > 0
-            ? dbSnapshot.userStories
-            : existingState.stories,
-        }
-        const nextPoker = {
-          ...existingPoker,
-          ...(dbSnapshot?.legacyPoker ?? {}),
-        }
-
-        localStorage.setItem("itfest_state", JSON.stringify(nextState))
-        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
-
         if (cancelled) return
-        if (Array.isArray(nextState.requirements)) setRequirements(nextState.requirements)
-        if (Array.isArray(nextState.stories)) setStories(nextState.stories)
-        if (nextPoker.pokerSessions) setPokerSessions(nextPoker.pokerSessions)
-        if (nextPoker.storyAssignees) setStoryAssignees(nextPoker.storyAssignees)
+        if (Array.isArray(dbSnapshot?.requirements)) setRequirements(dbSnapshot.requirements as Requirement[])
+        if (Array.isArray(dbSnapshot?.userStories)) setStories(dbSnapshot.userStories as UserStory[])
+        if (dbSnapshot?.legacyPoker?.pokerSessions) setPokerSessions(dbSnapshot.legacyPoker.pokerSessions as Record<string, PokerSession>)
+        if (dbSnapshot?.legacyPoker?.storyAssignees) setStoryAssignees(dbSnapshot.legacyPoker.storyAssignees as Record<string, string>)
       } catch {
         // ignore hydration failures
       } finally {
@@ -177,22 +159,17 @@ function DesignPageInner() {
   // Persist stories
   useEffect(() => {
     if (!isHydrated) return
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      const nextState = { ...existing, stories, requirements }
-      localStorage.setItem("itfest_state", JSON.stringify(nextState))
-      void syncLegacySnapshots({ projectId, legacyState: nextState })
-    } catch { /* quota */ }
+    void syncLegacySnapshots({
+      projectId,
+      legacyState: { stories, requirements },
+    })
   }, [stories, requirements, isHydrated, projectId])
 
   // Persist poker
   useEffect(() => {
     if (!isHydrated) return
-    try {
-      const nextPoker = { pokerSessions, storyAssignees }
-      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
-      void syncLegacySnapshots({ projectId, legacyPoker: nextPoker })
-    } catch { /* quota */ }
+    const nextPoker = { pokerSessions, storyAssignees }
+    void syncLegacySnapshots({ projectId, legacyPoker: nextPoker })
   }, [pokerSessions, storyAssignees, isHydrated, projectId])
 
   // Generate Backlog
@@ -259,6 +236,22 @@ function DesignPageInner() {
     }
   }
 
+  async function openImplementation() {
+    const nextState = { requirements, stories }
+    const nextPoker = {
+      pokerSessions,
+      storyAssignees,
+    }
+
+    await syncLegacySnapshots({
+      projectId,
+      legacyState: nextState,
+      legacyPoker: nextPoker,
+    })
+
+    router.push(withOptionalProjectQuery(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`, projectId))
+  }
+
   function applyMockBacklog() {
     const demoSessions = createDemoPokerSessions()
     const demoAssignees = createDemoStoryAssignees()
@@ -271,26 +264,15 @@ function DesignPageInner() {
     setStoryAssignees(demoAssignees)
     setRunningStories({})
 
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      const nextState = {
-        ...existing,
-        requirements: DEMO_REQUIREMENTS,
-        stories: DEMO_BACKLOG_STORIES,
-      }
-      const nextPoker = {
-        pokerSessions: demoSessions,
-        storyAssignees: demoAssignees,
-      }
-      localStorage.setItem(
-        "itfest_state",
-        JSON.stringify(nextState)
-      )
-      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
-      void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
-    } catch {
-      // ignore demo persistence issues
+    const nextState = {
+      requirements: DEMO_REQUIREMENTS,
+      stories: DEMO_BACKLOG_STORIES,
     }
+    const nextPoker = {
+      pokerSessions: demoSessions,
+      storyAssignees: demoAssignees,
+    }
+    void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
   }
 
   // Planning Poker session
@@ -460,7 +442,7 @@ function DesignPageInner() {
             </button>
             {allDonePoker && (
               <button
-                onClick={() => router.push(withOptionalProjectQuery(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`, projectId))}
+                onClick={() => { void openImplementation() }}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>play_arrow</span>
@@ -670,7 +652,7 @@ function DesignPageInner() {
                   <p className="text-xs text-muted-foreground mt-1">{stories.length} stories · {totalPoints} pts total</p>
                 </div>
                 <button
-                  onClick={() => router.push(withOptionalProjectQuery(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`, projectId))}
+                  onClick={() => { void openImplementation() }}
                   className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors uppercase tracking-wider"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>play_arrow</span>

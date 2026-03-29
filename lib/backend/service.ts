@@ -537,17 +537,32 @@ export async function updateBrief(
     technicalDocumentation?: string
     legacyState?: Record<string, unknown>
     legacyPoker?: Record<string, unknown>
+    replaceLegacyState?: boolean
+    replaceLegacyPoker?: boolean
     silent?: boolean
   }
 ) {
   return updateProjectState(projectId, async (project) => {
+    const nextLegacyState =
+      extras?.legacyState
+        ? extras.replaceLegacyState
+          ? extras.legacyState
+          : { ...(project.legacyState ?? {}), ...extras.legacyState }
+        : project.legacyState
+    const nextLegacyPoker =
+      extras?.legacyPoker
+        ? extras.replaceLegacyPoker
+          ? extras.legacyPoker
+          : { ...(project.legacyPoker ?? {}), ...extras.legacyPoker }
+        : project.legacyPoker
+
     const next = touch({
       ...project,
       brief: brief ?? project.brief,
       productDocumentation: extras?.productDocumentation ?? project.productDocumentation,
       technicalDocumentation: extras?.technicalDocumentation ?? project.technicalDocumentation,
-      legacyState: extras?.legacyState ?? project.legacyState,
-      legacyPoker: extras?.legacyPoker ?? project.legacyPoker,
+      legacyState: nextLegacyState,
+      legacyPoker: nextLegacyPoker,
     })
 
     if (extras?.silent) {

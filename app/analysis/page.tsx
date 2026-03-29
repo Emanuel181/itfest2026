@@ -32,31 +32,20 @@ function AnalysisPageInner() {
 
     async function hydratePage() {
       try {
-        const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
         const dbSnapshot = await hydrateLegacySnapshots(projectId)
-        const merged = {
-          ...existing,
-          ...(dbSnapshot?.legacyState ?? {}),
-          productDocumentation: dbSnapshot?.productDocumentation ?? existing.productDocumentation,
-          technicalDocumentation: dbSnapshot?.technicalDocumentation ?? existing.technicalDocumentation,
-          requirements: dbSnapshot?.requirements ?? existing.requirements,
-        }
-
-        localStorage.setItem("itfest_state", JSON.stringify(merged))
-
         let pDoc = {}
         let tDoc = {}
-        if (merged.productDocumentation) {
-          try { pDoc = JSON.parse(String(merged.productDocumentation)) } catch { /* ignore */ }
+        if (dbSnapshot?.productDocumentation) {
+          try { pDoc = JSON.parse(String(dbSnapshot.productDocumentation)) } catch { /* ignore */ }
         }
-        if (merged.technicalDocumentation) {
-          try { tDoc = JSON.parse(String(merged.technicalDocumentation)) } catch { /* ignore */ }
+        if (dbSnapshot?.technicalDocumentation) {
+          try { tDoc = JSON.parse(String(dbSnapshot.technicalDocumentation)) } catch { /* ignore */ }
         }
 
         if (cancelled) return
         setProductDoc(Object.keys(pDoc).length > 0 ? pDoc : DEMO_PRODUCT_DOC)
         setTechnicalDoc(Object.keys(tDoc).length > 0 ? tDoc : DEMO_TECHNICAL_DOC)
-        if (Array.isArray(merged.requirements)) setRequirements(merged.requirements as Requirement[])
+        if (Array.isArray(dbSnapshot?.requirements)) setRequirements(dbSnapshot.requirements as Requirement[])
       } catch {
         if (cancelled) return
         setProductDoc(DEMO_PRODUCT_DOC)
@@ -75,12 +64,12 @@ function AnalysisPageInner() {
   // Persist requirements
   useEffect(() => {
     if (!isHydrated || requirements.length === 0) return
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      const nextState = { ...existing, requirements }
-      localStorage.setItem("itfest_state", JSON.stringify(nextState))
-      void syncLegacySnapshots({ projectId, legacyState: nextState })
-    } catch { /* quota */ }
+    const nextState = {
+      productDocumentation: JSON.stringify(productDoc),
+      technicalDocumentation: JSON.stringify(technicalDoc),
+      requirements,
+    }
+    void syncLegacySnapshots({ projectId, legacyState: nextState })
   }, [requirements, isHydrated, projectId])
 
   const hasProductDoc = Boolean(productDoc.title && productDoc.objective)
@@ -151,22 +140,14 @@ function AnalysisPageInner() {
     setTechnicalDoc(DEMO_TECHNICAL_DOC)
     setRequirements(DEMO_REQUIREMENTS)
 
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      const nextState = {
-        ...existing,
+    void syncLegacySnapshots({
+      projectId,
+      legacyState: {
         productDocumentation: JSON.stringify(DEMO_PRODUCT_DOC),
         technicalDocumentation: JSON.stringify(DEMO_TECHNICAL_DOC),
         requirements: DEMO_REQUIREMENTS,
-      }
-      localStorage.setItem(
-        "itfest_state",
-        JSON.stringify(nextState)
-      )
-      void syncLegacySnapshots({ projectId, legacyState: nextState })
-    } catch {
-      // ignore localStorage write failures in demo mode
-    }
+      },
+    })
   }
 
   const priorityConfig = {

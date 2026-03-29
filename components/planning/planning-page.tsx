@@ -7,6 +7,7 @@ import { DocSidePanel } from "@/components/planning/doc-side-panel"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ProjectState } from "@/lib/backend/types"
+import { syncLegacySnapshots } from "@/lib/backend/project-client"
 
 type PlanningPageProps = {
   initialProject: ProjectState
@@ -306,7 +307,14 @@ function deriveProgress(doc: Record<string, unknown>, questions: typeof PRODUCT_
 export function PlanningPage({ initialProject, initialProjectId }: PlanningPageProps) {
   const [activeChannel, setActiveChannel] = useState<"product" | "technical">("product")
   const [productMessages, setProductMessages] = useState<ChatMessage[]>(() => {
-    return initialProject.messages.business.map((m) => ({
+    const source =
+      initialProject.messages.business.length > 0
+        ? initialProject.messages.business
+        : Array.isArray(initialProject.legacyState?.productMessages)
+          ? initialProject.legacyState.productMessages
+          : []
+
+    return source.map((m) => ({
       id: m.id,
       author: m.author,
       role: m.role,
@@ -314,7 +322,14 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
     }))
   })
   const [technicalMessages, setTechnicalMessages] = useState<ChatMessage[]>(() => {
-    return initialProject.messages.tech.map((m) => ({
+    const source =
+      initialProject.messages.tech.length > 0
+        ? initialProject.messages.tech
+        : Array.isArray(initialProject.legacyState?.technicalMessages)
+          ? initialProject.legacyState.technicalMessages
+          : []
+
+    return source.map((m) => ({
       id: m.id,
       author: m.author,
       role: m.role,
@@ -410,17 +425,13 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
     technicalAutoStarted.current = false
     setIsSending(false)
     setIsSummarizing(false)
-    // Clear localStorage
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem("itfest_state", JSON.stringify({
-        ...existing,
-        productDocumentation: "{}",
-        technicalDocumentation: "{}",
+    void syncLegacySnapshots({
+      projectId: projectIdRef.current,
+      legacyState: {
         productMessages: [],
         technicalMessages: [],
-      }))
-    } catch { /* ignore */ }
+      },
+    })
     // Reset backend project
     fetch(withProjectQuery("/api/project", projectIdRef.current), {
       method: "PATCH",
@@ -472,22 +483,13 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
       architecture: String(MOCK_TECHNICAL_DOC.architecture),
       dbSchema: String(MOCK_TECHNICAL_DOC.database),
     }
-
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem(
-        "itfest_state",
-        JSON.stringify({
-          ...existing,
-          productDocumentation: JSON.stringify(MOCK_PRODUCT_DOC),
-          technicalDocumentation: JSON.stringify(MOCK_TECHNICAL_DOC),
-          productMessages: MOCK_PRODUCT_MESSAGES,
-          technicalMessages: MOCK_TECHNICAL_MESSAGES,
-        })
-      )
-    } catch {
-      // Ignore local persistence failures in demo mode.
-    }
+    void syncLegacySnapshots({
+      projectId: projectIdRef.current,
+      legacyState: {
+        productMessages: MOCK_PRODUCT_MESSAGES,
+        technicalMessages: MOCK_TECHNICAL_MESSAGES,
+      },
+    })
 
     void fetch(withProjectQuery("/api/project", projectIdRef.current), {
       method: "PATCH",
@@ -500,21 +502,6 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
       }),
     }).catch(() => undefined)
   }, [initialProject.brief])
-
-  // Save docs to localStorage for cross-page access
-  useEffect(() => {
-    if (!isHydrated) return
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem("itfest_state", JSON.stringify({
-        ...existing,
-        productDocumentation: JSON.stringify(productDoc),
-        technicalDocumentation: JSON.stringify(technicalDoc),
-        productMessages,
-        technicalMessages,
-      }))
-    } catch { /* quota */ }
-  }, [productDoc, technicalDoc, productMessages, technicalMessages, isHydrated])
 
   // All 7 product fields must be filled for product to be "ready"
   const productDocReady = PRODUCT_QUESTIONS.every((q) => productProgress[q.key])

@@ -2194,83 +2194,61 @@ function ImplementationPageInner() {
   const [mounted, setMounted] = useState(false);
   const [runningStories, setRunningStories] = useState<Record<string, boolean>>({});
   const [showEvaluator, setShowEvaluator] = useState<Record<string, boolean>>({});
-  const [evalContent, setEvalContent] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.evalContent ?? {}; } catch { return {}; }
-  });
+  const [evalContent, setEvalContent] = useState<Record<string, string>>({});
   // reasoning: key = `${storyId}:${variantId}`
-  const [reasoningContent, setReasoningContent] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.reasoningContent ?? {}; } catch { return {}; }
-  });
+  const [reasoningContent, setReasoningContent] = useState<Record<string, string>>({});
   // noFrontend: key = `${storyId}:${variantId}` — true when reasoning says frontend not needed
-  const [noFrontend, setNoFrontend] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.noFrontend ?? {}; } catch { return {}; }
-  });
+  const [noFrontend, setNoFrontend] = useState<Record<string, boolean>>({});
   const [selectedStoryId, setSelectedStoryId] = useState<string>(storyIdParam);
   const [rerunningVariants, setRerunningVariants] = useState<Record<string, boolean>>({});
-  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.chatMessages ?? {}; } catch { return {}; }
-  });
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({});
   // prevCode: keyed `${storyId}:${variantId}`, stores backend/frontend code before last rerun
   const [prevCode, setPrevCode] = useState<Record<string, { backend: string; frontend: string }>>({});
   // Per-story poker sessions — one session per story
-  const [pokerSessions, setPokerSessions] = useState<Record<string, PokerSession>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_poker"); if (!raw) return {}; const p = JSON.parse(raw); return p.pokerSessions ?? {}; } catch { return {}; }
-  });
+  const [pokerSessions, setPokerSessions] = useState<Record<string, PokerSession>>({});
   // Ref always holds the latest value — avoids stale closures in async poker logic
   const pokerSessionsRef = useRef<Record<string, PokerSession>>({});
   useEffect(() => { pokerSessionsRef.current = pokerSessions; }, [pokerSessions]);
   // Per-story assigned agent label, set after poker completes (storyId → agent label)
-  const [storyAssignees, setStoryAssignees] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_poker"); if (!raw) return {}; const p = JSON.parse(raw); return p.storyAssignees ?? {}; } catch { return {}; }
-  });
+  const [storyAssignees, setStoryAssignees] = useState<Record<string, string>>({});
   // True when every story has a completed poker session
   const allDonePoker = stories.every((s) => pokerSessions[s.id]?.phase === "done");
   // Which story's poker drawer is open (null = closed)
   const [drawerStoryId, setDrawerStoryId] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const addLog = useCallback((_log: Omit<ActivityLog, "id">) => {}, []);
 
-  // Hydrate from localStorage on mount
+  // Hydrate from project state on mount
   useEffect(() => {
     let cancelled = false;
 
     async function hydratePage() {
       try {
-        const existingState = JSON.parse(localStorage.getItem("itfest_state") || "{}");
-        const existingPoker = JSON.parse(localStorage.getItem("itfest_poker") || "{}");
         const dbSnapshot = await hydrateLegacySnapshots(projectId);
-        const nextState = {
-          ...existingState,
-          ...(dbSnapshot?.legacyState ?? {}),
-          stories:
-            Array.isArray(dbSnapshot?.userStories) && dbSnapshot.userStories.length > 0
-              ? dbSnapshot.userStories
-              : existingState.stories,
-        };
-        const nextPoker = {
-          ...existingPoker,
-          ...(dbSnapshot?.legacyPoker ?? {}),
-        };
-
-        localStorage.setItem("itfest_state", JSON.stringify(nextState));
-        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker));
 
         if (cancelled) return;
-        if (nextState.stories?.length) setStories(nextState.stories);
-        if (nextState.reasoningContent) setReasoningContent(nextState.reasoningContent);
-        if (nextState.evalContent) setEvalContent(nextState.evalContent);
-        if (nextState.chatMessages) setChatMessages(nextState.chatMessages);
-        if (nextState.noFrontend) setNoFrontend(nextState.noFrontend);
-        if (nextPoker.pokerSessions) setPokerSessions(nextPoker.pokerSessions);
-        if (nextPoker.storyAssignees) setStoryAssignees(nextPoker.storyAssignees);
+        if (Array.isArray(dbSnapshot?.userStories)) setStories(dbSnapshot.userStories as UserStory[]);
+        if (dbSnapshot?.legacyState?.reasoningContent) setReasoningContent(dbSnapshot.legacyState.reasoningContent as Record<string, string>);
+        if (dbSnapshot?.legacyState?.evalContent) setEvalContent(dbSnapshot.legacyState.evalContent as Record<string, string>);
+        if (dbSnapshot?.legacyState?.chatMessages) setChatMessages(dbSnapshot.legacyState.chatMessages as Record<string, ChatMessage[]>);
+        if (dbSnapshot?.legacyState?.noFrontend) setNoFrontend(dbSnapshot.legacyState.noFrontend as Record<string, boolean>);
+        if (dbSnapshot?.legacyPoker?.pokerSessions) setPokerSessions(dbSnapshot.legacyPoker.pokerSessions as Record<string, PokerSession>);
+        if (dbSnapshot?.legacyPoker?.storyAssignees) setStoryAssignees(dbSnapshot.legacyPoker.storyAssignees as Record<string, string>);
+        if (dbSnapshot?.legacyState?.evalContent && typeof dbSnapshot.legacyState.evalContent === "object") {
+          const derived: Record<string, boolean> = {};
+          for (const key of Object.keys(dbSnapshot.legacyState.evalContent as Record<string, string>)) derived[key] = true;
+          setShowEvaluator(derived);
+        }
+        if (!storyIdParam) {
+          const firstStoryId = Array.isArray(dbSnapshot?.userStories) ? dbSnapshot.userStories[0]?.id : "";
+          if (firstStoryId) setSelectedStoryId(firstStoryId);
+        }
       } catch { /* ignore */ }
       finally {
-        if (!cancelled) setMounted(true);
+        if (!cancelled) {
+          setIsHydrated(true);
+          setMounted(true);
+        }
       }
     }
 
@@ -2278,7 +2256,7 @@ function ImplementationPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, storyIdParam]);
 
   const now = () => new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
@@ -2703,42 +2681,19 @@ function ImplementationPageInner() {
   }, [stories, selectedStoryId, runningStories, runImplementation, pokerSessions]);
 
   // ---------------------------------------------------------------------------
-  // localStorage persistence — save/restore across sessions
+  // Persist project-backed implementation state
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const nextState = { stories, reasoningContent, evalContent, chatMessages, noFrontend };
-      const snapshot = JSON.stringify(nextState);
-      localStorage.setItem("itfest_state", snapshot);
-      void syncLegacySnapshots({ projectId, legacyState: nextState });
-    } catch { /* quota or SSR — ignore */ }
-  }, [stories, reasoningContent, evalContent, chatMessages, noFrontend, projectId]);
+    if (!isHydrated) return;
+    const nextState = { stories, reasoningContent, evalContent, chatMessages, noFrontend };
+    void syncLegacySnapshots({ projectId, legacyState: nextState });
+  }, [stories, reasoningContent, evalContent, chatMessages, noFrontend, isHydrated, projectId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const nextPoker = { pokerSessions, storyAssignees };
-      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker));
-      void syncLegacySnapshots({ projectId, legacyPoker: nextPoker });
-    } catch { /* quota or SSR — ignore */ }
-  }, [pokerSessions, storyAssignees, projectId]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem("itfest_state");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      // Re-derive showEvaluator from restored evalContent (lazy inits handle the rest)
-      if (parsed.evalContent) {
-        const derived: Record<string, boolean> = {};
-        for (const k of Object.keys(parsed.evalContent)) derived[k] = true;
-        setShowEvaluator(derived);
-      }
-    } catch { /* corrupt data — ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!isHydrated) return;
+    const nextPoker = { pokerSessions, storyAssignees };
+    void syncLegacySnapshots({ projectId, legacyPoker: nextPoker });
+  }, [pokerSessions, storyAssignees, isHydrated, projectId]);
 
   // Auto-run all pending stories when arriving from "Dispatch Agents"
   const autoRunFiredRef = useRef(false);
@@ -2775,37 +2730,37 @@ function ImplementationPageInner() {
     setStoryAssignees(demoStoryAssignees);
 
     if (typeof window !== "undefined") {
-      try {
-        const nextState = {
-          stories: demoStories,
-          reasoningContent: demoReasoning,
-          evalContent: demoEval,
-          chatMessages: demoChat,
-          noFrontend: demoNoFrontend,
-        };
-        const nextPoker = {
-          pokerSessions: demoPokerSessions,
-          storyAssignees: demoStoryAssignees,
-        };
-        localStorage.setItem(
-          "itfest_state",
-          JSON.stringify(nextState)
-        );
-        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker));
-        void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker });
-      } catch {
-        // ignore local persistence issues in demo mode
-      }
+      const nextState = {
+        stories: demoStories,
+        reasoningContent: demoReasoning,
+        evalContent: demoEval,
+        chatMessages: demoChat,
+        noFrontend: demoNoFrontend,
+      };
+      const nextPoker = {
+        pokerSessions: demoPokerSessions,
+        storyAssignees: demoStoryAssignees,
+      };
+      void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker });
     }
   }, [projectId]);
 
   const clearSession = useCallback(() => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("itfest_state");
-      localStorage.removeItem("itfest_poker");
-      void syncLegacySnapshots({ projectId, legacyState: {}, legacyPoker: {} });
-    }
-    setStories(stories.map((s) => ({ ...s, variants: [], status: "pending" as const, chosenVariant: undefined })));
+    void syncLegacySnapshots({
+      projectId,
+      legacyState: {},
+      legacyPoker: {},
+      replaceLegacyState: true,
+      replaceLegacyPoker: true,
+    });
+    setStories((currentStories) =>
+      currentStories.map((story) => ({
+        ...story,
+        variants: [],
+        status: "pending" as const,
+        chosenVariant: undefined,
+      }))
+    );
     setReasoningContent({});
     setEvalContent({});
     setChatMessages({});
@@ -2815,7 +2770,7 @@ function ImplementationPageInner() {
     setRerunningVariants({});
     setPokerSessions({});
     setStoryAssignees({});
-  }, []);
+  }, [projectId]);
 
   // ---------------------------------------------------------------------------
   // Planning Poker — per-story session

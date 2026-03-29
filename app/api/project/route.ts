@@ -69,7 +69,13 @@ export async function PATCH(request: NextRequest) {
     | { type: "regenerate-workspace" }
     | { type: "generate-preview" }
     | { type: "open-preview" }
-    | { type: "sync-legacy-state"; legacyState?: Record<string, unknown>; legacyPoker?: Record<string, unknown> }
+    | {
+        type: "sync-legacy-state"
+        legacyState?: Record<string, unknown>
+        legacyPoker?: Record<string, unknown>
+        replaceLegacyState?: boolean
+        replaceLegacyPoker?: boolean
+      }
     | { type: "reset-project" }
 
   switch (body.type) {
@@ -134,6 +140,8 @@ export async function PATCH(request: NextRequest) {
         await updateBrief(access.projectId, undefined, {
           legacyState: body.legacyState,
           legacyPoker: body.legacyPoker,
+          replaceLegacyState: body.replaceLegacyState,
+          replaceLegacyPoker: body.replaceLegacyPoker,
           silent: true,
         })
       )

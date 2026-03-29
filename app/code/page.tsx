@@ -9,8 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { getProjectIdFromCurrentUrl, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import {
   buildWorkspaceFromIdeState,
+  loadProjectIdeState,
+  reloadEditableWorkspaceFromProject,
   useEditableWorkspace,
-  loadIdeStateFromStorage,
   saveEditableWorkspace,
   type StoredWorkspace,
 } from "@/lib/code-viewer/workspace-store"
@@ -156,7 +157,7 @@ function cloneWorkspaceFiles(files: VirtualFile[]) {
 
 export default function CodePage() {
   const projectId = useMemo(() => getProjectIdFromCurrentUrl(), [])
-  const workspace = useEditableWorkspace()
+  const workspace = useEditableWorkspace(projectId)
   const [selectedPath, setSelectedPath] = useState("")
   const [openTabs, setOpenTabs] = useState<string[]>(() => {
     return []
@@ -166,7 +167,7 @@ export default function CodePage() {
   const [isApplyingAiEdit, setIsApplyingAiEdit] = useState(false)
   const [aiInstruction, setAiInstruction] = useState("")
   const [aiStatus, setAiStatus] = useState("")
-  const [manualStatus, setManualStatus] = useState("Autosaved locally")
+  const [manualStatus, setManualStatus] = useState("Synced with project")
 
   const lineNumberRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<HTMLTextAreaElement>(null)
@@ -180,19 +181,21 @@ export default function CodePage() {
   const selectedLines = useMemo(() => (selectedFile ? selectedFile.content.split("\n") : []), [selectedFile])
 
   function publishWorkspace(nextWorkspace: StoredWorkspace, statusMessage: string) {
-    saveEditableWorkspace(nextWorkspace)
+    saveEditableWorkspace(projectId, nextWorkspace)
     setManualStatus(statusMessage)
   }
 
-  function reloadFromAiArtifacts() {
-    const nextWorkspace = buildWorkspaceFromIdeState(loadIdeStateFromStorage())
+  async function reloadFromAiArtifacts() {
+    const ideState = await loadProjectIdeState(projectId)
+    const nextWorkspace = buildWorkspaceFromIdeState(ideState)
     const nextSelectedPath = firstInterestingFile(nextWorkspace.files)
     setSelectedPath(nextSelectedPath)
     setOpenTabs((current) => {
       const kept = current.filter((path) => nextWorkspace.files.some((file) => file.path === path))
       return kept.includes(nextSelectedPath) ? kept : nextSelectedPath ? [...kept, nextSelectedPath] : kept
     })
-    publishWorkspace(nextWorkspace, "Reloaded from AI pipeline")
+    await reloadEditableWorkspaceFromProject(projectId)
+    publishWorkspace(nextWorkspace, "Reloaded from project state")
     setAiStatus("")
   }
 
@@ -232,7 +235,7 @@ export default function CodePage() {
     }
 
     setSelectedPath(selectedFile.path)
-    publishWorkspace(nextWorkspace, "Saved locally")
+    publishWorkspace(nextWorkspace, "Synced with project")
   }
 
   async function applyAiEdit() {
@@ -250,7 +253,7 @@ export default function CodePage() {
           content: selectedFile.content,
           instruction: aiInstruction.trim(),
           workspaceFiles: files,
-          projectContext: loadIdeStateFromStorage(),
+          projectContext: workspace.ideState,
         }),
       })
 
@@ -321,7 +324,7 @@ export default function CodePage() {
               Implementation
             </Link>
             <button
-              onClick={reloadFromAiArtifacts}
+              onClick={() => { void reloadFromAiArtifacts() }}
               className="flex items-center gap-1.5 rounded-lg border border-[#007acc]/30 bg-[#007acc]/10 px-3 py-1.5 text-xs font-semibold text-[#4fc1ff] transition-colors hover:bg-[#007acc]/15"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span>

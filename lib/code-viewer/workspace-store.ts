@@ -1,12 +1,17 @@
+import { useEffect, useSyncExternalStore } from "react"
+
+import {
+  buildStoredIdeStateFromProject,
+  fetchProjectSnapshot,
+  syncLegacySnapshots,
+} from "@/lib/backend/project-client"
 import {
   buildVirtualFilesFromState,
   type StoredIdeState,
   type VirtualFile,
   type VirtualFileBuildResult,
 } from "@/lib/code-viewer/virtual-files"
-import { useSyncExternalStore } from "react"
 
-export const CODE_WORKSPACE_STORAGE_KEY = "itfest_code_workspace_v1"
 export const CODE_WORKSPACE_BROADCAST_CHANNEL = "itfest-code-workspace"
 const CODE_WORKSPACE_INTERNAL_EVENT = "itfest-code-workspace-updated"
 
@@ -16,6 +21,7 @@ export type StoredWorkspace = {
   variantCount: number
   selectedVariantCount: number
   updatedAt: string
+  ideState: StoredIdeState | null
 }
 
 const EMPTY_WORKSPACE_RESULT = buildVirtualFilesFromState(null)
@@ -25,10 +31,25 @@ const EMPTY_WORKSPACE: StoredWorkspace = {
   variantCount: EMPTY_WORKSPACE_RESULT.variantCount,
   selectedVariantCount: EMPTY_WORKSPACE_RESULT.selectedVariantCount,
   updatedAt: "",
+  ideState: null,
 }
 
-let cachedSnapshotKey = "__empty__"
-let cachedSnapshot: StoredWorkspace = EMPTY_WORKSPACE
+const workspaceCache = new Map<string, StoredWorkspace>()
+const syncTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function emitWorkspaceChange() {
+  if (typeof window === "undefined") return
+
+  window.dispatchEvent(new Event(CODE_WORKSPACE_INTERNAL_EVENT))
+
+  try {
+    const channel = new BroadcastChannel(CODE_WORKSPACE_BROADCAST_CHANNEL)
+    channel.postMessage({ type: "workspace-updated" })
+    channel.close()
+  } catch {
+    // BroadcastChannel is best-effort only.
+  }
+}
 
 function isValidVirtualFile(value: unknown): value is VirtualFile {
   if (!value || typeof value !== "object") return false
@@ -41,127 +62,161 @@ function isValidVirtualFile(value: unknown): value is VirtualFile {
   )
 }
 
-function toStoredWorkspace(result: VirtualFileBuildResult): StoredWorkspace {
+function isStoredWorkspace(value: unknown): value is StoredWorkspace {
+  if (!value || typeof value !== "object") return false
+  const workspace = value as Partial<StoredWorkspace>
+  return (
+    Array.isArray(workspace.files) &&
+    workspace.files.every(isValidVirtualFile) &&
+    typeof workspace.storyCount === "number" &&
+    typeof workspace.variantCount === "number" &&
+    typeof workspace.selectedVariantCount === "number" &&
+    typeof workspace.updatedAt === "string"
+  )
+}
+
+function toStoredWorkspace(result: VirtualFileBuildResult, ideState: StoredIdeState | null): StoredWorkspace {
   return {
     files: result.files,
     storyCount: result.storyCount,
     variantCount: result.variantCount,
     selectedVariantCount: result.selectedVariantCount,
     updatedAt: new Date().toISOString(),
+    ideState,
   }
 }
 
 export function buildWorkspaceFromIdeState(state: StoredIdeState | null | undefined) {
-  return toStoredWorkspace(buildVirtualFilesFromState(state))
+  return toStoredWorkspace(buildVirtualFilesFromState(state), state ?? null)
 }
 
-export function loadEditableWorkspace() {
-  if (typeof window === "undefined") return null
+async function persistWorkspace(projectId: string, workspace: StoredWorkspace) {
+  const project = await fetchProjectSnapshot(projectId)
+  if (!project) return
 
-  try {
-    const raw = localStorage.getItem(CODE_WORKSPACE_STORAGE_KEY)
-    if (!raw) return null
-
-    const parsed = JSON.parse(raw) as Partial<StoredWorkspace>
-    const files = Array.isArray(parsed.files) ? parsed.files.filter(isValidVirtualFile) : []
-    if (files.length === 0) return null
-
-    return {
-      files,
-      storyCount: typeof parsed.storyCount === "number" ? parsed.storyCount : 0,
-      variantCount: typeof parsed.variantCount === "number" ? parsed.variantCount : 0,
-      selectedVariantCount: typeof parsed.selectedVariantCount === "number" ? parsed.selectedVariantCount : 0,
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
-    } satisfies StoredWorkspace
-  } catch {
-    return null
+  const legacyState = {
+    ...(project.legacyState ?? {}),
+    ...buildStoredIdeStateFromProject(project),
+    codeWorkspace: workspace,
   }
+
+  await syncLegacySnapshots({
+    projectId,
+    legacyState,
+    legacyPoker: project.legacyPoker ?? {},
+  })
 }
 
-export function loadIdeStateFromStorage() {
-  if (typeof window === "undefined") return null
+function scheduleWorkspaceSync(projectId: string, workspace: StoredWorkspace) {
+  const pending = syncTimers.get(projectId)
+  if (pending) clearTimeout(pending)
 
-  try {
-    const raw = localStorage.getItem("itfest_state")
-    return raw ? (JSON.parse(raw) as StoredIdeState) : null
-  } catch {
-    return null
+  const timer = setTimeout(() => {
+    syncTimers.delete(projectId)
+    void persistWorkspace(projectId, workspace)
+  }, 300)
+
+  syncTimers.set(projectId, timer)
+}
+
+export async function loadProjectIdeState(projectId: string) {
+  const project = await fetchProjectSnapshot(projectId)
+  return buildStoredIdeStateFromProject(project)
+}
+
+export async function hydrateEditableWorkspace(projectId: string) {
+  if (!projectId) return EMPTY_WORKSPACE
+
+  const project = await fetchProjectSnapshot(projectId)
+  if (!project) {
+    workspaceCache.set(projectId, EMPTY_WORKSPACE)
+    emitWorkspaceChange()
+    return EMPTY_WORKSPACE
   }
+
+  const ideState = buildStoredIdeStateFromProject(project)
+  const codeWorkspace = (project.legacyState as Record<string, unknown> | undefined)?.codeWorkspace
+  const nextWorkspace =
+    isStoredWorkspace(codeWorkspace)
+      ? {
+          ...codeWorkspace,
+          ideState,
+        }
+      : buildWorkspaceFromIdeState(ideState)
+
+  workspaceCache.set(projectId, nextWorkspace)
+  emitWorkspaceChange()
+  return nextWorkspace
 }
 
-export function loadOrBuildEditableWorkspace() {
-  const existing = loadEditableWorkspace()
-  if (existing) return existing
-
-  return buildWorkspaceFromIdeState(loadIdeStateFromStorage())
+export function getEditableWorkspaceSnapshot(projectId: string) {
+  return workspaceCache.get(projectId) ?? EMPTY_WORKSPACE
 }
 
-export function saveEditableWorkspace(workspace: StoredWorkspace) {
-  if (typeof window === "undefined") return
-
+export function saveEditableWorkspace(projectId: string, workspace: StoredWorkspace) {
   const next = {
     ...workspace,
     updatedAt: new Date().toISOString(),
   }
 
-  localStorage.setItem(CODE_WORKSPACE_STORAGE_KEY, JSON.stringify(next))
-  cachedSnapshotKey = `workspace:${JSON.stringify(next)}`
-  cachedSnapshot = next
-  window.dispatchEvent(new Event(CODE_WORKSPACE_INTERNAL_EVENT))
+  workspaceCache.set(projectId, next)
+  emitWorkspaceChange()
+  scheduleWorkspaceSync(projectId, next)
 }
 
-export function clearEditableWorkspace() {
-  if (typeof window === "undefined") return
-  localStorage.removeItem(CODE_WORKSPACE_STORAGE_KEY)
-  const next = buildWorkspaceFromIdeState(loadIdeStateFromStorage())
-  cachedSnapshotKey = `ide:${JSON.stringify(loadIdeStateFromStorage())}`
-  cachedSnapshot = next
-  window.dispatchEvent(new Event(CODE_WORKSPACE_INTERNAL_EVENT))
+export async function clearEditableWorkspace(projectId: string) {
+  const ideState = await loadProjectIdeState(projectId)
+  const next = buildWorkspaceFromIdeState(ideState)
+  workspaceCache.set(projectId, next)
+  emitWorkspaceChange()
+  scheduleWorkspaceSync(projectId, next)
 }
 
-function subscribeWorkspace(listener: () => void) {
+export async function reloadEditableWorkspaceFromProject(projectId: string) {
+  const ideState = await loadProjectIdeState(projectId)
+  const next = buildWorkspaceFromIdeState(ideState)
+  workspaceCache.set(projectId, next)
+  emitWorkspaceChange()
+  scheduleWorkspaceSync(projectId, next)
+  return next
+}
+
+function subscribeWorkspace(projectId: string, listener: () => void) {
   if (typeof window === "undefined") return () => {}
 
-  const handleStorage = (event: StorageEvent) => {
-    if (!event.key || event.key === CODE_WORKSPACE_STORAGE_KEY) listener()
-  }
+  const handleInternal = () => listener()
+  window.addEventListener(CODE_WORKSPACE_INTERNAL_EVENT, handleInternal)
 
-  window.addEventListener("storage", handleStorage)
-  window.addEventListener(CODE_WORKSPACE_INTERNAL_EVENT, listener)
+  let channel: BroadcastChannel | null = null
+  try {
+    channel = new BroadcastChannel(CODE_WORKSPACE_BROADCAST_CHANNEL)
+    channel.onmessage = () => listener()
+  } catch {
+    channel = null
+  }
 
   return () => {
-    window.removeEventListener("storage", handleStorage)
-    window.removeEventListener(CODE_WORKSPACE_INTERNAL_EVENT, listener)
+    window.removeEventListener(CODE_WORKSPACE_INTERNAL_EVENT, handleInternal)
+    if (channel) channel.close()
   }
 }
 
-function getServerWorkspaceSnapshot() {
-  return EMPTY_WORKSPACE
-}
+export function useEditableWorkspace(projectId: string) {
+  useEffect(() => {
+    if (!projectId) return
 
-function getClientWorkspaceSnapshot() {
-  if (typeof window === "undefined") return EMPTY_WORKSPACE
+    const unsubscribe = subscribeWorkspace(projectId, () => undefined)
 
-  const rawWorkspace = localStorage.getItem(CODE_WORKSPACE_STORAGE_KEY)
-  if (rawWorkspace) {
-    const nextKey = `workspace:${rawWorkspace}`
-    if (cachedSnapshotKey === nextKey) return cachedSnapshot
+    if (!workspaceCache.has(projectId)) {
+      void hydrateEditableWorkspace(projectId)
+    }
 
-    const parsed = loadEditableWorkspace()
-    cachedSnapshotKey = nextKey
-    cachedSnapshot = parsed ?? EMPTY_WORKSPACE
-    return cachedSnapshot
-  }
+    return unsubscribe
+  }, [projectId])
 
-  const rawIdeState = localStorage.getItem("itfest_state")
-  const nextKey = `ide:${rawIdeState ?? ""}`
-  if (cachedSnapshotKey === nextKey) return cachedSnapshot
-
-  cachedSnapshotKey = nextKey
-  cachedSnapshot = buildWorkspaceFromIdeState(loadIdeStateFromStorage())
-  return cachedSnapshot
-}
-
-export function useEditableWorkspace() {
-  return useSyncExternalStore(subscribeWorkspace, getClientWorkspaceSnapshot, getServerWorkspaceSnapshot)
+  return useSyncExternalStore(
+    (listener) => subscribeWorkspace(projectId, listener),
+    () => getEditableWorkspaceSnapshot(projectId),
+    () => EMPTY_WORKSPACE
+  )
 }

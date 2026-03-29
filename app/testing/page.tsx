@@ -46,13 +46,7 @@ function TestingPageInner() {
 
     async function hydratePage() {
       try {
-        const existingState = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-        const existingPoker = JSON.parse(localStorage.getItem("itfest_poker") || "{}")
         const dbSnapshot = await hydrateLegacySnapshots(projectId)
-        const nextState = { ...existingState, ...(dbSnapshot?.legacyState ?? {}) }
-        const nextPoker = { ...existingPoker, ...(dbSnapshot?.legacyPoker ?? {}) }
-        localStorage.setItem("itfest_state", JSON.stringify(nextState))
-        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
       } catch {
         // ignore hydration failures
       } finally {
@@ -128,32 +122,25 @@ function TestingPageInner() {
         }
       )
 
-      // Build merged code from localStorage
-      try {
-        const raw = localStorage.getItem("itfest_state")
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          const files: Record<string, string> = {}
-          if (parsed.stories) {
-            for (const selection of selections) {
-              const story = parsed.stories.find((s: { id: string }) => s.id === selection.id)
-              if (story?.variants) {
-                const variant = story.variants.find((v: { id: string }) => v.id.includes(selection.variant))
-                if (variant) {
-                  if (variant.backend?.content) files[`/src/${story.id}/backend.ts`] = variant.backend.content
-                  if (variant.frontend?.content) files[`/src/${story.id}/frontend.tsx`] = variant.frontend.content
-                }
-              }
+      const dbSnapshot = await hydrateLegacySnapshots(projectId)
+      const files: Record<string, string> = {}
+      const stories = Array.isArray(dbSnapshot?.userStories) ? dbSnapshot.userStories : []
+      if (stories.length > 0) {
+        for (const selection of selections) {
+          const story = stories.find((s: { id: string }) => s.id === selection.id)
+          if (story?.variants) {
+            const variant = story.variants.find((v: { id: string }) => v.id.includes(selection.variant))
+            if (variant) {
+              if (variant.backend?.content) files[`/src/${story.id}/backend.ts`] = variant.backend.content
+              if (variant.frontend?.content) files[`/src/${story.id}/frontend.tsx`] = variant.frontend.content
             }
-            // Generate basic app structure
-            files["/package.json"] = JSON.stringify({ name: "merged-project", dependencies: { react: "^18", "react-dom": "^18", next: "^14" } }, null, 2)
-            files["/src/app/page.tsx"] = `export default function Home() {\n  return <div className="p-8"><h1 className="text-2xl font-bold">Merged Project</h1><p>${selections.length} stories integrated</p></div>\n}`
-            files["/src/app/layout.tsx"] = `export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return <html><body>{children}</body></html>\n}`
           }
-          setMergedCode(files)
-          void syncLegacySnapshots({ projectId, legacyState: parsed })
         }
-      } catch { /* ignore */ }
+        files["/package.json"] = JSON.stringify({ name: "merged-project", dependencies: { react: "^18", "react-dom": "^18", next: "^14" } }, null, 2)
+        files["/src/app/page.tsx"] = `export default function Home() {\n  return <div className="p-8"><h1 className="text-2xl font-bold">Merged Project</h1><p>${selections.length} stories integrated</p></div>\n}`
+        files["/src/app/layout.tsx"] = `export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return <html><body>{children}</body></html>\n}`
+      }
+      setMergedCode(files)
 
       setMergePhase("done")
     } catch (err) {
@@ -200,25 +187,14 @@ function TestingPageInner() {
     setMergedCode(DEMO_MERGED_CODE)
     setMergePhase("done")
 
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      const nextState = {
-        ...existing,
-        stories: demoStories,
-      }
-      const nextPoker = {
-        pokerSessions: createDemoPokerSessions(),
-        storyAssignees: createDemoStoryAssignees(),
-      }
-      localStorage.setItem(
-        "itfest_state",
-        JSON.stringify(nextState)
-      )
-      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
-      void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
-    } catch {
-      // ignore demo persistence issues
+    const nextState = {
+      stories: demoStories,
     }
+    const nextPoker = {
+      pokerSessions: createDemoPokerSessions(),
+      storyAssignees: createDemoStoryAssignees(),
+    }
+    void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
   }
 
   if (!isHydrated) {

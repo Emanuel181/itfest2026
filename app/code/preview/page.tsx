@@ -142,7 +142,7 @@ function buildCssBundle(files: VirtualFile[]) {
 
 export default function CodePreviewPage() {
   const projectId = useMemo(() => getProjectIdFromCurrentUrl(), [])
-  const workspace = useEditableWorkspace()
+  const workspace = useEditableWorkspace(projectId)
   const previewItems = useMemo(() => buildPreviewItems(workspace.files), [workspace.files])
   const cssBundle = useMemo(() => buildCssBundle(workspace.files), [workspace.files])
   const [activeItemId, setActiveItemId] = useState("")

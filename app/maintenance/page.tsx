@@ -62,12 +62,9 @@ function MaintenancePageInner() {
 
     async function hydratePage() {
       try {
-        const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
         const dbSnapshot = await hydrateLegacySnapshots(projectId)
-        const nextState = { ...existing, ...(dbSnapshot?.legacyState ?? {}) }
-        localStorage.setItem("itfest_state", JSON.stringify(nextState))
-        if (!cancelled && Array.isArray(nextState.stories)) {
-          setStoriesCount(nextState.stories.length)
+        if (!cancelled && Array.isArray(dbSnapshot?.userStories)) {
+          setStoriesCount(dbSnapshot.userStories.length)
         }
       } catch { /* ignore */ }
       finally {
@@ -86,24 +83,18 @@ function MaintenancePageInner() {
     setStreamContent("")
     setReport(null)
 
-    // Collect all code from localStorage
     let codeContext = ""
-    try {
-      const raw = localStorage.getItem("itfest_state")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.stories) {
-          for (const story of parsed.stories) {
-            if (story.variants) {
-              for (const variant of story.variants) {
-                if (variant.backend?.content) codeContext += `\n--- Backend (${story.id}/${variant.id}) ---\n${variant.backend.content}`
-                if (variant.frontend?.content) codeContext += `\n--- Frontend (${story.id}/${variant.id}) ---\n${variant.frontend.content}`
-              }
-            }
+    const dbSnapshot = await hydrateLegacySnapshots(projectId)
+    if (Array.isArray(dbSnapshot?.userStories)) {
+      for (const story of dbSnapshot.userStories) {
+        if (story.variants) {
+          for (const variant of story.variants) {
+            if (variant.backend?.content) codeContext += `\n--- Backend (${story.id}/${variant.id}) ---\n${variant.backend.content}`
+            if (variant.frontend?.content) codeContext += `\n--- Frontend (${story.id}/${variant.id}) ---\n${variant.frontend.content}`
           }
         }
       }
-    } catch { /* ignore */ }
+    }
 
     if (!codeContext) codeContext = "No implementation code available for audit."
 
@@ -142,20 +133,10 @@ function MaintenancePageInner() {
     setReport(DEMO_SECURITY_REPORT)
     setStoriesCount((current) => (current > 0 ? current : createDemoImplementedStories().length))
 
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      const nextState = {
-        ...existing,
-        stories: existing.stories ?? createDemoImplementedStories(),
-      }
-      localStorage.setItem(
-        "itfest_state",
-        JSON.stringify(nextState)
-      )
-      void syncLegacySnapshots({ projectId, legacyState: nextState })
-    } catch {
-      // ignore demo persistence issues
+    const nextState = {
+      stories: createDemoImplementedStories(),
     }
+    void syncLegacySnapshots({ projectId, legacyState: nextState })
   }
 
   const severityConfig = {
