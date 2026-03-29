@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import type { CSSProperties } from "react"
 import { useMemo, useState } from "react"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import {
@@ -19,6 +20,22 @@ type PreviewItem = {
   labels: string[]
   acceptanceCriteria: string[]
   sourcePath: string
+  rootTag: "main" | "section" | "div" | "article"
+  rootClassName: string
+  rootStyle: CSSProperties
+}
+
+const TAILWIND_COLOR_MAP: Record<string, string> = {
+  "bg-red-500": "#ef4444",
+  "bg-red-600": "#dc2626",
+  "bg-red-700": "#b91c1c",
+  "bg-blue-500": "#3b82f6",
+  "bg-emerald-500": "#10b981",
+  "bg-black": "#000000",
+  "bg-white": "#ffffff",
+  "text-white": "#ffffff",
+  "text-black": "#000000",
+  "text-red-500": "#ef4444",
 }
 
 function extractPreviewCopy(file: VirtualFile) {
@@ -31,6 +48,53 @@ function extractPreviewCopy(file: VirtualFile) {
   }
 }
 
+function extractRootElement(file: VirtualFile) {
+  const tagMatch = file.content.match(/<(main|section|div|article)\b([^>]*)>/i)
+  const tag = (tagMatch?.[1]?.toLowerCase() as PreviewItem["rootTag"] | undefined) ?? "main"
+  const attrs = tagMatch?.[2] ?? ""
+
+  const classMatch = attrs.match(/className\s*=\s*(?:"([^"]*)"|'([^']*)')/)
+  const rootClassName = classMatch?.[1] ?? classMatch?.[2] ?? ""
+
+  const styleMatch = file.content.match(/style=\{\{([\s\S]*?)\}\}/)
+  const rootStyle = parseInlineStyle(styleMatch?.[1] ?? "", rootClassName)
+
+  return { rootTag: tag, rootClassName, rootStyle }
+}
+
+function parseInlineStyle(styleSource: string, className: string): CSSProperties {
+  const style: CSSProperties = {}
+
+  const propertyPatterns: Array<{ key: keyof CSSProperties; pattern: RegExp }> = [
+    { key: "background", pattern: /background\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "backgroundColor", pattern: /backgroundColor\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "color", pattern: /color\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "padding", pattern: /padding\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "borderRadius", pattern: /borderRadius\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "fontFamily", pattern: /fontFamily\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "maxWidth", pattern: /maxWidth\s*:\s*["'`]([^"'`]+)["'`]/i },
+    { key: "margin", pattern: /margin\s*:\s*["'`]([^"'`]+)["'`]/i },
+  ]
+
+  for (const property of propertyPatterns) {
+    const match = styleSource.match(property.pattern)
+    if (match?.[1]) {
+      style[property.key] = match[1] as never
+    }
+  }
+
+  for (const token of className.split(/\s+/).filter(Boolean)) {
+    if (token.startsWith("bg-") && TAILWIND_COLOR_MAP[token] && !style.background && !style.backgroundColor) {
+      style.backgroundColor = TAILWIND_COLOR_MAP[token]
+    }
+    if (token.startsWith("text-") && TAILWIND_COLOR_MAP[token] && !style.color) {
+      style.color = TAILWIND_COLOR_MAP[token]
+    }
+  }
+
+  return style
+}
+
 function buildPreviewItems(files: VirtualFile[]): PreviewItem[] {
   const previewFiles = files.filter(
     (file) => file.path.endsWith("frontend.tsx") || file.path === "src/app/page.tsx"
@@ -41,6 +105,7 @@ function buildPreviewItems(files: VirtualFile[]): PreviewItem[] {
     const storyId = segments.includes("generated") ? segments[segments.indexOf("generated") + 1] ?? "WORKSPACE" : "MERGED"
     const variantId = segments.includes("generated") ? segments[segments.indexOf("generated") + 2] ?? "A" : "APP"
     const previewCopy = extractPreviewCopy(file)
+    const rootElement = extractRootElement(file)
 
     return {
       id: file.path,
@@ -52,13 +117,30 @@ function buildPreviewItems(files: VirtualFile[]): PreviewItem[] {
       labels: [],
       acceptanceCriteria: [],
       sourcePath: file.path,
+      rootTag: rootElement.rootTag,
+      rootClassName: rootElement.rootClassName,
+      rootStyle: rootElement.rootStyle,
     }
   })
+}
+
+function scopeCssForPreview(css: string) {
+  return css
+    .replace(/\bhtml\b/g, "[data-preview-canvas]")
+    .replace(/\bbody\b/g, "[data-preview-canvas]")
+}
+
+function buildCssBundle(files: VirtualFile[]) {
+  return files
+    .filter((file) => file.path.endsWith(".css") || file.path.endsWith(".scss"))
+    .map((file) => `/* ${file.path} */\n${scopeCssForPreview(file.content)}`)
+    .join("\n\n")
 }
 
 export default function CodePreviewPage() {
   const workspace = useEditableWorkspace()
   const previewItems = useMemo(() => buildPreviewItems(workspace.files), [workspace.files])
+  const cssBundle = useMemo(() => buildCssBundle(workspace.files), [workspace.files])
   const [activeItemId, setActiveItemId] = useState("")
 
   const activeItem = useMemo(
@@ -79,6 +161,7 @@ export default function CodePreviewPage() {
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f8f6ef]">
+        {cssBundle ? <style>{cssBundle}</style> : null}
         <header className="flex items-center justify-between border-b border-[#e6ddce] bg-white/85 px-6 py-3 backdrop-blur">
           <div className="flex items-center gap-3">
             <h1 className="font-serif text-lg font-bold text-[#1e1d1b]">Generated Preview</h1>
@@ -193,9 +276,26 @@ export default function CodePreviewPage() {
                       <article className="rounded-[24px] bg-[#faf6ee] p-5">
                         <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7e54]">Rendering Model</div>
                         <p className="mt-3 text-sm leading-6 text-[#4f4a43]">
-                          The shell is derived from the current frontend code and updates as soon as the file contents change.
+                          The shell is derived from the current frontend code and applies any CSS files from the editable workspace live.
                         </p>
                       </article>
+                    </div>
+
+                    <div className="mt-10 rounded-[28px] border border-[#efe7d8] bg-[#fffaf0] p-4">
+                      <div className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#9c7e54]">Live Canvas</div>
+                      <div className="overflow-hidden rounded-[24px] border border-[#e7dcc8] bg-white shadow-[0_12px_35px_rgba(88,64,32,0.08)]">
+                        <div className="flex items-center gap-2 border-b border-[#efe7d8] bg-[#fbf6ec] px-4 py-2">
+                          <div className="flex gap-1.5">
+                            <div className="size-2.5 rounded-full bg-[#ff8f8f]" />
+                            <div className="size-2.5 rounded-full bg-[#ffd36a]" />
+                            <div className="size-2.5 rounded-full bg-[#7ce7a2]" />
+                          </div>
+                          <div className="ml-2 text-[11px] text-[#7e776b]">{activeItem.sourcePath}</div>
+                        </div>
+                        <div data-preview-canvas className="min-h-[340px] bg-white p-6">
+                          <PreviewCanvas item={activeItem} />
+                        </div>
+                      </div>
                     </div>
 
                     {activeItem.acceptanceCriteria.length > 0 ? (
@@ -221,5 +321,20 @@ export default function CodePreviewPage() {
         )}
       </main>
     </div>
+  )
+}
+
+function PreviewCanvas({ item }: { item: PreviewItem }) {
+  const Tag = item.rootTag
+
+  return (
+    <Tag
+      className={item.rootClassName || undefined}
+      style={item.rootStyle}
+      data-preview-root=""
+    >
+      <h1>{item.headline}</h1>
+      <p>{item.summary}</p>
+    </Tag>
   )
 }

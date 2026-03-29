@@ -43,7 +43,14 @@ function parseDocument(value: unknown) {
 }
 
 function detectKind(path: string): VirtualFile["kind"] {
-  if (path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".js") || path.endsWith(".jsx")) return "code"
+  if (
+    path.endsWith(".ts") ||
+    path.endsWith(".tsx") ||
+    path.endsWith(".js") ||
+    path.endsWith(".jsx") ||
+    path.endsWith(".css") ||
+    path.endsWith(".scss")
+  ) return "code"
   if (path.endsWith(".json")) return "json"
   if (path.endsWith(".md")) return "markdown"
   return "text"

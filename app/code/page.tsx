@@ -91,6 +91,7 @@ function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
 function fileIcon(path: string) {
   if (path.endsWith(".tsx") || path.endsWith(".jsx")) return "javascript"
   if (path.endsWith(".ts") || path.endsWith(".js")) return "code"
+  if (path.endsWith(".css") || path.endsWith(".scss")) return "palette"
   if (path.endsWith(".json")) return "data_object"
   if (path.endsWith(".md")) return "description"
   return "draft"
@@ -125,6 +126,8 @@ function originLabel(origin: VirtualFile["origin"]) {
 function languageLabel(path: string) {
   if (path.endsWith(".tsx")) return "TypeScript React"
   if (path.endsWith(".ts")) return "TypeScript"
+  if (path.endsWith(".css")) return "CSS"
+  if (path.endsWith(".scss")) return "SCSS"
   if (path.endsWith(".json")) return "JSON"
   if (path.endsWith(".md")) return "Markdown"
   return "Plain Text"
@@ -242,6 +245,8 @@ export default function CodePage() {
           path: selectedFile.path,
           content: selectedFile.content,
           instruction: aiInstruction.trim(),
+          workspaceFiles: files,
+          projectContext: loadIdeStateFromStorage(),
         }),
       })
 
