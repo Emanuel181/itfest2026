@@ -14,8 +14,8 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: "Luminescent IDE",
-  description: "Responsive ideation dashboard integrated in Next.js",
+  title: "AgenticSDLC",
+  description: "AI-native IDE for collaborative SDLC",
 }
 
 export default function RootLayout({
@@ -34,6 +34,9 @@ export default function RootLayout({
         spaceGrotesk.variable
       )}
     >
+      <head>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+      </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"

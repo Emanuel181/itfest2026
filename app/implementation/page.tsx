@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
+import { SDLCSidebar } from "@/components/sdlc-sidebar";
 
 import type {
   UserStory,
@@ -985,7 +986,7 @@ function VariantGrid({ story, reasoningContent, noFrontend, onRerunOrchestrator,
         orchLines.slice(from + 1, to).map((l) => l.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean);
       const doneItems    = completedIdx >= 0 ? extractItems(completedIdx, pendingIdx >= 0 ? pendingIdx : undefined) : [];
       const pendingItems = pendingIdx   >= 0 ? extractItems(pendingIdx) : [];
-      result[v] = [...doneItems, ...pendingItems];
+      result[v] = [...doneItems, ...pendingItems].slice(0, 8);
     }
     return result;
   })();
@@ -1672,7 +1673,7 @@ function VariantCard({
     orchLines.slice(from + 1, to).map((l) => l.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean);
   const doneItems    = completedIdx >= 0 ? extractItems(completedIdx, pendingIdx >= 0 ? pendingIdx : undefined) : [];
   const pendingItems = pendingIdx   >= 0 ? extractItems(pendingIdx) : [];
-  const allSteps = [...doneItems, ...pendingItems];
+  const allSteps = [...doneItems, ...pendingItems].slice(0, 8);
 
   // Security parsing
   let secIssues: SecIssue[] = [];
@@ -2174,63 +2175,6 @@ function GlobalEvaluatorPanel({
 // ---------------------------------------------------------------------------
 // Sidebar — Pipeline Stepper
 // ---------------------------------------------------------------------------
-function Sidebar() {
-  const steps = [
-    { label: "Ideation",        icon: "lightbulb",        href: "#"                },
-    { label: "Requirements",    icon: "assignment",       href: "#"                },
-    { label: "User Stories",    icon: "group",            href: "#"                },
-    { label: "Planning",        icon: "event_note",       href: "#"                },
-    { label: "Analysis",        icon: "code",             href: "/analysis"        },
-    { label: "Implementation",  icon: "construction",     href: "/implementation"  },
-    { label: "Merge",           icon: "call_merge",       href: "#"                },
-    { label: "Dashboard",       icon: "dashboard",        href: "#"                },
-  ];
-  const activeIdx = 5; // Implementation
-
-  return (
-    <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#201f1f] border-r border-[#3c4a42]/20 z-40 flex flex-col py-6 px-4">
-      <div className="flex flex-col flex-1">
-        {steps.map((step, idx) => {
-          const isActive = idx === activeIdx;
-          return (
-            <div key={step.label} className="flex flex-col">
-              <a href={step.href} className="flex items-center gap-3">
-                {/* Circle node */}
-                <div
-                  className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm shrink-0 transition-all",
-                    isActive
-                      ? "border-[#4edea3] bg-[#4edea3]/10 text-[#4edea3] glow-pulse"
-                      : "border-[#474746] bg-transparent text-[#474746]"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-sm">{step.icon}</span>
-                </div>
-                {/* Label */}
-                <span
-                  className={cn(
-                    "text-xs uppercase tracking-widest font-bold transition-colors",
-                    isActive ? "text-[#4edea3]" : "text-[#474746]"
-                  )}
-                >
-                  {step.label}
-                </span>
-              </a>
-
-              {/* Connector line */}
-              {idx < steps.length - 1 && (
-                <div className="w-0.5 h-6 mx-auto bg-[#3c4a42]/40 my-0.5" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Bottom label */}
-    </aside>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
@@ -2240,16 +2184,8 @@ function ImplementationPageInner() {
   const storyIdParam = searchParams.get("story") ?? "";
   const autoRun = searchParams.get("autorun") === "1";
 
-  const [stories, setStories] = useState<UserStory[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem("itfest_state");
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (parsed.stories) return parsed.stories;
-    } catch { /* ignore */ }
-    return [];
-  });
+  const [stories, setStories] = useState<UserStory[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [runningStories, setRunningStories] = useState<Record<string, boolean>>({});
   const [showEvaluator, setShowEvaluator] = useState<Record<string, boolean>>({});
   const [evalContent, setEvalContent] = useState<Record<string, string>>(() => {
@@ -2293,6 +2229,18 @@ function ImplementationPageInner() {
   const [drawerStoryId, setDrawerStoryId] = useState<string | null>(null);
   const addLog = useCallback((_log: Omit<ActivityLog, "id">) => {}, []);
 
+  // Hydrate from localStorage on mount
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const raw = localStorage.getItem("itfest_state");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.stories?.length) setStories(parsed.stories);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const now = () => new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
@@ -2326,7 +2274,11 @@ function ImplementationPageInner() {
       if (runningStories[storyId]) return;
       setRunningStories((p) => ({ ...p, [storyId]: true }));
 
-      const story = stories.find((s) => s.id === storyId)!;
+      const story = stories.find((s) => s.id === storyId);
+      if (!story) {
+        setRunningStories((p) => ({ ...p, [storyId]: false }));
+        return;
+      }
 
       const initVariants: ImplementationVariant[] = (["A", "B", "C"] as VariantId[]).map((id) => ({
         ...makeVariant(id),
@@ -2460,31 +2412,31 @@ function ImplementationPageInner() {
       await sleep(800);
       addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-[#c8c6c5]", message: `All 3 variants complete for ${storyId}. Running evaluation…`, timestamp: now(), type: "evaluator", progress: 95 });
 
+      // Read current variant content from state via a synchronous snapshot
+      let evalContext = "";
       setStories((prev) => {
         const storyNow = prev.find((s) => s.id === storyId);
-        const evalContext = storyNow?.variants.map((v) =>
+        evalContext = storyNow?.variants.map((v) =>
           `Variant ${v.id}:\nBackend:\n${v.backend.content}\n\nFrontend:\n${v.frontend.content}`
         ).join("\n\n---\n\n") ?? "";
-
-        callAgentStream(
-          { ...base, role: "evaluator", context: evalContext },
-          () => {}
-        ).then((evalResult) => {
-          setEvalContent((p) => ({ ...p, [storyId]: evalResult }));
-          addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-[#c8c6c5]", message: `Evaluation ready. Choose your variant for ${storyId}.`, timestamp: now(), type: "evaluator" });
-          setStories((p2) => p2.map((s) => (s.id === storyId ? { ...s, status: "evaluating" } : s)));
-          setShowEvaluator((p) => ({ ...p, [storyId]: true }));
-          setRunningStories((p) => ({ ...p, [storyId]: false }));
-        }).catch(() => {
-          setStories((p2) => p2.map((s) => (s.id === storyId ? { ...s, status: "evaluating" } : s)));
-          setShowEvaluator((p) => ({ ...p, [storyId]: true }));
-          setRunningStories((p) => ({ ...p, [storyId]: false }));
-        });
-
         return prev;
       });
+
+      // Run evaluator outside the state setter
+      try {
+        const evalResult = await callAgentStream(
+          { ...base, role: "evaluator", context: evalContext },
+          () => {}
+        );
+        setEvalContent((p) => ({ ...p, [storyId]: evalResult }));
+        addLog({ agent: "GLOBAL EVALUATOR", agentColor: "text-[#c8c6c5]", message: `Evaluation ready. Choose your variant for ${storyId}.`, timestamp: now(), type: "evaluator" });
+      } catch { /* ignore */ }
+
+      setStories((p2) => p2.map((s) => (s.id === storyId ? { ...s, status: "evaluating" } : s)));
+      setShowEvaluator((p) => ({ ...p, [storyId]: true }));
+      setRunningStories((p) => ({ ...p, [storyId]: false }));
     },
-    [runningStories, addLog, patchVariant, pokerSessions]
+    [stories, runningStories, addLog, patchVariant, pokerSessions]
   );
 
   const chooseVariant = useCallback((storyId: string, v: VariantId) => {
@@ -2701,7 +2653,7 @@ function ImplementationPageInner() {
       const meta = e.metaKey || e.ctrlKey;
       if (meta && e.key === "Enter") {
         const story = stories.find((s) => s.id === selectedStoryId);
-        if (story?.status === "pending" && !runningStories[selectedStoryId] && pokerSessions[selectedStoryId]?.phase === "done") {
+        if (story?.status === "pending" && !runningStories[selectedStoryId]) {
           e.preventDefault();
           stories.filter((s) => s.status === "pending" && !runningStories[s.id]).forEach((s) => runImplementation(s.id));
         }
@@ -2748,14 +2700,14 @@ function ImplementationPageInner() {
   // Auto-run all pending stories when arriving from "Dispatch Agents"
   const autoRunFiredRef = useRef(false);
   useEffect(() => {
-    if (!autoRun || autoRunFiredRef.current) return;
+    if (!autoRun || autoRunFiredRef.current || !mounted || stories.length === 0) return;
     autoRunFiredRef.current = true;
     const pending = stories.filter((s) => s.status === "pending" && !runningStories[s.id]);
     if (pending.length > 0) {
       pending.forEach((s) => runImplementation(s.id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, runImplementation]);
+  }, [autoRun, runImplementation, mounted, stories.length]);
 
   const clearSession = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -2929,16 +2881,16 @@ function ImplementationPageInner() {
 
   const handleConfirmMerge = useCallback(() => {
     const param = stories.map((s) => `${s.id}:${s.chosenVariant}`).join(",");
-    router.push(`/merge?stories=${encodeURIComponent(param)}`);
+    router.push(`/testing?stories=${encodeURIComponent(param)}`);
   }, [stories, router]);
 
   const selectedStory = stories.find((s) => s.id === selectedStoryId) ?? stories[0];
 
   return (
-    <>
+    <div className="flex h-screen bg-background text-foreground">
       {/* Material Symbols */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         rel="stylesheet"
       />
       <style>{`
@@ -2969,66 +2921,47 @@ function ImplementationPageInner() {
         .agent-flow-line { animation: agentFlow 1.5s ease-in-out infinite; }
       `}</style>
 
-      {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
-      <header className="fixed top-0 w-full z-50 h-16 flex items-center justify-between px-6 bg-[#131313] border-b border-[#3c4a42]/20">
-        {/* Left */}
-        <div className="flex items-center gap-3">
-          <span className="text-xl font-bold text-[#4edea3] tracking-tight font-serif">Luminescent IDE</span>
-          <span className="text-xs font-bold px-2 py-1 rounded-full bg-[#4edea3]/10 text-[#4edea3]">
-            {selectedStoryId}
-          </span>
+      {/* ── SIDEBAR ─────────────────────────────────────────────────────── */}
+      <aside className="hidden w-[264px] shrink-0 border-r border-border/20 bg-sidebar lg:flex lg:flex-col">
+        <div className="flex items-center gap-2.5 border-b border-border/20 px-5 py-3">
+          <div className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-primary to-primary/70">
+            <span className="material-symbols-outlined text-primary-foreground" style={{ fontSize: 14 }}>code</span>
+          </div>
+          <span className="font-brand text-sm font-bold tracking-tight text-foreground">AgenticSDLC</span>
         </div>
+        <SDLCSidebar />
+      </aside>
 
-        {/* Right */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={clearSession}
-            className="text-[10px] font-bold uppercase tracking-widest text-[#474746] hover:text-[#c8c6c5] transition-colors px-2 py-1 rounded border border-[#3c4a42]/20 hover:border-[#3c4a42]/40"
-            title="Clear session and reset all state"
-          >
-            Clear session
-          </button>
+      <main className="flex flex-1 flex-col min-h-0">
+        {/* Header */}
+        <header className="flex items-center justify-between border-b border-border/20 px-6 py-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <h1 className="font-serif text-lg font-bold text-foreground">Implementation</h1>
+            <span className="rounded-md bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold text-orange-500">PHASE 4</span>
+            {mounted && stories.length > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground/50">{stories.length} stories · {totalProgress}% done</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#c8c6c5] uppercase tracking-wider">Progress</span>
-            <div className="w-32 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
-              <div
-                className="h-full primary-gradient rounded-full transition-all duration-700"
-                style={{ width: `${totalProgress}%` }}
-              />
-            </div>
-            <span className="text-xs font-mono text-[#4edea3]">{totalProgress}%</span>
+            <a href="/design" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
+              Backlog
+            </a>
+            <button
+              onClick={clearSession}
+              className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="Clear session and reset all state"
+            >
+              Clear session
+            </button>
           </div>
-          <div className="w-8 h-8 rounded-full bg-[#353534] border border-[#3c4a42]/30 flex items-center justify-center text-[#4edea3] text-xs font-bold">
-            E
-          </div>
-        </div>
+        </header>
 
-        {/* Thin progress bar at bottom of nav */}
-        <div
-          className="absolute bottom-0 left-0 h-0.5 primary-gradient transition-all duration-700"
-          style={{ width: `${totalProgress}%` }}
-        />
-      </header>
-
-      <div className="flex h-screen pt-16">
-        {/* ── SIDEBAR ───────────────────────────────────────────────────── */}
-        <Sidebar />
-
-        {/* ── MAIN CONTENT ──────────────────────────────────────────────── */}
-        <main className="ml-64 flex-1 bg-[#131313]">
-        <ScrollArea className="h-[calc(100vh-64px)]">
+        <div className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto p-6">
 
               {/* ── STORY TABS ──────────────────────────────── */}
-              <div className="flex items-center gap-2 mb-5">
-                <a
-                  href="/analysis"
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#474746] hover:text-[#c8c6c5] transition-colors px-2 py-1 rounded border border-[#3c4a42]/20 hover:border-[#3c4a42]/40 shrink-0"
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>arrow_back</span>
-                  Backlog
-                </a>
-                <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 mb-5 flex-wrap">
                   {stories.map((s) => {
                     const isActive = s.id === selectedStoryId;
                     const statusCfg = STATUS_CONFIG[s.status];
@@ -3048,10 +2981,26 @@ function ImplementationPageInner() {
                       </button>
                     );
                   })}
-                </div>
               </div>
 
               {/* ── STORY CONTENT ──────────────────────────── */}
+              {!selectedStory ? (
+                <Card className="bg-[#1c1b1b] rounded-2xl border border-[#3c4a42]/20 ring-0">
+                  <CardContent className="p-12 flex flex-col items-center gap-3 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-[#2a2a2a] border border-[#3c4a42]/30 flex items-center justify-center mb-1">
+                      <span className="material-symbols-outlined text-3xl text-[#474746]">inbox</span>
+                    </div>
+                    <p className="text-[13px] font-semibold text-[#c8c6c5]">No user stories loaded</p>
+                    <p className="text-[11px] text-[#474746] max-w-xs leading-relaxed">
+                      Go to the Design page to generate and estimate user stories first, then click Implement Backlog.
+                    </p>
+                    <a href="/design" className="mt-2 flex items-center gap-1 rounded-lg border border-[#3c4a42]/30 px-4 py-2 text-xs text-[#4edea3] hover:bg-[#4edea3]/5 transition-colors">
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
+                      Go to Design
+                    </a>
+                  </CardContent>
+                </Card>
+              ) : (<>
               <div className="space-y-5">
                 {/* Story header — Jira-style issue view */}
                 {(() => {
@@ -3169,31 +3118,8 @@ function ImplementationPageInner() {
 
                 {/* Run button — pending state */}
                 {selectedStory.status === "pending" && (() => {
-                  const pokerDone = allDonePoker;
-                  const pokerRunning = stories.some((s) => { const p = pokerSessions[s.id]; return p && (p.phase === "estimating" || p.phase === "revealing" || p.phase === "debating"); });
                   const anyRunning = stories.some((s) => !!runningStories[s.id]);
                   const pendingCount = stories.filter((s) => s.status === "pending").length;
-
-                  if (!pokerDone) {
-                    return (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 px-1">
-                          <div className="flex-1 h-px bg-[#3c4a42]/30" />
-                          <span className="text-[10px] text-[#474746] uppercase tracking-wider">
-                            {pokerRunning ? "Poker in progress…" : "Complete poker to unlock"}
-                          </span>
-                          <div className="flex-1 h-px bg-[#3c4a42]/30" />
-                        </div>
-                        <Button
-                          disabled
-                          className="w-full primary-gradient text-[#003824] py-4 rounded-2xl text-sm font-bold uppercase tracking-widest opacity-30 shadow-none border-transparent h-auto flex items-center justify-center gap-2 cursor-not-allowed"
-                        >
-                          <span className="material-symbols-outlined text-base">lock</span>
-                          Start Implementing
-                        </Button>
-                      </div>
-                    );
-                  }
 
                   return (
                     <Button
@@ -3242,11 +3168,9 @@ function ImplementationPageInner() {
                       <div className="w-14 h-14 rounded-2xl bg-[#2a2a2a] border border-[#3c4a42]/30 flex items-center justify-center mb-1">
                         <span className="material-symbols-outlined text-3xl text-[#474746]">code_blocks</span>
                       </div>
-                      <p className="text-[13px] font-semibold text-[#c8c6c5]">No analysis yet for this story</p>
+                      <p className="text-[13px] font-semibold text-[#c8c6c5]">No implementation yet for this story</p>
                       <p className="text-[11px] text-[#474746] max-w-xs leading-relaxed">
-                        {allDonePoker
-                          ? "Click Start Implementing to dispatch agents across all stories in parallel."
-                          : "Run Estimation Poker first to let agents align on effort, then start implementing."}
+                        Click Start Implementing to dispatch agents across all stories in parallel.
                       </p>
                     </CardContent>
                   </Card>
@@ -3293,7 +3217,7 @@ function ImplementationPageInner() {
               </div>
 
           {/* Sticky merge banner */}
-          {allDone && (
+          {allDone && selectedStory && (
             <div className="sticky bottom-6 z-30 mt-8">
               <Card className="bg-[#1c1b1b] border border-[#4edea3]/30 rounded-2xl shadow-[0_0_40px_-10px_rgba(78,222,163,0.2)] ring-0 slide-up">
                 <CardContent className="p-5 flex items-center justify-between gap-6">
@@ -3327,10 +3251,10 @@ function ImplementationPageInner() {
               </Card>
             </div>
           )}
+          </>)}
           </div>
-        </ScrollArea>
+          </div>
         </main>
-      </div>
 
       {/* Planning Poker Drawer */}
       {(() => {
@@ -3445,7 +3369,7 @@ function ImplementationPageInner() {
           </Drawer>
         );
       })()}
-    </>
+    </div>
   );
 }
 

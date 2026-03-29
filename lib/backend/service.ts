@@ -1674,7 +1674,7 @@ export async function getHealth(projectId: string) {
     ok: true,
     projectId: project.id,
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    openaiModel: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+    openaiModel: process.env.OPENAI_MODEL ?? "gpt-5.1",
     runtime: "nodejs",
   }
 }

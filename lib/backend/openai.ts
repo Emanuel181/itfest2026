@@ -548,7 +548,7 @@ async function requestJsonArray<T>(instructions: string, input: string): Promise
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1",
       instructions,
       input,
     })
@@ -574,7 +574,7 @@ export async function generateOpenAIReply(options: {
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1",
       instructions:
         "You are a general AI discovery assistant inside an AI-native SDLC IDE. The user is defining a production website. Reply in Romanian, in 2-4 short sentences. First confirm what you understood. Ask at most one simple follow-up question only if essential information is still missing for documentation. If enough information already exists, stop asking repetitive questions and instead briefly summarize what is now clear and say you can generate the documentation. If the user did not provide technical guidance, proactively recommend a suitable production stack and architecture. Keep the tone practical and concise.",
       input: `Project title: ${options.brief.title}
@@ -604,7 +604,7 @@ export async function generateBriefFromConversation(options: {
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1",
       instructions:
         "You turn a project discovery conversation into production-ready documentation for a website. Return ONLY valid JSON with the keys: title, objective, audience, scope, deliverables, risks, techStack, dbSchema, architecture. audience, scope, deliverables, risks, techStack must be arrays of short strings. Keep the content concise, specific, and usable for implementation planning. Prefer Romanian. If technical instructions are missing, proactively recommend a sensible production setup instead of leaving fields empty. Do not add markdown fences.",
       input: JSON.stringify({
@@ -745,7 +745,7 @@ export async function generateWorkspaceScaffold(options: {
 
   try {
     const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.1",
       instructions:
         "You are a senior AI-native IDE scaffold generator. Return ONLY valid JSON for a workspace scaffold. The JSON object must have folders, files, and runtimeEntrypoints arrays. Each folder needs id, name, path. Each file needs id, name, path, content. Use TypeScript or TSX for source files. The workspace should represent a small but real Next.js app with readable code and no markdown fences. Keep paths consistent and include src/app/layout.tsx, src/app/page.tsx, src/components/agent-status.tsx, and src/lib/preview-data.ts whenever possible. Never concatenate multiple virtual files into one file. Never include markers like // File:. Keep src/lib/preview-data.ts as plain data exports only.",
       input: JSON.stringify({
