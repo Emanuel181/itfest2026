@@ -23,6 +23,7 @@ import {
 import type { BriefState, StageKey, StoryVariant } from "@/lib/backend/types"
 
 export const runtime = "nodejs"
+export const maxDuration = 180
 
 export async function GET(request: NextRequest) {
   const projectId = getProjectIdFromRequest(request)
