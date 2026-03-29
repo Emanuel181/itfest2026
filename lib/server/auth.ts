@@ -17,6 +17,13 @@ export type AuthUser = {
   name: string
 }
 
+function shouldUseSecureCookies() {
+  const override = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase()
+  if (override === "true") return true
+  if (override === "false") return false
+  return process.env.NODE_ENV === "production"
+}
+
 function nowIso() {
   return new Date().toISOString()
 }
@@ -53,7 +60,7 @@ export function applySessionCookie(response: NextResponse, token: string) {
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   })
@@ -63,7 +70,7 @@ export function clearSessionCookie(response: NextResponse) {
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     path: "/",
     maxAge: 0,
   })

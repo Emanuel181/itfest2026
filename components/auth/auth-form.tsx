@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +10,6 @@ type AuthFormProps = {
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
-  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -29,6 +27,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       const response = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           name,
           email,
@@ -41,8 +40,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         throw new Error(data.error || "Authentication failed.")
       }
 
-      router.push("/projects")
-      router.refresh()
+      window.location.assign("/projects")
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Authentication failed.")
     } finally {
