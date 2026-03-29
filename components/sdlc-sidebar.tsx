@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { withOptionalProjectQuery } from "@/lib/backend/project-client"
 import type { CollaboratorPresence } from "@/lib/backend/types"
@@ -93,15 +93,14 @@ export type { SDLCPhase, SDLCStage }
 
 export function SDLCSidebar() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const activePhaseId = getActivePhaseId(pathname)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(activePhaseId ? [activePhaseId] : []))
   const [userEmail, setUserEmail] = useState("Loading account...")
   const [presence, setPresence] = useState<CollaboratorPresence[]>([])
   const [presenceNow, setPresenceNow] = useState(() => Date.now())
-  const projectId = searchParams.get("project") ?? ""
+  const [projectId, setProjectId] = useState("")
+  const [storyId, setStoryId] = useState("")
   const projectHref = useMemo(() => withOptionalProjectQuery("/projects", projectId), [projectId])
-  const storyId = searchParams.get("story") ?? ""
   const currentLocation = useMemo(() => getLocationDetails(pathname, storyId), [pathname, storyId])
   const visiblePresence = projectId ? presence : []
 
@@ -117,6 +116,23 @@ export function SDLCSidebar() {
         setUserEmail("Signed in")
       })
   }, [])
+
+  useEffect(() => {
+    function syncRouteState() {
+      if (typeof window === "undefined") return
+
+      const url = new URL(window.location.href)
+      setProjectId(url.searchParams.get("project") ?? "")
+      setStoryId(url.searchParams.get("story") ?? "")
+    }
+
+    syncRouteState()
+    window.addEventListener("popstate", syncRouteState)
+
+    return () => {
+      window.removeEventListener("popstate", syncRouteState)
+    }
+  }, [pathname])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
