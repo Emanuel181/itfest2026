@@ -127,6 +127,9 @@ export type UserStory = {
   code: string
   variants: StoryVariant[]
   selectedVariantId: string
+  storyPoints?: number
+  pokerHistory?: { agent: string; estimate: number; reasoning: string }[]
+  pokerConsensus?: number
 }
 
 export type WorkspaceFile = {
@@ -214,6 +217,8 @@ export type ProjectState = {
   currentStage: StageKey
   search: string
   brief: BriefState
+  productDocumentation: string
+  technicalDocumentation: string
   requirements: Requirement[]
   features: Feature[]
   selectedFeatureId: string

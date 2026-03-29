@@ -800,7 +800,7 @@ export function IdeationDashboard({
   })
 
   const [terminalHistory, setTerminalHistory] = useState<TerminalLine[]>([
-    { type: "system", text: "Luminescent OS v1.2.0 initialized." },
+    { type: "system", text: "AgenticSDLC initialized." },
     { type: "system", text: "Type 'help' to see available commands or 'npm run dev' for the virtual preview runtime." }
   ])
   const [terminalInput, setTerminalInput] = useState("")
@@ -1851,7 +1851,7 @@ export function IdeationDashboard({
             <div className="grid size-7 place-items-center rounded-[8px] border border-primary/20 bg-gradient-to-br from-primary to-primary/80 shadow-[0_2px_10px_rgba(16,185,129,0.25)]">
               <Icon name="spark" className="size-4 text-primary-foreground" />
             </div>
-            <span className="font-brand text-[15px] font-semibold tracking-tight text-foreground">Luminescent</span>
+            <span className="font-brand text-[15px] font-semibold tracking-tight text-foreground">AgenticSDLC</span>
           </div>
           <div className="hidden h-5 w-px bg-border/60 sm:block" />
           <nav className="hidden items-center gap-2 sm:flex">

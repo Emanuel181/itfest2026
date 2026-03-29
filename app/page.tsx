@@ -1,4 +1,4 @@
-import { IdeationDashboard } from "@/components/ideation-dashboard"
+import { PlanningPage } from "@/components/planning/planning-page"
 import { createProjectId, isValidProjectId } from "@/lib/backend/http"
 import { getProject } from "@/lib/backend/service"
 import { redirect } from "next/navigation"
@@ -16,5 +16,5 @@ export default async function Home(props: { searchParams?: Promise<Record<string
 
   const project = await getProject(projectId)
 
-  return <IdeationDashboard initialProject={project} initialProjectId={projectId} />
+  return <PlanningPage initialProject={project} initialProjectId={projectId} />
 }

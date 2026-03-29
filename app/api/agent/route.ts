@@ -10,10 +10,32 @@ import {
   MERGE_PROMPT,
   POKER_ESTIMATE_PROMPT,
   POKER_DEBATE_PROMPT,
+  PRODUCT_CHAT_PROMPT,
+  TECHNICAL_CHAT_PROMPT,
+  REQUIREMENTS_AGENT_PROMPT,
+  BACKLOG_AGENT_PROMPT,
+  SECURITY_AUDIT_PROMPT,
 } from "@/lib/agents/prompts";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+const TOKEN_LIMITS: Record<string, number> = {
+  reasoning: 1024,
+  orchestrator: 1024,
+  backend: 8192,
+  frontend: 8192,
+  security: 8192,
+  evaluator: 4096,
+  merge: 4096,
+  poker_estimate: 2048,
+  poker_debate: 2048,
+  product_chat: 4096,
+  technical_chat: 4096,
+  requirements_writer: 8192,
+  backlog_writer: 16384,
+  security_audit: 8192,
+};
 
 const PROMPTS: Record<string, string> = {
   orchestrator: ORCHESTRATOR_PROMPT,
@@ -25,6 +47,11 @@ const PROMPTS: Record<string, string> = {
   merge: MERGE_PROMPT,
   poker_estimate: POKER_ESTIMATE_PROMPT,
   poker_debate: POKER_DEBATE_PROMPT,
+  product_chat: PRODUCT_CHAT_PROMPT,
+  technical_chat: TECHNICAL_CHAT_PROMPT,
+  requirements_writer: REQUIREMENTS_AGENT_PROMPT,
+  backlog_writer: BACKLOG_AGENT_PROMPT,
+  security_audit: SECURITY_AUDIT_PROMPT,
 };
 
 export async function POST(req: NextRequest) {
@@ -49,7 +76,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         await invokeAgentStream(
-          { systemPrompt, messages: [{ role: "user", content: userMessage }], maxTokens: 4096 },
+          { systemPrompt, messages: [{ role: "user", content: userMessage }], maxTokens: TOKEN_LIMITS[role] ?? 4096 },
           (delta) => {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`));
           }
@@ -107,6 +134,16 @@ function buildUserMessage(
       return `User Story: ${opts.storyId} — ${opts.storyTitle}\nDescription: ${opts.storyDescription}\n\nYou are the ${opts.context ?? "team member"}.\nIndependently estimate the implementation effort. Do not guess or reference other agents' estimates.`;
     case "poker_debate":
       return `User Story: ${opts.storyId} — ${opts.storyTitle}\nDescription: ${opts.storyDescription}\n\n${opts.context ?? ""}\n\nYou are the ${opts.variantId ?? "team member"}. Argue for your position and work toward consensus.`;
+    case "product_chat":
+      return `${opts.context ?? ""}\n\nUser message: ${opts.storyDescription}`;
+    case "technical_chat":
+      return `${opts.context ?? ""}\n\nUser message: ${opts.storyDescription}`;
+    case "requirements_writer":
+      return `Product Documentation:\n${opts.context ?? ""}\n\nBased on the product and technical documentation above, generate a comprehensive list of software requirements as a JSON array.`;
+    case "backlog_writer":
+      return `Requirements:\n${opts.context ?? ""}\n\nBased on the requirements above, generate user stories for the product backlog as a JSON array.`;
+    case "security_audit":
+      return `Project Code:\n${opts.context ?? ""}\n\nPerform a comprehensive security audit of the above project code.`;
     default:
       return base;
   }

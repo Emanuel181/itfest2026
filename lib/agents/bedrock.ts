@@ -20,7 +20,7 @@ export interface AgentResponse {
   content: string;
 }
 
-const MODEL = "gpt-4.1-nano";
+const MODEL = "gpt-5.1";
 
 function client() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -29,7 +29,7 @@ function client() {
 export async function invokeAgent(opts: AgentInvokeOptions): Promise<AgentResponse> {
   const res = await client().chat.completions.create({
     model: MODEL,
-    max_tokens: opts.maxTokens ?? 4096,
+    max_completion_tokens: opts.maxTokens ?? 8192,
     messages: [
       { role: "system", content: opts.systemPrompt },
       ...opts.messages.map((m) => ({ role: m.role, content: m.content })),
@@ -44,7 +44,7 @@ export async function invokeAgentStream(
 ): Promise<string> {
   const stream = await client().chat.completions.create({
     model: MODEL,
-    max_tokens: opts.maxTokens ?? 4096,
+    max_completion_tokens: opts.maxTokens ?? 8192,
     stream: true,
     messages: [
       { role: "system", content: opts.systemPrompt },
