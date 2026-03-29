@@ -16,8 +16,12 @@ export default async function LoginPage() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#1b4332,transparent_30%),linear-gradient(180deg,#050816,#090d14)] text-foreground">
       <div className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
         <section className="w-full rounded-[28px] border border-white/10 bg-black/35 p-8 shadow-2xl shadow-black/30 backdrop-blur-xl">
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-white">Sign in</h2>
+          <div className="mb-6 space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200/80">AgenticSDLC</div>
+            <h2 className="text-2xl font-semibold text-white">Acces în workspace-ul de proiecte</h2>
+            <p className="text-sm leading-6 text-slate-300">
+              Autentifică-te pentru a continua proiectele active, a urmări progresul SDLC și a colabora în același spațiu de lucru.
+            </p>
           </div>
 
           <AuthForm mode="login" />

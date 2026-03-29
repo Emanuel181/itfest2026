@@ -46,13 +46,38 @@ export async function hydrateLegacySnapshots(projectId: string) {
     requirements?: unknown[]
     userStories?: unknown[]
   }
+  const legacyState = project.legacyState ?? {}
+  const requirements =
+    Array.isArray(project.requirements) && project.requirements.length > 0
+      ? project.requirements
+      : Array.isArray(legacyState.requirements)
+        ? legacyState.requirements
+        : undefined
+  const userStories =
+    Array.isArray(project.userStories) && project.userStories.length > 0
+      ? project.userStories
+      : Array.isArray(legacyState.stories)
+        ? legacyState.stories
+        : undefined
+  const productDocumentation =
+    typeof project.productDocumentation === "string" && project.productDocumentation.trim()
+      ? project.productDocumentation
+      : typeof legacyState.productDocumentation === "string"
+        ? legacyState.productDocumentation
+        : undefined
+  const technicalDocumentation =
+    typeof project.technicalDocumentation === "string" && project.technicalDocumentation.trim()
+      ? project.technicalDocumentation
+      : typeof legacyState.technicalDocumentation === "string"
+        ? legacyState.technicalDocumentation
+        : undefined
 
   return {
-    legacyState: project.legacyState ?? {},
+    legacyState,
     legacyPoker: project.legacyPoker ?? {},
-    productDocumentation: project.productDocumentation,
-    technicalDocumentation: project.technicalDocumentation,
-    requirements: project.requirements,
-    userStories: project.userStories,
+    productDocumentation,
+    technicalDocumentation,
+    requirements,
+    userStories,
   }
 }
