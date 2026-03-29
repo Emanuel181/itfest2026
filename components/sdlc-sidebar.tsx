@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { getProjectIdFromCurrentUrl, withOptionalProjectQuery } from "@/lib/backend/project-client"
+import { withOptionalProjectQuery } from "@/lib/backend/project-client"
+import type { CollaboratorPresence } from "@/lib/backend/types"
 
 type SDLCPhase = {
   id: string
@@ -92,11 +93,17 @@ export type { SDLCPhase, SDLCStage }
 
 export function SDLCSidebar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const activePhaseId = getActivePhaseId(pathname)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(activePhaseId ? [activePhaseId] : []))
   const [userEmail, setUserEmail] = useState("Loading account...")
-  const projectId = useMemo(() => getProjectIdFromCurrentUrl(), [pathname])
+  const [presence, setPresence] = useState<CollaboratorPresence[]>([])
+  const [presenceNow, setPresenceNow] = useState(() => Date.now())
+  const projectId = searchParams.get("project") ?? ""
   const projectHref = useMemo(() => withOptionalProjectQuery("/projects", projectId), [projectId])
+  const storyId = searchParams.get("story") ?? ""
+  const currentLocation = useMemo(() => getLocationDetails(pathname, storyId), [pathname, storyId])
+  const visiblePresence = projectId ? presence : []
 
   useEffect(() => {
     fetch("/api/auth/session", { cache: "no-store" })
@@ -110,6 +117,63 @@ export function SDLCSidebar() {
         setUserEmail("Signed in")
       })
   }, [])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setPresenceNow(Date.now())
+    }, 1_000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!projectId) return
+
+    let cancelled = false
+
+    async function syncPresence() {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+
+      const response = await fetch(`/api/project-presence?project=${encodeURIComponent(projectId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          pathname,
+          locationLabel: currentLocation.locationLabel,
+          menuLabel: currentLocation.menuLabel,
+          storyId: currentLocation.storyId,
+        }),
+      }).catch(() => null)
+
+      if (!response?.ok || cancelled) return
+      const payload = (await response.json().catch(() => null)) as { presence?: CollaboratorPresence[] } | null
+      if (!cancelled && Array.isArray(payload?.presence)) {
+        setPresence(payload.presence)
+      }
+    }
+
+    void syncPresence()
+    const interval = window.setInterval(() => {
+      void syncPresence()
+    }, 4_000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncPresence()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      document.removeEventListener("visibilitychange", handleVisibility)
+    }
+  }, [currentLocation.locationLabel, currentLocation.menuLabel, currentLocation.storyId, pathname, projectId])
 
   function togglePhase(phaseId: string) {
     setExpandedPhases((prev) => {
@@ -277,6 +341,52 @@ export function SDLCSidebar() {
           </div>
           <span className="material-symbols-outlined text-muted-foreground/40" style={{ fontSize: 14 }}>more_horiz</span>
         </div>
+
+        {projectId ? (
+          <div className="mt-3 rounded-[12px] border border-border/30 bg-card/30 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary/80" style={{ fontSize: 15 }}>groups</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">Live Collaboration</span>
+            </div>
+
+            <div className="space-y-2">
+              {visiblePresence.length > 0 ? (
+                visiblePresence.map((entry) => {
+                  const secondsAgo = Math.max(0, Math.round((presenceNow - new Date(entry.updatedAt).getTime()) / 1000))
+
+                  return (
+                    <div key={entry.userId} className="rounded-[10px] border border-border/20 bg-background/70 px-2.5 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="grid size-7 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                          {entry.initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-[11px] font-semibold text-foreground">
+                              {entry.isCurrentUser ? "You" : entry.name}
+                            </span>
+                            <span className="inline-flex size-2 rounded-full bg-emerald-500" />
+                          </div>
+                          <p className="truncate text-[10px] text-muted-foreground/70">{entry.menuLabel}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 pl-9">
+                        <p className="truncate text-[11px] text-foreground/90">{entry.locationLabel}</p>
+                        <p className="text-[10px] text-muted-foreground/60">
+                          {secondsAgo <= 2 ? "Live now" : `Updated ${secondsAgo}s ago`}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="rounded-[10px] border border-dashed border-border/30 px-3 py-3 text-[11px] text-muted-foreground/70">
+                  No active collaborators are visible in this project yet.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -294,4 +404,48 @@ function getActivePhaseId(pathname: string): string | undefined {
     }
   }
   return undefined
+}
+
+function getLocationDetails(pathname: string, storyId: string) {
+  if (pathname === "/projects") {
+    return {
+      menuLabel: "Project Management",
+      locationLabel: "Projects Hub",
+      storyId: undefined,
+    }
+  }
+
+  if (pathname === "/code") {
+    return {
+      menuLabel: "Code Workspace",
+      locationLabel: "View Code",
+      storyId: undefined,
+    }
+  }
+
+  if (pathname === "/code/preview") {
+    return {
+      menuLabel: "Code Workspace",
+      locationLabel: "Generated Preview",
+      storyId: undefined,
+    }
+  }
+
+  for (const phase of SDLC_PHASES) {
+    for (const stage of phase.stages) {
+      if (isStageActive(stage.href, pathname)) {
+        return {
+          menuLabel: phase.label,
+          locationLabel: storyId ? `${stage.label} · ${storyId}` : stage.label,
+          storyId: storyId || undefined,
+        }
+      }
+    }
+  }
+
+  return {
+    menuLabel: "Workspace",
+    locationLabel: pathname === "/" ? "Planning" : pathname.replaceAll("/", " ").trim() || "Workspace",
+    storyId: storyId || undefined,
+  }
 }
