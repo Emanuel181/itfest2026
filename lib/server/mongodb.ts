@@ -35,6 +35,20 @@ export type ProjectDocument = {
   updatedAt: string
 }
 
+export type ProjectPresenceDocument = {
+  _id: string
+  projectId: string
+  userId: string
+  userName: string
+  userEmail: string
+  pathname: string
+  locationLabel: string
+  menuLabel: string
+  storyId?: string
+  updatedAt: string
+  expiresAt: string
+}
+
 declare global {
   var __agentsdlcMongoClientPromise: Promise<MongoClient> | undefined
 }
@@ -92,4 +106,9 @@ export async function getSessionsCollection(): Promise<Collection<SessionDocumen
 export async function getProjectsCollection(): Promise<Collection<ProjectDocument>> {
   const db = await getDatabase()
   return db.collection<ProjectDocument>("projects")
+}
+
+export async function getProjectPresenceCollection(): Promise<Collection<ProjectPresenceDocument>> {
+  const db = await getDatabase()
+  return db.collection<ProjectPresenceDocument>("projectPresence")
 }
