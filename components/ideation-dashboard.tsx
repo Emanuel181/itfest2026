@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ReactFlow, Controls, Background } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -11,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { supabase } from "@/lib/supabase"
 
 type StageKey =
   | "Conversation"
@@ -598,9 +601,15 @@ function IDEHeader({ title, icon, rightNode }: { title: string; icon: string; ri
   )
 }
 
-export function IdeationDashboard() {
+export function IdeationDashboard({ projectTitle }: { projectTitle?: string }) {
   const [mounted, setMounted] = useState(false)
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
+
+  const [userInitial, setUserInitial] = useState("?")
+  const [userEmail, setUserEmail] = useState("")
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
 
   const [currentStage, setCurrentStage] = useState<StageKey>("Conversation")
   const [search, setSearch] = useState("")
@@ -649,6 +658,23 @@ export function IdeationDashboard() {
 
   useEffect(() => {
     setMounted(true)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      const name = user.user_metadata?.display_name as string | undefined
+      const email = user.email ?? ""
+      setUserEmail(email)
+      setUserInitial(((name ?? email)[0] ?? "?").toUpperCase())
+    })
+  }, [])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
   const features = useMemo(() => buildFeatures(brief), [brief])
@@ -825,10 +851,25 @@ export function IdeationDashboard() {
 
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-2.5">
+            <Link
+              href="/projects"
+              className="flex items-center justify-center size-7 rounded-[8px] border border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="All projects"
+            >
+              <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </Link>
             <div className="grid size-7 place-items-center rounded-[8px] border border-primary/20 bg-gradient-to-br from-primary to-primary/80 shadow-[0_2px_10px_rgba(16,185,129,0.25)]">
               <Icon name="spark" className="size-4 text-primary-foreground" />
             </div>
             <span className="font-brand text-[15px] font-semibold tracking-tight text-foreground">Luminescent</span>
+            {projectTitle && (
+              <>
+                <div className="h-4 w-px bg-border/60" />
+                <span className="max-w-[180px] truncate text-[13px] text-muted-foreground">{projectTitle}</span>
+              </>
+            )}
           </div>
           <div className="hidden h-5 w-px bg-border/60 sm:block" />
           <nav className="hidden items-center gap-2 sm:flex">
@@ -872,6 +913,43 @@ export function IdeationDashboard() {
               <Icon name={theme === "dark" ? "sun" : "moon"} className="size-4" />
             </Button>
           )}
+          {/* Account button */}
+          <div ref={accountRef} className="relative">
+            <button
+              onClick={() => setAccountOpen((o) => !o)}
+              className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-border/40 bg-muted/30 text-[11px] font-semibold text-foreground shadow-inner hover:bg-muted transition-colors"
+              title={userEmail}
+            >
+              {userInitial}
+            </button>
+            {accountOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[200] w-52 rounded-[10px] border border-border/60 bg-background py-1 shadow-xl">
+                <div className="border-b border-border/50 px-3 pb-2 pt-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-0.5">Account</p>
+                  <p className="truncate text-[12px] text-foreground/80">{userEmail}</p>
+                </div>
+                <div className="p-1">
+                  <Link
+                    href="/settings"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-[12px] text-foreground/80 hover:bg-muted/60 hover:text-foreground transition-colors"
+                  >
+                    <svg className="size-3.5 shrink-0 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Settings
+                  </Link>
+                  <div className="my-1 h-px bg-border/40" />
+                  <button
+                    onClick={async () => { await supabase.auth.signOut(); router.replace("/login") }}
+                    className="flex w-full items-center gap-2.5 rounded-[6px] px-2.5 py-1.5 text-[12px] text-red-500 dark:text-red-400 hover:bg-red-500/8 transition-colors"
+                  >
+                    <svg className="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <Button
             size="sm"
             className="h-8 rounded-[8px] bg-primary text-[12px] font-medium text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_3px_rgba(16,185,129,0.2)] transition-all hover:bg-primary/95"
