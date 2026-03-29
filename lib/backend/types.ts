@@ -166,6 +166,19 @@ export type Collaborator = {
   invitePending?: boolean
 }
 
+export type CollaboratorPresence = {
+  userId: string
+  name: string
+  email: string
+  initials: string
+  pathname: string
+  locationLabel: string
+  menuLabel: string
+  storyId?: string
+  updatedAt: string
+  isCurrentUser?: boolean
+}
+
 export type WorkspaceState = {
   folders: WorkspaceFolder[]
   files: WorkspaceFile[]
