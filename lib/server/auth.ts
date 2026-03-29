@@ -17,10 +17,19 @@ export type AuthUser = {
   name: string
 }
 
-function shouldUseSecureCookies() {
+function shouldUseSecureCookies(request?: NextRequest) {
   const override = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase()
   if (override === "true") return true
   if (override === "false") return false
+
+  const forwardedProto = request?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase()
+  if (forwardedProto === "https") return true
+  if (forwardedProto === "http") return false
+
+  const requestProtocol = request?.nextUrl.protocol?.replace(":", "").toLowerCase()
+  if (requestProtocol === "https") return true
+  if (requestProtocol === "http") return false
+
   return process.env.NODE_ENV === "production"
 }
 
@@ -56,21 +65,21 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex")
 }
 
-export function applySessionCookie(response: NextResponse, token: string) {
+export function applySessionCookie(response: NextResponse, token: string, request?: NextRequest) {
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: shouldUseSecureCookies(),
+    secure: shouldUseSecureCookies(request),
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   })
 }
 
-export function clearSessionCookie(response: NextResponse) {
+export function clearSessionCookie(response: NextResponse, request?: NextRequest) {
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: shouldUseSecureCookies(),
+    secure: shouldUseSecureCookies(request),
     path: "/",
     maxAge: 0,
   })

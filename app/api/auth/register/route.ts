@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const token = await createSession(user.id)
     const response = NextResponse.json({ user })
-    applySessionCookie(response, token)
+    applySessionCookie(response, token, request)
     return response
   } catch (error) {
     const message = error instanceof Error ? error.message : "Registration failed."

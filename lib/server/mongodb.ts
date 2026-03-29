@@ -66,8 +66,13 @@ function getMongoDbName(uri: string) {
   const explicit = process.env.MONGODB_DB?.trim()
   if (explicit) return explicit
 
-  const match = uri.match(/\/([^/?]+)(?:\?|$)/)
-  return match?.[1] || "agentsdlc"
+  try {
+    const parsed = new URL(uri)
+    const pathname = parsed.pathname.replace(/^\/+/, "").trim()
+    return pathname || "agentsdlc"
+  } catch {
+    return "agentsdlc"
+  }
 }
 
 function createClient() {
