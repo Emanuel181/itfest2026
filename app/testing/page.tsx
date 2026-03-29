@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import { callAgentStream } from "@/lib/agents/client"
 import {
   createDemoImplementedStories,
@@ -30,6 +31,7 @@ interface ActivityEntry {
 
 function TestingPageInner() {
   const searchParams = useSearchParams()
+  const projectId = searchParams.get("project") ?? ""
 
   // Parse story selections from URL
   const [selections, setSelections] = useState<StorySelection[]>([])
@@ -40,16 +42,37 @@ function TestingPageInner() {
   const logEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setIsHydrated(true)
-    const storiesParam = searchParams.get("stories")
-    if (storiesParam) {
-      const pairs = storiesParam.split(",").map((pair) => {
-        const [id, variant] = pair.split(":")
-        return { id, variant }
-      })
-      setSelections(pairs)
+    let cancelled = false
+
+    async function hydratePage() {
+      try {
+        const existingState = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+        const existingPoker = JSON.parse(localStorage.getItem("itfest_poker") || "{}")
+        const dbSnapshot = await hydrateLegacySnapshots(projectId)
+        const nextState = { ...existingState, ...(dbSnapshot?.legacyState ?? {}) }
+        const nextPoker = { ...existingPoker, ...(dbSnapshot?.legacyPoker ?? {}) }
+        localStorage.setItem("itfest_state", JSON.stringify(nextState))
+        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
+      } catch {
+        // ignore hydration failures
+      } finally {
+        const storiesParam = searchParams.get("stories")
+        if (storiesParam && !cancelled) {
+          const pairs = storiesParam.split(",").map((pair) => {
+            const [id, variant] = pair.split(":")
+            return { id, variant }
+          })
+          setSelections(pairs)
+        }
+        if (!cancelled) setIsHydrated(true)
+      }
     }
-  }, [searchParams])
+
+    void hydratePage()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, searchParams])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -128,6 +151,7 @@ function TestingPageInner() {
             files["/src/app/layout.tsx"] = `export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return <html><body>{children}</body></html>\n}`
           }
           setMergedCode(files)
+          void syncLegacySnapshots({ projectId, legacyState: parsed })
         }
       } catch { /* ignore */ }
 
@@ -178,20 +202,20 @@ function TestingPageInner() {
 
     try {
       const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      const nextState = {
+        ...existing,
+        stories: demoStories,
+      }
+      const nextPoker = {
+        pokerSessions: createDemoPokerSessions(),
+        storyAssignees: createDemoStoryAssignees(),
+      }
       localStorage.setItem(
         "itfest_state",
-        JSON.stringify({
-          ...existing,
-          stories: demoStories,
-        })
+        JSON.stringify(nextState)
       )
-      localStorage.setItem(
-        "itfest_poker",
-        JSON.stringify({
-          pokerSessions: createDemoPokerSessions(),
-          storyAssignees: createDemoStoryAssignees(),
-        })
-      )
+      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
+      void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
     } catch {
       // ignore demo persistence issues
     }
@@ -232,7 +256,7 @@ function TestingPageInner() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/implementation" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/implementation", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Implementation
             </a>
@@ -245,7 +269,7 @@ function TestingPageInner() {
             </button>
             {mergePhase === "done" && (
               <a
-                href="/maintenance"
+                href={withOptionalProjectQuery("/maintenance", projectId)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Go to Maintenance

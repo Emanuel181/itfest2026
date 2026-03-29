@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState, useCallback, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import { callAgentStream } from "@/lib/agents/client"
 import { createDemoPokerSessions, createDemoStoryAssignees, DEMO_BACKLOG_STORIES, DEMO_REQUIREMENTS } from "@/lib/demo/mock-sdlc"
 
@@ -105,8 +106,10 @@ type Requirement = {
 // ---------------------------------------------------------------------------
 // Main Design Page
 // ---------------------------------------------------------------------------
-export default function DesignPage() {
+function DesignPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get("project") ?? ""
 
   const [requirements, setRequirements] = useState<Requirement[]>([])
   const [stories, setStories] = useState<UserStory[]>([])
@@ -129,41 +132,68 @@ export default function DesignPage() {
 
   // Load from localStorage
   useEffect(() => {
-    setIsHydrated(true)
-    try {
-      const raw = localStorage.getItem("itfest_state")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.requirements) setRequirements(parsed.requirements)
-        if (parsed.stories) setStories(parsed.stories)
+    let cancelled = false
+
+    async function hydratePage() {
+      try {
+        const existingState = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+        const existingPoker = JSON.parse(localStorage.getItem("itfest_poker") || "{}")
+        const dbSnapshot = await hydrateLegacySnapshots(projectId)
+
+        const nextState = {
+          ...existingState,
+          ...(dbSnapshot?.legacyState ?? {}),
+          requirements: dbSnapshot?.requirements ?? existingState.requirements,
+          stories: Array.isArray(dbSnapshot?.userStories) && dbSnapshot?.userStories.length > 0
+            ? dbSnapshot.userStories
+            : existingState.stories,
+        }
+        const nextPoker = {
+          ...existingPoker,
+          ...(dbSnapshot?.legacyPoker ?? {}),
+        }
+
+        localStorage.setItem("itfest_state", JSON.stringify(nextState))
+        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
+
+        if (cancelled) return
+        if (Array.isArray(nextState.requirements)) setRequirements(nextState.requirements)
+        if (Array.isArray(nextState.stories)) setStories(nextState.stories)
+        if (nextPoker.pokerSessions) setPokerSessions(nextPoker.pokerSessions)
+        if (nextPoker.storyAssignees) setStoryAssignees(nextPoker.storyAssignees)
+      } catch {
+        // ignore hydration failures
+      } finally {
+        if (!cancelled) setIsHydrated(true)
       }
-    } catch { /* ignore */ }
-    try {
-      const raw = localStorage.getItem("itfest_poker")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.pokerSessions) setPokerSessions(parsed.pokerSessions)
-        if (parsed.storyAssignees) setStoryAssignees(parsed.storyAssignees)
-      }
-    } catch { /* ignore */ }
-  }, [])
+    }
+
+    void hydratePage()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
 
   // Persist stories
   useEffect(() => {
     if (!isHydrated) return
     try {
       const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem("itfest_state", JSON.stringify({ ...existing, stories }))
+      const nextState = { ...existing, stories, requirements }
+      localStorage.setItem("itfest_state", JSON.stringify(nextState))
+      void syncLegacySnapshots({ projectId, legacyState: nextState })
     } catch { /* quota */ }
-  }, [stories, isHydrated])
+  }, [stories, requirements, isHydrated, projectId])
 
   // Persist poker
   useEffect(() => {
     if (!isHydrated) return
     try {
-      localStorage.setItem("itfest_poker", JSON.stringify({ pokerSessions, storyAssignees }))
+      const nextPoker = { pokerSessions, storyAssignees }
+      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
+      void syncLegacySnapshots({ projectId, legacyPoker: nextPoker })
     } catch { /* quota */ }
-  }, [pokerSessions, storyAssignees, isHydrated])
+  }, [pokerSessions, storyAssignees, isHydrated, projectId])
 
   // Generate Backlog
   async function generateBacklog() {
@@ -243,21 +273,21 @@ export default function DesignPage() {
 
     try {
       const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      const nextState = {
+        ...existing,
+        requirements: DEMO_REQUIREMENTS,
+        stories: DEMO_BACKLOG_STORIES,
+      }
+      const nextPoker = {
+        pokerSessions: demoSessions,
+        storyAssignees: demoAssignees,
+      }
       localStorage.setItem(
         "itfest_state",
-        JSON.stringify({
-          ...existing,
-          requirements: DEMO_REQUIREMENTS,
-          stories: DEMO_BACKLOG_STORIES,
-        })
+        JSON.stringify(nextState)
       )
-      localStorage.setItem(
-        "itfest_poker",
-        JSON.stringify({
-          pokerSessions: demoSessions,
-          storyAssignees: demoAssignees,
-        })
-      )
+      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker))
+      void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
     } catch {
       // ignore demo persistence issues
     }
@@ -417,7 +447,7 @@ export default function DesignPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <a href="/analysis" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/analysis", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Analysis
             </a>
@@ -430,7 +460,7 @@ export default function DesignPage() {
             </button>
             {allDonePoker && (
               <button
-                onClick={() => router.push(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`)}
+                onClick={() => router.push(withOptionalProjectQuery(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`, projectId))}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>play_arrow</span>
@@ -640,7 +670,7 @@ export default function DesignPage() {
                   <p className="text-xs text-muted-foreground mt-1">{stories.length} stories · {totalPoints} pts total</p>
                 </div>
                 <button
-                  onClick={() => router.push(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`)}
+                  onClick={() => router.push(withOptionalProjectQuery(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`, projectId))}
                   className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors uppercase tracking-wider"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 16 }}>play_arrow</span>
@@ -654,7 +684,7 @@ export default function DesignPage() {
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <span className="material-symbols-outlined text-muted-foreground/20" style={{ fontSize: 48 }}>view_kanban</span>
                 <p className="text-sm text-muted-foreground/40">No requirements available. Go back to Analysis to generate requirements first.</p>
-                <a href="/analysis" className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                <a href={withOptionalProjectQuery("/analysis", projectId)} className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
                   Go to Analysis
                 </a>
@@ -760,5 +790,17 @@ export default function DesignPage() {
         </DrawerContent>
       </Drawer>
     </div>
+  )
+}
+
+export default function DesignPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <DesignPageInner />
+    </Suspense>
   )
 }

@@ -1,9 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import { DEMO_PRODUCT_DOC, DEMO_REQUIREMENTS, DEMO_TECHNICAL_DOC } from "@/lib/demo/mock-sdlc"
 import { cn } from "@/lib/utils"
 
@@ -15,7 +17,9 @@ type Requirement = {
   priority: "must-have" | "should-have" | "nice-to-have"
 }
 
-export default function AnalysisPage() {
+function AnalysisPageInner() {
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get("project") ?? ""
   const [productDoc, setProductDoc] = useState<Record<string, unknown>>({})
   const [technicalDoc, setTechnicalDoc] = useState<Record<string, unknown>>({})
   const [requirements, setRequirements] = useState<Requirement[]>([])
@@ -24,42 +28,60 @@ export default function AnalysisPage() {
   const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
-    setIsHydrated(true)
-    try {
-      const raw = localStorage.getItem("itfest_state")
-      if (raw) {
-        const parsed = JSON.parse(raw)
+    let cancelled = false
+
+    async function hydratePage() {
+      try {
+        const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+        const dbSnapshot = await hydrateLegacySnapshots(projectId)
+        const merged = {
+          ...existing,
+          ...(dbSnapshot?.legacyState ?? {}),
+          productDocumentation: dbSnapshot?.productDocumentation ?? existing.productDocumentation,
+          technicalDocumentation: dbSnapshot?.technicalDocumentation ?? existing.technicalDocumentation,
+          requirements: dbSnapshot?.requirements ?? existing.requirements,
+        }
+
+        localStorage.setItem("itfest_state", JSON.stringify(merged))
+
         let pDoc = {}
         let tDoc = {}
-        if (parsed.productDocumentation) {
-          try { pDoc = JSON.parse(parsed.productDocumentation) } catch { /* ignore */ }
+        if (merged.productDocumentation) {
+          try { pDoc = JSON.parse(String(merged.productDocumentation)) } catch { /* ignore */ }
         }
-        if (parsed.technicalDocumentation) {
-          try { tDoc = JSON.parse(parsed.technicalDocumentation) } catch { /* ignore */ }
+        if (merged.technicalDocumentation) {
+          try { tDoc = JSON.parse(String(merged.technicalDocumentation)) } catch { /* ignore */ }
         }
-        // Use real data if available, otherwise fall back to mock
+
+        if (cancelled) return
         setProductDoc(Object.keys(pDoc).length > 0 ? pDoc : DEMO_PRODUCT_DOC)
         setTechnicalDoc(Object.keys(tDoc).length > 0 ? tDoc : DEMO_TECHNICAL_DOC)
-        if (parsed.requirements) setRequirements(parsed.requirements)
-      } else {
-        // No localStorage data — use mock
+        if (Array.isArray(merged.requirements)) setRequirements(merged.requirements as Requirement[])
+      } catch {
+        if (cancelled) return
         setProductDoc(DEMO_PRODUCT_DOC)
         setTechnicalDoc(DEMO_TECHNICAL_DOC)
+      } finally {
+        if (!cancelled) setIsHydrated(true)
       }
-    } catch {
-      setProductDoc(DEMO_PRODUCT_DOC)
-      setTechnicalDoc(DEMO_TECHNICAL_DOC)
     }
-  }, [])
+
+    void hydratePage()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
 
   // Persist requirements
   useEffect(() => {
     if (!isHydrated || requirements.length === 0) return
     try {
       const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem("itfest_state", JSON.stringify({ ...existing, requirements }))
+      const nextState = { ...existing, requirements }
+      localStorage.setItem("itfest_state", JSON.stringify(nextState))
+      void syncLegacySnapshots({ projectId, legacyState: nextState })
     } catch { /* quota */ }
-  }, [requirements, isHydrated])
+  }, [requirements, isHydrated, projectId])
 
   const hasProductDoc = Boolean(productDoc.title && productDoc.objective)
   const hasTechnicalDoc = Boolean((technicalDoc.techStack as string[] | undefined)?.length)
@@ -131,15 +153,17 @@ export default function AnalysisPage() {
 
     try {
       const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      const nextState = {
+        ...existing,
+        productDocumentation: JSON.stringify(DEMO_PRODUCT_DOC),
+        technicalDocumentation: JSON.stringify(DEMO_TECHNICAL_DOC),
+        requirements: DEMO_REQUIREMENTS,
+      }
       localStorage.setItem(
         "itfest_state",
-        JSON.stringify({
-          ...existing,
-          productDocumentation: JSON.stringify(DEMO_PRODUCT_DOC),
-          technicalDocumentation: JSON.stringify(DEMO_TECHNICAL_DOC),
-          requirements: DEMO_REQUIREMENTS,
-        })
+        JSON.stringify(nextState)
       )
+      void syncLegacySnapshots({ projectId, legacyState: nextState })
     } catch {
       // ignore localStorage write failures in demo mode
     }
@@ -178,7 +202,7 @@ export default function AnalysisPage() {
             <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-500">PHASE 2</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <Link href={withOptionalProjectQuery("/", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Planning
             </Link>
@@ -191,7 +215,7 @@ export default function AnalysisPage() {
             </button>
             {requirements.length > 0 && (
               <a
-                href="/design"
+                href={withOptionalProjectQuery("/design", projectId)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Go to Design
@@ -350,7 +374,7 @@ export default function AnalysisPage() {
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <span className="material-symbols-outlined text-muted-foreground/20" style={{ fontSize: 48 }}>assignment</span>
                 <p className="text-sm text-muted-foreground/40">No documentation available. Go back to Planning to create your product and technical documentation.</p>
-                <Link href="/" className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+                <Link href={withOptionalProjectQuery("/", projectId)} className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
                   Go to Planning
                 </Link>
@@ -360,5 +384,17 @@ export default function AnalysisPage() {
         </ScrollArea>
       </main>
     </div>
+  )
+}
+
+export default function AnalysisPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <AnalysisPageInner />
+    </Suspense>
   )
 }

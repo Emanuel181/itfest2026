@@ -495,6 +495,8 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
       body: JSON.stringify({
         type: "update-brief",
         brief: nextBrief,
+        productDocumentation: JSON.stringify(MOCK_PRODUCT_DOC),
+        technicalDocumentation: JSON.stringify(MOCK_TECHNICAL_DOC),
       }),
     }).catch(() => undefined)
   }, [initialProject.brief])

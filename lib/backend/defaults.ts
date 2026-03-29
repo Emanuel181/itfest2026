@@ -303,6 +303,8 @@ export function createDefaultProjectState(projectId: string): ProjectState {
       previewOpened: false,
       mode: "virtual-runtime",
     },
+    legacyState: {},
+    legacyPoker: {},
   }
 }
 
@@ -360,6 +362,8 @@ export function normalizeProjectState(project: ProjectState, projectId: string):
         ...fresh.preview,
         ...project.preview,
       },
+      legacyState: project.legacyState ?? fresh.legacyState,
+      legacyPoker: project.legacyPoker ?? fresh.legacyPoker,
       workspace: {
         ...fresh.workspace,
         ...project.workspace,
@@ -403,5 +407,7 @@ export function normalizeProjectState(project: ProjectState, projectId: string):
       },
       ...fresh.activity,
     ],
+    legacyState: project.legacyState ?? fresh.legacyState,
+    legacyPoker: project.legacyPoker ?? fresh.legacyPoker,
   }
 }

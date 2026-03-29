@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useSearchParams } from "next/navigation"
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import { callAgentStream } from "@/lib/agents/client"
 import { createDemoImplementedStories, DEMO_SECURITY_REPORT } from "@/lib/demo/mock-sdlc"
 import { cn } from "@/lib/utils"
@@ -46,7 +48,9 @@ function Ring({ value, size = 80, strokeWidth = 6, color }: { value: number; siz
   )
 }
 
-export default function MaintenancePage() {
+function MaintenancePageInner() {
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get("project") ?? ""
   const [report, setReport] = useState<SecurityReport | null>(null)
   const [isAuditing, setIsAuditing] = useState(false)
   const [streamContent, setStreamContent] = useState("")
@@ -54,15 +58,28 @@ export default function MaintenancePage() {
   const [storiesCount, setStoriesCount] = useState(0)
 
   useEffect(() => {
-    setIsHydrated(true)
-    try {
-      const raw = localStorage.getItem("itfest_state")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.stories) setStoriesCount(parsed.stories.length)
+    let cancelled = false
+
+    async function hydratePage() {
+      try {
+        const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+        const dbSnapshot = await hydrateLegacySnapshots(projectId)
+        const nextState = { ...existing, ...(dbSnapshot?.legacyState ?? {}) }
+        localStorage.setItem("itfest_state", JSON.stringify(nextState))
+        if (!cancelled && Array.isArray(nextState.stories)) {
+          setStoriesCount(nextState.stories.length)
+        }
+      } catch { /* ignore */ }
+      finally {
+        if (!cancelled) setIsHydrated(true)
       }
-    } catch { /* ignore */ }
-  }, [])
+    }
+
+    void hydratePage()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
 
   async function runSecurityAudit() {
     setIsAuditing(true)
@@ -127,13 +144,15 @@ export default function MaintenancePage() {
 
     try {
       const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      const nextState = {
+        ...existing,
+        stories: existing.stories ?? createDemoImplementedStories(),
+      }
       localStorage.setItem(
         "itfest_state",
-        JSON.stringify({
-          ...existing,
-          stories: existing.stories ?? createDemoImplementedStories(),
-        })
+        JSON.stringify(nextState)
       )
+      void syncLegacySnapshots({ projectId, legacyState: nextState })
     } catch {
       // ignore demo persistence issues
     }
@@ -173,7 +192,7 @@ export default function MaintenancePage() {
             <span className="rounded-md bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-500">PHASE 6</span>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/testing" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/testing", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Testing
             </a>
@@ -357,5 +376,17 @@ export default function MaintenancePage() {
         </ScrollArea>
       </main>
     </div>
+  )
+}
+
+export default function MaintenancePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <MaintenancePageInner />
+    </Suspense>
   )
 }

@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import Link from "next/link"
 import type { CSSProperties } from "react"
 import { useMemo, useState } from "react"
@@ -7,6 +9,7 @@ import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import {
   useEditableWorkspace,
 } from "@/lib/code-viewer/workspace-store"
+import { getProjectIdFromCurrentUrl, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import type { VirtualFile } from "@/lib/code-viewer/virtual-files"
 import { cn } from "@/lib/utils"
 
@@ -138,6 +141,7 @@ function buildCssBundle(files: VirtualFile[]) {
 }
 
 export default function CodePreviewPage() {
+  const projectId = useMemo(() => getProjectIdFromCurrentUrl(), [])
   const workspace = useEditableWorkspace()
   const previewItems = useMemo(() => buildPreviewItems(workspace.files), [workspace.files])
   const cssBundle = useMemo(() => buildCssBundle(workspace.files), [workspace.files])
@@ -175,7 +179,7 @@ export default function CodePreviewPage() {
 
           <div className="flex items-center gap-2">
             <Link
-              href="/code"
+              href={withOptionalProjectQuery("/code", projectId)}
               className="flex items-center gap-1 rounded-lg border border-[#d8d1c4] px-3 py-1.5 text-xs text-[#6c665d] transition-colors hover:text-[#1e1d1b]"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>

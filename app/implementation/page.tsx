@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
 import { SDLCSidebar } from "@/components/sdlc-sidebar";
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client";
 import {
   createDemoChatMessages,
   createDemoEvalContent,
@@ -2185,6 +2186,7 @@ function GlobalEvaluatorPanel({
 function ImplementationPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const projectId = searchParams.get("project") ?? "";
   const storyIdParam = searchParams.get("story") ?? "";
   const autoRun = searchParams.get("autorun") === "1";
 
@@ -2235,15 +2237,48 @@ function ImplementationPageInner() {
 
   // Hydrate from localStorage on mount
   useEffect(() => {
-    setMounted(true);
-    try {
-      const raw = localStorage.getItem("itfest_state");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.stories?.length) setStories(parsed.stories);
+    let cancelled = false;
+
+    async function hydratePage() {
+      try {
+        const existingState = JSON.parse(localStorage.getItem("itfest_state") || "{}");
+        const existingPoker = JSON.parse(localStorage.getItem("itfest_poker") || "{}");
+        const dbSnapshot = await hydrateLegacySnapshots(projectId);
+        const nextState = {
+          ...existingState,
+          ...(dbSnapshot?.legacyState ?? {}),
+          stories:
+            Array.isArray(dbSnapshot?.userStories) && dbSnapshot.userStories.length > 0
+              ? dbSnapshot.userStories
+              : existingState.stories,
+        };
+        const nextPoker = {
+          ...existingPoker,
+          ...(dbSnapshot?.legacyPoker ?? {}),
+        };
+
+        localStorage.setItem("itfest_state", JSON.stringify(nextState));
+        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker));
+
+        if (cancelled) return;
+        if (nextState.stories?.length) setStories(nextState.stories);
+        if (nextState.reasoningContent) setReasoningContent(nextState.reasoningContent);
+        if (nextState.evalContent) setEvalContent(nextState.evalContent);
+        if (nextState.chatMessages) setChatMessages(nextState.chatMessages);
+        if (nextState.noFrontend) setNoFrontend(nextState.noFrontend);
+        if (nextPoker.pokerSessions) setPokerSessions(nextPoker.pokerSessions);
+        if (nextPoker.storyAssignees) setStoryAssignees(nextPoker.storyAssignees);
+      } catch { /* ignore */ }
+      finally {
+        if (!cancelled) setMounted(true);
       }
-    } catch { /* ignore */ }
-  }, []);
+    }
+
+    void hydratePage();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   const now = () => new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
@@ -2673,17 +2708,21 @@ function ImplementationPageInner() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const snapshot = JSON.stringify({ stories, reasoningContent, evalContent, chatMessages, noFrontend });
+      const nextState = { stories, reasoningContent, evalContent, chatMessages, noFrontend };
+      const snapshot = JSON.stringify(nextState);
       localStorage.setItem("itfest_state", snapshot);
+      void syncLegacySnapshots({ projectId, legacyState: nextState });
     } catch { /* quota or SSR — ignore */ }
-  }, [stories, reasoningContent, evalContent, chatMessages, noFrontend]);
+  }, [stories, reasoningContent, evalContent, chatMessages, noFrontend, projectId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem("itfest_poker", JSON.stringify({ pokerSessions, storyAssignees }));
+      const nextPoker = { pokerSessions, storyAssignees };
+      localStorage.setItem("itfest_poker", JSON.stringify(nextPoker));
+      void syncLegacySnapshots({ projectId, legacyPoker: nextPoker });
     } catch { /* quota or SSR — ignore */ }
-  }, [pokerSessions, storyAssignees]);
+  }, [pokerSessions, storyAssignees, projectId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2737,33 +2776,34 @@ function ImplementationPageInner() {
 
     if (typeof window !== "undefined") {
       try {
+        const nextState = {
+          stories: demoStories,
+          reasoningContent: demoReasoning,
+          evalContent: demoEval,
+          chatMessages: demoChat,
+          noFrontend: demoNoFrontend,
+        };
+        const nextPoker = {
+          pokerSessions: demoPokerSessions,
+          storyAssignees: demoStoryAssignees,
+        };
         localStorage.setItem(
           "itfest_state",
-          JSON.stringify({
-            stories: demoStories,
-            reasoningContent: demoReasoning,
-            evalContent: demoEval,
-            chatMessages: demoChat,
-            noFrontend: demoNoFrontend,
-          })
+          JSON.stringify(nextState)
         );
-        localStorage.setItem(
-          "itfest_poker",
-          JSON.stringify({
-            pokerSessions: demoPokerSessions,
-            storyAssignees: demoStoryAssignees,
-          })
-        );
+        localStorage.setItem("itfest_poker", JSON.stringify(nextPoker));
+        void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker });
       } catch {
         // ignore local persistence issues in demo mode
       }
     }
-  }, []);
+  }, [projectId]);
 
   const clearSession = useCallback(() => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("itfest_state");
       localStorage.removeItem("itfest_poker");
+      void syncLegacySnapshots({ projectId, legacyState: {}, legacyPoker: {} });
     }
     setStories(stories.map((s) => ({ ...s, variants: [], status: "pending" as const, chosenVariant: undefined })));
     setReasoningContent({});
@@ -2906,7 +2946,7 @@ function ImplementationPageInner() {
       `\nInitial Estimates:\n${estimatesSummary}`,
       `\nDebate:\n${debateTranscript}`,
     ].join("\n"));
-  }, [stories]);
+  }, [projectId, stories]);
 
   // Standalone evaluator runner (called by runImplementation and CTA button)
   const runEvaluator = useCallback(async (storyId: string) => {
@@ -2932,7 +2972,7 @@ function ImplementationPageInner() {
 
   const handleConfirmMerge = useCallback(() => {
     const param = stories.map((s) => `${s.id}:${s.chosenVariant}`).join(",");
-    router.push(`/testing?stories=${encodeURIComponent(param)}`);
+    router.push(withOptionalProjectQuery(`/testing?stories=${encodeURIComponent(param)}`, projectId));
   }, [stories, router]);
 
   const selectedStory = stories.find((s) => s.id === selectedStoryId) ?? stories[0];
@@ -2994,7 +3034,7 @@ function ImplementationPageInner() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <a href="/design" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/design", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Backlog
             </a>
@@ -3052,7 +3092,7 @@ function ImplementationPageInner() {
                     <p className="text-[11px] text-[#474746] max-w-xs leading-relaxed">
                       Go to the Design page to generate and estimate user stories first, then click Implement Backlog.
                     </p>
-                    <a href="/design" className="mt-2 flex items-center gap-1 rounded-lg border border-[#3c4a42]/30 px-4 py-2 text-xs text-[#4edea3] hover:bg-[#4edea3]/5 transition-colors">
+                    <a href={withOptionalProjectQuery("/design", projectId)} className="mt-2 flex items-center gap-1 rounded-lg border border-[#3c4a42]/30 px-4 py-2 text-xs text-[#4edea3] hover:bg-[#4edea3]/5 transition-colors">
                       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
                       Go to Design
                     </a>

@@ -1,9 +1,12 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { getProjectIdFromCurrentUrl, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import {
   buildWorkspaceFromIdeState,
   useEditableWorkspace,
@@ -152,6 +155,7 @@ function cloneWorkspaceFiles(files: VirtualFile[]) {
 }
 
 export default function CodePage() {
+  const projectId = useMemo(() => getProjectIdFromCurrentUrl(), [])
   const workspace = useEditableWorkspace()
   const [selectedPath, setSelectedPath] = useState("")
   const [openTabs, setOpenTabs] = useState<string[]>(() => {
@@ -301,7 +305,7 @@ export default function CodePage() {
 
           <div className="flex items-center gap-2">
             <Link
-              href="/code/preview"
+              href={withOptionalProjectQuery("/code/preview", projectId)}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 rounded-lg border border-[#d97706]/30 bg-[#d97706]/10 px-3 py-1.5 text-xs font-semibold text-[#f0b35d] transition-colors hover:bg-[#d97706]/15"
@@ -310,7 +314,7 @@ export default function CodePage() {
               Open Preview
             </Link>
             <Link
-              href="/implementation"
+              href={withOptionalProjectQuery("/implementation", projectId)}
               className="flex items-center gap-1 rounded-lg border border-[#333] px-3 py-1.5 text-xs text-[#9da3ae] transition-colors hover:text-white"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>

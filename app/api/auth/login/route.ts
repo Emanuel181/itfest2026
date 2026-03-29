@@ -1,0 +1,35 @@
+import { NextRequest, NextResponse } from "next/server"
+
+import { readJsonBody } from "@/lib/backend/http"
+import { applySessionCookie, createSession, loginUser } from "@/lib/server/auth"
+
+export const runtime = "nodejs"
+
+export async function POST(request: NextRequest) {
+  const payload = await readJsonBody(request)
+  if (!payload.ok) return payload.response
+
+  const body = payload.data as { email?: string; password?: string }
+  if (typeof body.email !== "string" || !body.email.includes("@")) {
+    return NextResponse.json({ error: "A valid email is required." }, { status: 400 })
+  }
+
+  if (typeof body.password !== "string" || body.password.length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters long." }, { status: 400 })
+  }
+
+  try {
+    const user = await loginUser({
+      email: body.email,
+      password: body.password,
+    })
+
+    const token = await createSession(user.id)
+    const response = NextResponse.json({ user })
+    applySessionCookie(response, token)
+    return response
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Login failed."
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
+}
