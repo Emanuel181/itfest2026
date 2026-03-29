@@ -9,6 +9,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
 import { SDLCSidebar } from "@/components/sdlc-sidebar";
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client";
+import {
+  createDemoChatMessages,
+  createDemoEvalContent,
+  createDemoImplementedStories,
+  createDemoNoFrontend,
+  createDemoPokerSessions,
+  createDemoReasoningContent,
+  createDemoStoryAssignees,
+} from "@/lib/demo/mock-sdlc";
 
 import type {
   UserStory,
@@ -124,11 +134,6 @@ function highlightCode(code: string): React.ReactNode[] {
     <span key={i} style={{ color: colorMap[s.type] }}>{s.text}</span>
   ));
 }
-
-// ---------------------------------------------------------------------------
-// No mock data — stories are loaded from localStorage (populated by the
-// ideation pipeline).
-// ---------------------------------------------------------------------------
 
 const PRIORITY_CONFIG = {
   critical: { color: "#ffb4ab", bg: "bg-[#ffb4ab]/10", border: "border-[#ffb4ab]/20", icon: "keyboard_double_arrow_up", label: "Critical" },
@@ -2181,6 +2186,7 @@ function GlobalEvaluatorPanel({
 function ImplementationPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const projectId = searchParams.get("project") ?? "";
   const storyIdParam = searchParams.get("story") ?? "";
   const autoRun = searchParams.get("autorun") === "1";
 
@@ -2188,58 +2194,69 @@ function ImplementationPageInner() {
   const [mounted, setMounted] = useState(false);
   const [runningStories, setRunningStories] = useState<Record<string, boolean>>({});
   const [showEvaluator, setShowEvaluator] = useState<Record<string, boolean>>({});
-  const [evalContent, setEvalContent] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.evalContent ?? {}; } catch { return {}; }
-  });
+  const [evalContent, setEvalContent] = useState<Record<string, string>>({});
   // reasoning: key = `${storyId}:${variantId}`
-  const [reasoningContent, setReasoningContent] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.reasoningContent ?? {}; } catch { return {}; }
-  });
+  const [reasoningContent, setReasoningContent] = useState<Record<string, string>>({});
   // noFrontend: key = `${storyId}:${variantId}` — true when reasoning says frontend not needed
-  const [noFrontend, setNoFrontend] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.noFrontend ?? {}; } catch { return {}; }
-  });
+  const [noFrontend, setNoFrontend] = useState<Record<string, boolean>>({});
   const [selectedStoryId, setSelectedStoryId] = useState<string>(storyIdParam);
   const [rerunningVariants, setRerunningVariants] = useState<Record<string, boolean>>({});
-  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_state"); if (!raw) return {}; const p = JSON.parse(raw); return p.chatMessages ?? {}; } catch { return {}; }
-  });
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({});
   // prevCode: keyed `${storyId}:${variantId}`, stores backend/frontend code before last rerun
   const [prevCode, setPrevCode] = useState<Record<string, { backend: string; frontend: string }>>({});
   // Per-story poker sessions — one session per story
-  const [pokerSessions, setPokerSessions] = useState<Record<string, PokerSession>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_poker"); if (!raw) return {}; const p = JSON.parse(raw); return p.pokerSessions ?? {}; } catch { return {}; }
-  });
+  const [pokerSessions, setPokerSessions] = useState<Record<string, PokerSession>>({});
   // Ref always holds the latest value — avoids stale closures in async poker logic
   const pokerSessionsRef = useRef<Record<string, PokerSession>>({});
   useEffect(() => { pokerSessionsRef.current = pokerSessions; }, [pokerSessions]);
   // Per-story assigned agent label, set after poker completes (storyId → agent label)
-  const [storyAssignees, setStoryAssignees] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try { const raw = localStorage.getItem("itfest_poker"); if (!raw) return {}; const p = JSON.parse(raw); return p.storyAssignees ?? {}; } catch { return {}; }
-  });
+  const [storyAssignees, setStoryAssignees] = useState<Record<string, string>>({});
   // True when every story has a completed poker session
   const allDonePoker = stories.every((s) => pokerSessions[s.id]?.phase === "done");
   // Which story's poker drawer is open (null = closed)
   const [drawerStoryId, setDrawerStoryId] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const addLog = useCallback((_log: Omit<ActivityLog, "id">) => {}, []);
 
-  // Hydrate from localStorage on mount
+  // Hydrate from project state on mount
   useEffect(() => {
-    setMounted(true);
-    try {
-      const raw = localStorage.getItem("itfest_state");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.stories?.length) setStories(parsed.stories);
+    let cancelled = false;
+
+    async function hydratePage() {
+      try {
+        const dbSnapshot = await hydrateLegacySnapshots(projectId);
+
+        if (cancelled) return;
+        if (Array.isArray(dbSnapshot?.userStories)) setStories(dbSnapshot.userStories as UserStory[]);
+        if (dbSnapshot?.legacyState?.reasoningContent) setReasoningContent(dbSnapshot.legacyState.reasoningContent as Record<string, string>);
+        if (dbSnapshot?.legacyState?.evalContent) setEvalContent(dbSnapshot.legacyState.evalContent as Record<string, string>);
+        if (dbSnapshot?.legacyState?.chatMessages) setChatMessages(dbSnapshot.legacyState.chatMessages as Record<string, ChatMessage[]>);
+        if (dbSnapshot?.legacyState?.noFrontend) setNoFrontend(dbSnapshot.legacyState.noFrontend as Record<string, boolean>);
+        if (dbSnapshot?.legacyPoker?.pokerSessions) setPokerSessions(dbSnapshot.legacyPoker.pokerSessions as Record<string, PokerSession>);
+        if (dbSnapshot?.legacyPoker?.storyAssignees) setStoryAssignees(dbSnapshot.legacyPoker.storyAssignees as Record<string, string>);
+        if (dbSnapshot?.legacyState?.evalContent && typeof dbSnapshot.legacyState.evalContent === "object") {
+          const derived: Record<string, boolean> = {};
+          for (const key of Object.keys(dbSnapshot.legacyState.evalContent as Record<string, string>)) derived[key] = true;
+          setShowEvaluator(derived);
+        }
+        if (!storyIdParam) {
+          const firstStoryId = Array.isArray(dbSnapshot?.userStories) ? dbSnapshot.userStories[0]?.id : "";
+          if (firstStoryId) setSelectedStoryId(firstStoryId);
+        }
+      } catch { /* ignore */ }
+      finally {
+        if (!cancelled) {
+          setIsHydrated(true);
+          setMounted(true);
+        }
       }
-    } catch { /* ignore */ }
-  }, []);
+    }
+
+    void hydratePage();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, storyIdParam]);
 
   const now = () => new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
@@ -2664,38 +2681,19 @@ function ImplementationPageInner() {
   }, [stories, selectedStoryId, runningStories, runImplementation, pokerSessions]);
 
   // ---------------------------------------------------------------------------
-  // localStorage persistence — save/restore across sessions
+  // Persist project-backed implementation state
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const snapshot = JSON.stringify({ stories, reasoningContent, evalContent, chatMessages, noFrontend });
-      localStorage.setItem("itfest_state", snapshot);
-    } catch { /* quota or SSR — ignore */ }
-  }, [stories, reasoningContent, evalContent, chatMessages, noFrontend]);
+    if (!isHydrated) return;
+    const nextState = { stories, reasoningContent, evalContent, chatMessages, noFrontend };
+    void syncLegacySnapshots({ projectId, legacyState: nextState });
+  }, [stories, reasoningContent, evalContent, chatMessages, noFrontend, isHydrated, projectId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem("itfest_poker", JSON.stringify({ pokerSessions, storyAssignees }));
-    } catch { /* quota or SSR — ignore */ }
-  }, [pokerSessions, storyAssignees]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem("itfest_state");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      // Re-derive showEvaluator from restored evalContent (lazy inits handle the rest)
-      if (parsed.evalContent) {
-        const derived: Record<string, boolean> = {};
-        for (const k of Object.keys(parsed.evalContent)) derived[k] = true;
-        setShowEvaluator(derived);
-      }
-    } catch { /* corrupt data — ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!isHydrated) return;
+    const nextPoker = { pokerSessions, storyAssignees };
+    void syncLegacySnapshots({ projectId, legacyPoker: nextPoker });
+  }, [pokerSessions, storyAssignees, isHydrated, projectId]);
 
   // Auto-run all pending stories when arriving from "Dispatch Agents"
   const autoRunFiredRef = useRef(false);
@@ -2709,12 +2707,60 @@ function ImplementationPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, runImplementation, mounted, stories.length]);
 
-  const clearSession = useCallback(() => {
+  const applyMockImplementation = useCallback(() => {
+    const demoStories = createDemoImplementedStories();
+    const demoReasoning = createDemoReasoningContent();
+    const demoEval = createDemoEvalContent();
+    const demoChat = createDemoChatMessages();
+    const demoNoFrontend = createDemoNoFrontend();
+    const demoPokerSessions = createDemoPokerSessions();
+    const demoStoryAssignees = createDemoStoryAssignees();
+
+    autoRunFiredRef.current = true;
+    setStories(demoStories);
+    setSelectedStoryId(demoStories[0]?.id ?? "");
+    setReasoningContent(demoReasoning);
+    setEvalContent(demoEval);
+    setChatMessages(demoChat);
+    setNoFrontend(demoNoFrontend);
+    setShowEvaluator(Object.fromEntries(demoStories.map((story) => [story.id, true])));
+    setRunningStories({});
+    setRerunningVariants({});
+    setPokerSessions(demoPokerSessions);
+    setStoryAssignees(demoStoryAssignees);
+
     if (typeof window !== "undefined") {
-      localStorage.removeItem("itfest_state");
-      localStorage.removeItem("itfest_poker");
+      const nextState = {
+        stories: demoStories,
+        reasoningContent: demoReasoning,
+        evalContent: demoEval,
+        chatMessages: demoChat,
+        noFrontend: demoNoFrontend,
+      };
+      const nextPoker = {
+        pokerSessions: demoPokerSessions,
+        storyAssignees: demoStoryAssignees,
+      };
+      void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker });
     }
-    setStories(stories.map((s) => ({ ...s, variants: [], status: "pending" as const, chosenVariant: undefined })));
+  }, [projectId]);
+
+  const clearSession = useCallback(() => {
+    void syncLegacySnapshots({
+      projectId,
+      legacyState: {},
+      legacyPoker: {},
+      replaceLegacyState: true,
+      replaceLegacyPoker: true,
+    });
+    setStories((currentStories) =>
+      currentStories.map((story) => ({
+        ...story,
+        variants: [],
+        status: "pending" as const,
+        chosenVariant: undefined,
+      }))
+    );
     setReasoningContent({});
     setEvalContent({});
     setChatMessages({});
@@ -2724,7 +2770,7 @@ function ImplementationPageInner() {
     setRerunningVariants({});
     setPokerSessions({});
     setStoryAssignees({});
-  }, []);
+  }, [projectId]);
 
   // ---------------------------------------------------------------------------
   // Planning Poker — per-story session
@@ -2855,7 +2901,7 @@ function ImplementationPageInner() {
       `\nInitial Estimates:\n${estimatesSummary}`,
       `\nDebate:\n${debateTranscript}`,
     ].join("\n"));
-  }, [stories]);
+  }, [projectId, stories]);
 
   // Standalone evaluator runner (called by runImplementation and CTA button)
   const runEvaluator = useCallback(async (storyId: string) => {
@@ -2881,7 +2927,7 @@ function ImplementationPageInner() {
 
   const handleConfirmMerge = useCallback(() => {
     const param = stories.map((s) => `${s.id}:${s.chosenVariant}`).join(",");
-    router.push(`/testing?stories=${encodeURIComponent(param)}`);
+    router.push(withOptionalProjectQuery(`/testing?stories=${encodeURIComponent(param)}`, projectId));
   }, [stories, router]);
 
   const selectedStory = stories.find((s) => s.id === selectedStoryId) ?? stories[0];
@@ -2943,10 +2989,17 @@ function ImplementationPageInner() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <a href="/design" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/design", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Backlog
             </a>
+            <button
+              onClick={applyMockImplementation}
+              className="flex items-center gap-1.5 rounded-lg border border-[#4edea3]/30 bg-[#4edea3]/5 px-3 py-1.5 text-xs font-semibold text-[#4edea3] hover:bg-[#4edea3]/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Implementation
+            </button>
             <button
               onClick={clearSession}
               className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -2994,7 +3047,7 @@ function ImplementationPageInner() {
                     <p className="text-[11px] text-[#474746] max-w-xs leading-relaxed">
                       Go to the Design page to generate and estimate user stories first, then click Implement Backlog.
                     </p>
-                    <a href="/design" className="mt-2 flex items-center gap-1 rounded-lg border border-[#3c4a42]/30 px-4 py-2 text-xs text-[#4edea3] hover:bg-[#4edea3]/5 transition-colors">
+                    <a href={withOptionalProjectQuery("/design", projectId)} className="mt-2 flex items-center gap-1 rounded-lg border border-[#3c4a42]/30 px-4 py-2 text-xs text-[#4edea3] hover:bg-[#4edea3]/5 transition-colors">
                       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
                       Go to Design
                     </a>

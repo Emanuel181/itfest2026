@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { getProjectIdFromCurrentUrl, withOptionalProjectQuery } from "@/lib/backend/project-client"
 
 type SDLCPhase = {
   id: string
@@ -92,21 +94,22 @@ export function SDLCSidebar() {
   const pathname = usePathname()
   const activePhaseId = getActivePhaseId(pathname)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(activePhaseId ? [activePhaseId] : []))
-  const [isHydrated, setIsHydrated] = useState(false)
+  const [userEmail, setUserEmail] = useState("Loading account...")
+  const projectId = useMemo(() => getProjectIdFromCurrentUrl(), [pathname])
+  const projectHref = useMemo(() => withOptionalProjectQuery("/projects", projectId), [projectId])
 
   useEffect(() => {
-    setIsHydrated(true)
-  }, [])
-
-  useEffect(() => {
-    if (activePhaseId) {
-      setExpandedPhases((prev) => {
-        const next = new Set(prev)
-        next.add(activePhaseId)
-        return next
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (payload?.user?.email) {
+          setUserEmail(payload.user.email)
+        }
       })
-    }
-  }, [activePhaseId])
+      .catch(() => {
+        setUserEmail("Signed in")
+      })
+  }, [])
 
   function togglePhase(phaseId: string) {
     setExpandedPhases((prev) => {
@@ -126,7 +129,7 @@ export function SDLCSidebar() {
 
       <div className="space-y-1">
         {SDLC_PHASES.map((phase) => {
-          const isExpanded = expandedPhases.has(phase.id)
+          const isExpanded = expandedPhases.has(phase.id) || phase.id === activePhaseId
           const isActivePhase = phase.id === activePhaseId
 
           return (
@@ -151,7 +154,7 @@ export function SDLCSidebar() {
                   {phase.number}
                 </span>
                 <span className="flex-1 text-[12px] font-semibold uppercase tracking-wide">
-                  {isHydrated ? phase.label : ""}
+                  {phase.label}
                 </span>
                 <span
                   className={cn(
@@ -170,9 +173,9 @@ export function SDLCSidebar() {
                     const isActive = isStageActive(stage.href, pathname)
 
                     return (
-                      <a
+                      <Link
                         key={stage.id}
-                        href={stage.href}
+                        href={withOptionalProjectQuery(stage.href, projectId)}
                         className={cn(
                           "flex w-full items-start gap-2 rounded-[6px] px-2 py-1.5 text-left text-[12px] font-medium transition-all duration-200",
                           isActive
@@ -191,7 +194,7 @@ export function SDLCSidebar() {
                             >
                               {stage.icon}
                             </span>
-                            <span className="text-[12px]">{isHydrated ? stage.label : ""}</span>
+                            <span className="text-[12px]">{stage.label}</span>
                             <span
                               className="material-symbols-outlined text-muted-foreground/30"
                               style={{ fontSize: 10 }}
@@ -200,10 +203,10 @@ export function SDLCSidebar() {
                             </span>
                           </span>
                           <span className="ml-[22px] text-[10px] font-normal leading-snug text-muted-foreground/60">
-                            {isHydrated ? stage.description : ""}
+                            {stage.description}
                           </span>
                         </span>
-                      </a>
+                      </Link>
                     )
                   })}
                 </div>
@@ -213,14 +216,64 @@ export function SDLCSidebar() {
         })}
       </div>
 
+      <div className="mt-4 border-t border-border/20 pt-3">
+        <Link
+          href={withOptionalProjectQuery("/code", projectId)}
+          className={cn(
+            "flex items-center gap-3 rounded-[10px] border px-3 py-3 transition-all duration-200",
+            pathname.startsWith("/code")
+              ? "border-primary/30 bg-primary/10 text-primary shadow-sm"
+              : "border-border/30 bg-card/30 text-muted-foreground hover:border-primary/20 hover:bg-card hover:text-foreground"
+          )}
+        >
+          <div
+            className={cn(
+              "grid size-9 place-items-center rounded-lg",
+              pathname.startsWith("/code") ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground/70"
+            )}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>terminal</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-semibold uppercase tracking-wide">View Code</div>
+            <div className="text-[10px] text-muted-foreground/70">VS Code style explorer for AI output</div>
+          </div>
+          <span className="material-symbols-outlined text-muted-foreground/40" style={{ fontSize: 14 }}>arrow_forward</span>
+        </Link>
+      </div>
+
       <div className="mt-auto border-t border-border/20 pt-3 px-4 pb-3">
+        <Link
+          href={projectHref}
+          className={cn(
+            "mb-3 flex items-center gap-3 rounded-[10px] border px-3 py-3 transition-all duration-200",
+            pathname.startsWith("/projects")
+              ? "border-primary/30 bg-primary/10 text-primary shadow-sm"
+              : "border-border/30 bg-card/30 text-muted-foreground hover:border-primary/20 hover:bg-card hover:text-foreground"
+          )}
+        >
+          <div
+            className={cn(
+              "grid size-9 place-items-center rounded-lg",
+              pathname.startsWith("/projects") ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground/70"
+            )}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>folder_managed</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-semibold uppercase tracking-wide">Projects</div>
+            <div className="text-[10px] text-muted-foreground/70">Manage access, invites and saved work</div>
+          </div>
+          <span className="material-symbols-outlined text-muted-foreground/40" style={{ fontSize: 14 }}>arrow_forward</span>
+        </Link>
+
         <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-muted/50 transition-colors cursor-pointer">
           <div className="grid size-7 place-items-center rounded-full bg-primary/10">
             <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>person</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-foreground truncate">User Account</p>
-            <p className="text-[10px] text-muted-foreground/60 truncate">user@example.com</p>
+            <p className="text-[10px] text-muted-foreground/60 truncate">{userEmail}</p>
           </div>
           <span className="material-symbols-outlined text-muted-foreground/40" style={{ fontSize: 14 }}>more_horiz</span>
         </div>

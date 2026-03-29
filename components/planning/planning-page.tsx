@@ -4,10 +4,10 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ChatPanel, type ChatMessage } from "@/components/planning/chat-panel"
 import { DocSidePanel } from "@/components/planning/doc-side-panel"
-import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ProjectState } from "@/lib/backend/types"
+import { syncLegacySnapshots } from "@/lib/backend/project-client"
 
 type PlanningPageProps = {
   initialProject: ProjectState
@@ -68,6 +68,125 @@ const TECHNICAL_STARTERS = [
   "Vreau sa folosesc Next.js",
   "Am nevoie de o baza de date",
   "Cum ar trebui sa structurez API-ul?",
+]
+
+const MOCK_PRODUCT_DOC = {
+  title: "Luminescent IDE",
+  objective:
+    "Un IDE web colaborativ, AI-native, care ghideaza echipele software prin toate etapele SDLC si produce artefacte clare, cod si preview-uri cu human approval la fiecare tranzitie importanta.",
+  audience: [
+    "Echipe de dezvoltare software din startup-uri si companii de produs",
+    "Tech leads si engineering managers care coordoneaza livrarea",
+    "Developeri full-stack care vor accelerare in discovery, planning si implementation",
+    "Hackathoane si demo-uri unde viteza de trecere prin SDLC conteaza",
+  ],
+  scope: [
+    "Convorbire AI structurata pentru business discovery si technical discovery",
+    "Generare de requirements, features si user stories trasabile",
+    "3 variante paralele de implementare pentru fiecare user story",
+    "Security review, merge orchestration si project review",
+    "Workspace cu preview live pentru aplicatia generata",
+  ],
+  outOfScope: [
+    "Deploy automat in productie in prima versiune",
+    "Integrare cu toate platformele externe de issue tracking din prima iteratie",
+    "Editare colaborativa avansata in timp real pentru cod sursa final",
+  ],
+  deliverables: [
+    "Brief de produs si documentatie tehnica aprobate",
+    "Requirements, feature backlog si user stories aprobate",
+    "Workspace generat cu preview functional",
+    "Security report, merge log si project health report",
+  ],
+  risks: [
+    "Conversatiile de discovery pot dura prea mult pentru demo-uri live",
+    "Output-ul AI poate deveni inconsistent intre ecranele legacy si backend-ul nou",
+    "Preview-ul poate esua daca workspace-ul generat contine cod invalid",
+  ],
+  extraNotes: [
+    "Aplicatia trebuie sa aiba si un mod rapid pentru demo, fara a parcurge manual tot discovery-ul.",
+  ],
+} satisfies Record<string, unknown>
+
+const MOCK_TECHNICAL_DOC = {
+  techStack: [
+    "Next.js 16 App Router",
+    "TypeScript",
+    "Tailwind CSS",
+    "OpenAI API",
+    "AWS Bedrock",
+    "esbuild runtime preview",
+    "Local JSON project store",
+  ],
+  architecture:
+    "Aplicatia foloseste un frontend Next.js cu route handlers server-side pentru orchestration. Un backend local persistent pastreaza proiectele, artefactele si workspace-ul. Preview-ul compileaza fisierele generate din workspace cu esbuild si monteaza pagina intr-un runtime de browser izolat.",
+  database:
+    "Pentru demo si dezvoltare folosim persistenta locala in fisiere JSON pe proiect. Modelul de date contine brief, requirements, features, user stories, variante, artefacte, activity feed, workspace files/folders, security report, merge report si project health.",
+  apis:
+    "API-urile principale sunt /api/project pentru orchestration state, /api/messages pentru conversatii business/tech, /api/workspace/* pentru fisiere si foldere, /api/preview pentru runtime preview si /api/agent pentru streaming de output de la agenti specializati.",
+  authStrategy:
+    "Pentru demo autentificarea este optionala. Pentru productie recomandam autentificare cu Cognito sau NextAuth, roluri pe proiect si audit trail pentru toate aprobarile dintre etapele SDLC.",
+  deployment:
+    "Frontend-ul poate rula pe Amplify sau App Runner. Pentru demo local folosim next dev. Etapele lente trebuie sa aiba timeout configurabil, iar preview-ul trebuie sa poata esua elegant fara sa blocheze proiectul.",
+  infrastructure:
+    "Arhitectura target include hosting Next.js, storage pentru artefacte, persistenta pentru proiecte si WebSockets pentru activity feed live. In demo, aceste responsabilitati sunt emulate local pentru viteza si predictibilitate.",
+  extraNotes: [
+    "Pentru prezentari avem nevoie de un buton de mock conversation care umple instant documentatia si deblocheaza etapa urmatoare.",
+  ],
+} satisfies Record<string, unknown>
+
+const MOCK_PRODUCT_MESSAGES: ChatMessage[] = [
+  {
+    id: "mock-product-human-1",
+    author: "You",
+    role: "human",
+    text: "Vreau un IDE web AI-native pentru echipe software, unde agentii participa in fiecare etapa din SDLC si oamenii aproba tranzitiile critice.",
+  },
+  {
+    id: "mock-product-ai-1",
+    author: "Product AI",
+    role: "ai",
+    text: "Am inteles: produsul este un workspace colaborativ orientat pe SDLC complet, nu doar un chat cu AI. Accentul cade pe orchestrare, trasabilitate si handoff-uri clare intre ideation, planning, implementation si review.",
+  },
+  {
+    id: "mock-product-human-2",
+    author: "You",
+    role: "human",
+    text: "Pentru demo vreau sa pot genera rapid brief, requirements, user stories, cod si preview, fara sa stau prea mult in discovery.",
+  },
+  {
+    id: "mock-product-ai-2",
+    author: "Product AI",
+    role: "ai",
+    text: "Perfect. Pentru prezentare, produsul trebuie sa sustina atat flow-ul complet, cat si un fast-forward controlat pentru demo-uri live.",
+  },
+]
+
+const MOCK_TECHNICAL_MESSAGES: ChatMessage[] = [
+  {
+    id: "mock-tech-human-1",
+    author: "You",
+    role: "human",
+    text: "Vreau frontend in Next.js, preview runtime pentru workspace si agenti care genereaza artefacte si variante de implementare.",
+  },
+  {
+    id: "mock-tech-ai-1",
+    author: "Tech AI",
+    role: "ai",
+    text: "Directia tehnica buna este un backend orchestrat prin route handlers, persistenta locala pe proiect si runtime preview care bundle-uieste fisierele generate. Astfel demo-ul ramane rapid, iar proiectul pastreaza trasabilitatea.",
+  },
+  {
+    id: "mock-tech-human-2",
+    author: "You",
+    role: "human",
+    text: "Mai vreau un shortcut pentru demo care sa precompleteze conversatiile business si technical si sa ne lase sa trecem imediat la Analysis.",
+  },
+  {
+    id: "mock-tech-ai-2",
+    author: "Tech AI",
+    role: "ai",
+    text: "Atunci trebuie sa populam instant documentatia, progresul intrebarilor si brief-ul minim necesar in backend, plus persistenta locala pentru ecranele legacy.",
+  },
 ]
 
 // List-type fields where semicolon-separated values become arrays
@@ -188,7 +307,14 @@ function deriveProgress(doc: Record<string, unknown>, questions: typeof PRODUCT_
 export function PlanningPage({ initialProject, initialProjectId }: PlanningPageProps) {
   const [activeChannel, setActiveChannel] = useState<"product" | "technical">("product")
   const [productMessages, setProductMessages] = useState<ChatMessage[]>(() => {
-    return initialProject.messages.business.map((m) => ({
+    const source =
+      initialProject.messages.business.length > 0
+        ? initialProject.messages.business
+        : Array.isArray(initialProject.legacyState?.productMessages)
+          ? initialProject.legacyState.productMessages
+          : []
+
+    return source.map((m) => ({
       id: m.id,
       author: m.author,
       role: m.role,
@@ -196,7 +322,14 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
     }))
   })
   const [technicalMessages, setTechnicalMessages] = useState<ChatMessage[]>(() => {
-    return initialProject.messages.tech.map((m) => ({
+    const source =
+      initialProject.messages.tech.length > 0
+        ? initialProject.messages.tech
+        : Array.isArray(initialProject.legacyState?.technicalMessages)
+          ? initialProject.legacyState.technicalMessages
+          : []
+
+    return source.map((m) => ({
       id: m.id,
       author: m.author,
       role: m.role,
@@ -292,17 +425,13 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
     technicalAutoStarted.current = false
     setIsSending(false)
     setIsSummarizing(false)
-    // Clear localStorage
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem("itfest_state", JSON.stringify({
-        ...existing,
-        productDocumentation: "{}",
-        technicalDocumentation: "{}",
+    void syncLegacySnapshots({
+      projectId: projectIdRef.current,
+      legacyState: {
         productMessages: [],
         technicalMessages: [],
-      }))
-    } catch { /* ignore */ }
+      },
+    })
     // Reset backend project
     fetch(withProjectQuery("/api/project", projectIdRef.current), {
       method: "PATCH",
@@ -326,20 +455,53 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
     }, 0)
   }, [])
 
-  // Save docs to localStorage for cross-page access
-  useEffect(() => {
-    if (!isHydrated) return
-    try {
-      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
-      localStorage.setItem("itfest_state", JSON.stringify({
-        ...existing,
-        productDocumentation: JSON.stringify(productDoc),
-        technicalDocumentation: JSON.stringify(technicalDoc),
-        productMessages,
-        technicalMessages,
-      }))
-    } catch { /* quota */ }
-  }, [productDoc, technicalDoc, productMessages, technicalMessages, isHydrated])
+  const handleMockConversation = useCallback(() => {
+    const nextProductProgress = deriveProgress(MOCK_PRODUCT_DOC, PRODUCT_QUESTIONS)
+    const nextTechnicalProgress = deriveProgress(MOCK_TECHNICAL_DOC, TECHNICAL_QUESTIONS)
+
+    setCycleStarted(true)
+    setProductMessages(MOCK_PRODUCT_MESSAGES)
+    setTechnicalMessages(MOCK_TECHNICAL_MESSAGES)
+    setProductDoc(MOCK_PRODUCT_DOC)
+    setTechnicalDoc(MOCK_TECHNICAL_DOC)
+    setProductProgress(nextProductProgress)
+    setTechnicalProgress(nextTechnicalProgress)
+    setProductComplete(true)
+    setTechnicalComplete(true)
+    setActiveChannel("technical")
+    technicalAutoStarted.current = true
+
+    const nextBrief = {
+      ...initialProject.brief,
+      title: String(MOCK_PRODUCT_DOC.title),
+      objective: String(MOCK_PRODUCT_DOC.objective),
+      audience: Array.isArray(MOCK_PRODUCT_DOC.audience) ? [...MOCK_PRODUCT_DOC.audience] : [],
+      scope: Array.isArray(MOCK_PRODUCT_DOC.scope) ? [...MOCK_PRODUCT_DOC.scope] : [],
+      deliverables: Array.isArray(MOCK_PRODUCT_DOC.deliverables) ? [...MOCK_PRODUCT_DOC.deliverables] : [],
+      risks: Array.isArray(MOCK_PRODUCT_DOC.risks) ? [...MOCK_PRODUCT_DOC.risks] : [],
+      techStack: Array.isArray(MOCK_TECHNICAL_DOC.techStack) ? [...MOCK_TECHNICAL_DOC.techStack] : [],
+      architecture: String(MOCK_TECHNICAL_DOC.architecture),
+      dbSchema: String(MOCK_TECHNICAL_DOC.database),
+    }
+    void syncLegacySnapshots({
+      projectId: projectIdRef.current,
+      legacyState: {
+        productMessages: MOCK_PRODUCT_MESSAGES,
+        technicalMessages: MOCK_TECHNICAL_MESSAGES,
+      },
+    })
+
+    void fetch(withProjectQuery("/api/project", projectIdRef.current), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "update-brief",
+        brief: nextBrief,
+        productDocumentation: JSON.stringify(MOCK_PRODUCT_DOC),
+        technicalDocumentation: JSON.stringify(MOCK_TECHNICAL_DOC),
+      }),
+    }).catch(() => undefined)
+  }, [initialProject.brief])
 
   // All 7 product fields must be filled for product to be "ready"
   const productDocReady = PRODUCT_QUESTIONS.every((q) => productProgress[q.key])
@@ -748,6 +910,15 @@ export function PlanningPage({ initialProject, initialProjectId }: PlanningPageP
                 Reset
               </button>
             )}
+
+            <button
+              onClick={handleMockConversation}
+              disabled={isSending || isSummarizing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 transition-colors disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+              Mock Conversation
+            </button>
 
             {technicalDocReady && (
               <a

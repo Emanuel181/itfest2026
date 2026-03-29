@@ -156,10 +156,14 @@ export type AgentState = {
 }
 
 export type Collaborator = {
+  id?: string
   name: string
+  email?: string
   role: string
   initials: string
   status: string
+  isOwner?: boolean
+  invitePending?: boolean
 }
 
 export type WorkspaceState = {
@@ -238,6 +242,8 @@ export type ProjectState = {
   mergeReport: MergeReport
   projectHealth: ProjectHealthReport
   preview: PreviewState
+  legacyState: Record<string, unknown>
+  legacyPoker: Record<string, unknown>
 }
 
 export type MessageChannel = "business" | "tech"

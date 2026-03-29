@@ -1,11 +1,19 @@
 "use client"
 
 import { useEffect, useState, useRef, Suspense } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import { callAgentStream } from "@/lib/agents/client"
+import {
+  createDemoImplementedStories,
+  createDemoPokerSessions,
+  createDemoStoryAssignees,
+  DEMO_MERGED_CODE,
+  DEMO_TESTING_SELECTIONS,
+} from "@/lib/demo/mock-sdlc"
 
 interface StorySelection {
   id: string
@@ -23,7 +31,7 @@ interface ActivityEntry {
 
 function TestingPageInner() {
   const searchParams = useSearchParams()
-  const router = useRouter()
+  const projectId = searchParams.get("project") ?? ""
 
   // Parse story selections from URL
   const [selections, setSelections] = useState<StorySelection[]>([])
@@ -34,16 +42,31 @@ function TestingPageInner() {
   const logEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setIsHydrated(true)
-    const storiesParam = searchParams.get("stories")
-    if (storiesParam) {
-      const pairs = storiesParam.split(",").map((pair) => {
-        const [id, variant] = pair.split(":")
-        return { id, variant }
-      })
-      setSelections(pairs)
+    let cancelled = false
+
+    async function hydratePage() {
+      try {
+        const dbSnapshot = await hydrateLegacySnapshots(projectId)
+      } catch {
+        // ignore hydration failures
+      } finally {
+        const storiesParam = searchParams.get("stories")
+        if (storiesParam && !cancelled) {
+          const pairs = storiesParam.split(",").map((pair) => {
+            const [id, variant] = pair.split(":")
+            return { id, variant }
+          })
+          setSelections(pairs)
+        }
+        if (!cancelled) setIsHydrated(true)
+      }
     }
-  }, [searchParams])
+
+    void hydratePage()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, searchParams])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -99,31 +122,25 @@ function TestingPageInner() {
         }
       )
 
-      // Build merged code from localStorage
-      try {
-        const raw = localStorage.getItem("itfest_state")
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          const files: Record<string, string> = {}
-          if (parsed.stories) {
-            for (const selection of selections) {
-              const story = parsed.stories.find((s: { id: string }) => s.id === selection.id)
-              if (story?.variants) {
-                const variant = story.variants.find((v: { id: string }) => v.id.includes(selection.variant))
-                if (variant) {
-                  if (variant.backend?.content) files[`/src/${story.id}/backend.ts`] = variant.backend.content
-                  if (variant.frontend?.content) files[`/src/${story.id}/frontend.tsx`] = variant.frontend.content
-                }
-              }
+      const dbSnapshot = await hydrateLegacySnapshots(projectId)
+      const files: Record<string, string> = {}
+      const stories = Array.isArray(dbSnapshot?.userStories) ? dbSnapshot.userStories : []
+      if (stories.length > 0) {
+        for (const selection of selections) {
+          const story = stories.find((s: { id: string }) => s.id === selection.id)
+          if (story?.variants) {
+            const variant = story.variants.find((v: { id: string }) => v.id.includes(selection.variant))
+            if (variant) {
+              if (variant.backend?.content) files[`/src/${story.id}/backend.ts`] = variant.backend.content
+              if (variant.frontend?.content) files[`/src/${story.id}/frontend.tsx`] = variant.frontend.content
             }
-            // Generate basic app structure
-            files["/package.json"] = JSON.stringify({ name: "merged-project", dependencies: { react: "^18", "react-dom": "^18", next: "^14" } }, null, 2)
-            files["/src/app/page.tsx"] = `export default function Home() {\n  return <div className="p-8"><h1 className="text-2xl font-bold">Merged Project</h1><p>${selections.length} stories integrated</p></div>\n}`
-            files["/src/app/layout.tsx"] = `export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return <html><body>{children}</body></html>\n}`
           }
-          setMergedCode(files)
         }
-      } catch { /* ignore */ }
+        files["/package.json"] = JSON.stringify({ name: "merged-project", dependencies: { react: "^18", "react-dom": "^18", next: "^14" } }, null, 2)
+        files["/src/app/page.tsx"] = `export default function Home() {\n  return <div className="p-8"><h1 className="text-2xl font-bold">Merged Project</h1><p>${selections.length} stories integrated</p></div>\n}`
+        files["/src/app/layout.tsx"] = `export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return <html><body>{children}</body></html>\n}`
+      }
+      setMergedCode(files)
 
       setMergePhase("done")
     } catch (err) {
@@ -133,6 +150,51 @@ function TestingPageInner() {
       ])
       setMergePhase("done")
     }
+  }
+
+  function applyMockMerge() {
+    const demoStories = createDemoImplementedStories()
+    const demoSelections = DEMO_TESTING_SELECTIONS
+    const demoActivity: ActivityEntry[] = [
+      {
+        id: "mock-merge-1",
+        agent: "Merge Agent",
+        color: "#4edea3",
+        message: "Collected selected variants and prepared the integration workspace.",
+        timestamp: "10:05:00",
+        done: true,
+      },
+      {
+        id: "mock-merge-2",
+        agent: "Build Agent",
+        color: "#ffd080",
+        message: "Bundled the merged preview app and validated the runtime structure.",
+        timestamp: "10:05:06",
+        done: true,
+      },
+      {
+        id: "mock-merge-3",
+        agent: "Security Auditor",
+        color: "#ffb4ab",
+        message: "Confirmed the selected variants are safe for demo handoff.",
+        timestamp: "10:05:12",
+        done: true,
+      },
+    ]
+
+    setSelections(demoSelections)
+    setActivityLog(demoActivity)
+    setMergedCode(DEMO_MERGED_CODE)
+    setMergePhase("done")
+
+    const nextState = {
+      stories: demoStories,
+    }
+    const nextPoker = {
+      pokerSessions: createDemoPokerSessions(),
+      storyAssignees: createDemoStoryAssignees(),
+    }
+    void syncLegacySnapshots({ projectId, legacyState: nextState, legacyPoker: nextPoker })
   }
 
   if (!isHydrated) {
@@ -170,13 +232,20 @@ function TestingPageInner() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/implementation" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/implementation", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Implementation
             </a>
+            <button
+              onClick={applyMockMerge}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Merge
+            </button>
             {mergePhase === "done" && (
               <a
-                href="/maintenance"
+                href={withOptionalProjectQuery("/maintenance", projectId)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Go to Maintenance

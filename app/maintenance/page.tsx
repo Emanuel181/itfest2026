@@ -1,9 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useSearchParams } from "next/navigation"
+import { hydrateLegacySnapshots, syncLegacySnapshots, withOptionalProjectQuery } from "@/lib/backend/project-client"
 import { callAgentStream } from "@/lib/agents/client"
+import { createDemoImplementedStories, DEMO_SECURITY_REPORT } from "@/lib/demo/mock-sdlc"
 import { cn } from "@/lib/utils"
 
 interface SecurityIssue {
@@ -45,7 +48,9 @@ function Ring({ value, size = 80, strokeWidth = 6, color }: { value: number; siz
   )
 }
 
-export default function MaintenancePage() {
+function MaintenancePageInner() {
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get("project") ?? ""
   const [report, setReport] = useState<SecurityReport | null>(null)
   const [isAuditing, setIsAuditing] = useState(false)
   const [streamContent, setStreamContent] = useState("")
@@ -53,39 +58,43 @@ export default function MaintenancePage() {
   const [storiesCount, setStoriesCount] = useState(0)
 
   useEffect(() => {
-    setIsHydrated(true)
-    try {
-      const raw = localStorage.getItem("itfest_state")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.stories) setStoriesCount(parsed.stories.length)
+    let cancelled = false
+
+    async function hydratePage() {
+      try {
+        const dbSnapshot = await hydrateLegacySnapshots(projectId)
+        if (!cancelled && Array.isArray(dbSnapshot?.userStories)) {
+          setStoriesCount(dbSnapshot.userStories.length)
+        }
+      } catch { /* ignore */ }
+      finally {
+        if (!cancelled) setIsHydrated(true)
       }
-    } catch { /* ignore */ }
-  }, [])
+    }
+
+    void hydratePage()
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
 
   async function runSecurityAudit() {
     setIsAuditing(true)
     setStreamContent("")
     setReport(null)
 
-    // Collect all code from localStorage
     let codeContext = ""
-    try {
-      const raw = localStorage.getItem("itfest_state")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed.stories) {
-          for (const story of parsed.stories) {
-            if (story.variants) {
-              for (const variant of story.variants) {
-                if (variant.backend?.content) codeContext += `\n--- Backend (${story.id}/${variant.id}) ---\n${variant.backend.content}`
-                if (variant.frontend?.content) codeContext += `\n--- Frontend (${story.id}/${variant.id}) ---\n${variant.frontend.content}`
-              }
-            }
+    const dbSnapshot = await hydrateLegacySnapshots(projectId)
+    if (Array.isArray(dbSnapshot?.userStories)) {
+      for (const story of dbSnapshot.userStories) {
+        if (story.variants) {
+          for (const variant of story.variants) {
+            if (variant.backend?.content) codeContext += `\n--- Backend (${story.id}/${variant.id}) ---\n${variant.backend.content}`
+            if (variant.frontend?.content) codeContext += `\n--- Frontend (${story.id}/${variant.id}) ---\n${variant.frontend.content}`
           }
         }
       }
-    } catch { /* ignore */ }
+    }
 
     if (!codeContext) codeContext = "No implementation code available for audit."
 
@@ -116,6 +125,18 @@ export default function MaintenancePage() {
     } finally {
       setIsAuditing(false)
     }
+  }
+
+  function applyMockAudit() {
+    setIsAuditing(false)
+    setStreamContent("")
+    setReport(DEMO_SECURITY_REPORT)
+    setStoriesCount((current) => (current > 0 ? current : createDemoImplementedStories().length))
+
+    const nextState = {
+      stories: createDemoImplementedStories(),
+    }
+    void syncLegacySnapshots({ projectId, legacyState: nextState })
   }
 
   const severityConfig = {
@@ -152,10 +173,17 @@ export default function MaintenancePage() {
             <span className="rounded-md bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-500">PHASE 6</span>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/testing" className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <a href={withOptionalProjectQuery("/testing", projectId)} className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Testing
             </a>
+            <button
+              onClick={applyMockAudit}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Audit
+            </button>
             <button
               onClick={runSecurityAudit}
               disabled={isAuditing}
@@ -329,5 +357,17 @@ export default function MaintenancePage() {
         </ScrollArea>
       </main>
     </div>
+  )
+}
+
+export default function MaintenancePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <MaintenancePageInner />
+    </Suspense>
   )
 }

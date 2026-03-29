@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import {
-  getProjectIdFromRequest,
-  invalidProjectResponse,
   isMessageChannel,
   readJsonBody,
 } from "@/lib/backend/http"
 import { appendConversationMessage } from "@/lib/backend/service"
+import { requireProjectAccess } from "@/lib/server/project-auth"
 import type { MessageChannel } from "@/lib/backend/types"
 
 export const runtime = "nodejs"
 
 export async function POST(request: NextRequest) {
-  const projectId = getProjectIdFromRequest(request)
-  if (!projectId) return invalidProjectResponse()
+  const access = await requireProjectAccess(request)
+  if (!access.ok) return access.response
 
   const payload = await readJsonBody(request)
   if (!payload.ok) return payload.response
@@ -36,5 +35,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Message text is required." }, { status: 400 })
   }
 
-  return NextResponse.json(await appendConversationMessage({ ...body, projectId }))
+  return NextResponse.json(await appendConversationMessage({ ...body, projectId: access.projectId }))
 }

@@ -529,14 +529,47 @@ export async function transitionStage(projectId: string, stage: StageKey, detail
   })
 }
 
-export async function updateBrief(projectId: string, brief: BriefState) {
+export async function updateBrief(
+  projectId: string,
+  brief?: BriefState,
+  extras?: {
+    productDocumentation?: string
+    technicalDocumentation?: string
+    legacyState?: Record<string, unknown>
+    legacyPoker?: Record<string, unknown>
+    replaceLegacyState?: boolean
+    replaceLegacyPoker?: boolean
+    silent?: boolean
+  }
+) {
   return updateProjectState(projectId, async (project) => {
+    const nextLegacyState =
+      extras?.legacyState
+        ? extras.replaceLegacyState
+          ? extras.legacyState
+          : { ...(project.legacyState ?? {}), ...extras.legacyState }
+        : project.legacyState
+    const nextLegacyPoker =
+      extras?.legacyPoker
+        ? extras.replaceLegacyPoker
+          ? extras.legacyPoker
+          : { ...(project.legacyPoker ?? {}), ...extras.legacyPoker }
+        : project.legacyPoker
+
     const next = touch({
       ...project,
-      brief,
+      brief: brief ?? project.brief,
+      productDocumentation: extras?.productDocumentation ?? project.productDocumentation,
+      technicalDocumentation: extras?.technicalDocumentation ?? project.technicalDocumentation,
+      legacyState: nextLegacyState,
+      legacyPoker: nextLegacyPoker,
     })
 
-    return appendActivity(next, "Brief updated", "Project brief a fost salvat în backend fără să rescrie artefactele generate.")
+    if (extras?.silent) {
+      return next
+    }
+
+    return appendActivity(next, "Project saved", "Brief-ul și snapshot-urile etapei curente au fost salvate în MongoDB.")
   })
 }
 
