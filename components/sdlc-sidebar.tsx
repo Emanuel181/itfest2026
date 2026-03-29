@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -92,21 +93,6 @@ export function SDLCSidebar() {
   const pathname = usePathname()
   const activePhaseId = getActivePhaseId(pathname)
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set(activePhaseId ? [activePhaseId] : []))
-  const [isHydrated, setIsHydrated] = useState(false)
-
-  useEffect(() => {
-    setIsHydrated(true)
-  }, [])
-
-  useEffect(() => {
-    if (activePhaseId) {
-      setExpandedPhases((prev) => {
-        const next = new Set(prev)
-        next.add(activePhaseId)
-        return next
-      })
-    }
-  }, [activePhaseId])
 
   function togglePhase(phaseId: string) {
     setExpandedPhases((prev) => {
@@ -126,7 +112,7 @@ export function SDLCSidebar() {
 
       <div className="space-y-1">
         {SDLC_PHASES.map((phase) => {
-          const isExpanded = expandedPhases.has(phase.id)
+          const isExpanded = expandedPhases.has(phase.id) || phase.id === activePhaseId
           const isActivePhase = phase.id === activePhaseId
 
           return (
@@ -151,7 +137,7 @@ export function SDLCSidebar() {
                   {phase.number}
                 </span>
                 <span className="flex-1 text-[12px] font-semibold uppercase tracking-wide">
-                  {isHydrated ? phase.label : ""}
+                  {phase.label}
                 </span>
                 <span
                   className={cn(
@@ -170,7 +156,7 @@ export function SDLCSidebar() {
                     const isActive = isStageActive(stage.href, pathname)
 
                     return (
-                      <a
+                      <Link
                         key={stage.id}
                         href={stage.href}
                         className={cn(
@@ -191,7 +177,7 @@ export function SDLCSidebar() {
                             >
                               {stage.icon}
                             </span>
-                            <span className="text-[12px]">{isHydrated ? stage.label : ""}</span>
+                            <span className="text-[12px]">{stage.label}</span>
                             <span
                               className="material-symbols-outlined text-muted-foreground/30"
                               style={{ fontSize: 10 }}
@@ -200,10 +186,10 @@ export function SDLCSidebar() {
                             </span>
                           </span>
                           <span className="ml-[22px] text-[10px] font-normal leading-snug text-muted-foreground/60">
-                            {isHydrated ? stage.description : ""}
+                            {stage.description}
                           </span>
                         </span>
-                      </a>
+                      </Link>
                     )
                   })}
                 </div>
@@ -211,6 +197,32 @@ export function SDLCSidebar() {
             </div>
           )
         })}
+      </div>
+
+      <div className="mt-4 border-t border-border/20 pt-3">
+        <Link
+          href="/code"
+          className={cn(
+            "flex items-center gap-3 rounded-[10px] border px-3 py-3 transition-all duration-200",
+            pathname.startsWith("/code")
+              ? "border-primary/30 bg-primary/10 text-primary shadow-sm"
+              : "border-border/30 bg-card/30 text-muted-foreground hover:border-primary/20 hover:bg-card hover:text-foreground"
+          )}
+        >
+          <div
+            className={cn(
+              "grid size-9 place-items-center rounded-lg",
+              pathname.startsWith("/code") ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground/70"
+            )}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>terminal</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-semibold uppercase tracking-wide">View Code</div>
+            <div className="text-[10px] text-muted-foreground/70">VS Code style explorer for AI output</div>
+          </div>
+          <span className="material-symbols-outlined text-muted-foreground/40" style={{ fontSize: 14 }}>arrow_forward</span>
+        </Link>
       </div>
 
       <div className="mt-auto border-t border-border/20 pt-3 px-4 pb-3">

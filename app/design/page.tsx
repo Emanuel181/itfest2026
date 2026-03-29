@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { callAgentStream } from "@/lib/agents/client"
+import { createDemoPokerSessions, createDemoStoryAssignees, DEMO_BACKLOG_STORIES, DEMO_REQUIREMENTS } from "@/lib/demo/mock-sdlc"
 
 import type { UserStory } from "@/lib/agents/types"
 
@@ -228,6 +229,40 @@ export default function DesignPage() {
     }
   }
 
+  function applyMockBacklog() {
+    const demoSessions = createDemoPokerSessions()
+    const demoAssignees = createDemoStoryAssignees()
+
+    setIsGeneratingBacklog(false)
+    setBacklogStream("")
+    setRequirements(DEMO_REQUIREMENTS)
+    setStories(DEMO_BACKLOG_STORIES)
+    setPokerSessions(demoSessions)
+    setStoryAssignees(demoAssignees)
+    setRunningStories({})
+
+    try {
+      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      localStorage.setItem(
+        "itfest_state",
+        JSON.stringify({
+          ...existing,
+          requirements: DEMO_REQUIREMENTS,
+          stories: DEMO_BACKLOG_STORIES,
+        })
+      )
+      localStorage.setItem(
+        "itfest_poker",
+        JSON.stringify({
+          pokerSessions: demoSessions,
+          storyAssignees: demoAssignees,
+        })
+      )
+    } catch {
+      // ignore demo persistence issues
+    }
+  }
+
   // Planning Poker session
   const runPokerSession = useCallback(async (storyId: string) => {
     const existing = pokerSessionsRef.current[storyId]
@@ -386,6 +421,13 @@ export default function DesignPage() {
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Analysis
             </a>
+            <button
+              onClick={applyMockBacklog}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Backlog
+            </button>
             {allDonePoker && (
               <button
                 onClick={() => router.push(`/implementation?story=${encodeURIComponent(stories[0]?.id ?? "")}&autorun=1`)}

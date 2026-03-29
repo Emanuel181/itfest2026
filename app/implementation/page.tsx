@@ -9,6 +9,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
 import { SDLCSidebar } from "@/components/sdlc-sidebar";
+import {
+  createDemoChatMessages,
+  createDemoEvalContent,
+  createDemoImplementedStories,
+  createDemoNoFrontend,
+  createDemoPokerSessions,
+  createDemoReasoningContent,
+  createDemoStoryAssignees,
+} from "@/lib/demo/mock-sdlc";
 
 import type {
   UserStory,
@@ -124,11 +133,6 @@ function highlightCode(code: string): React.ReactNode[] {
     <span key={i} style={{ color: colorMap[s.type] }}>{s.text}</span>
   ));
 }
-
-// ---------------------------------------------------------------------------
-// No mock data — stories are loaded from localStorage (populated by the
-// ideation pipeline).
-// ---------------------------------------------------------------------------
 
 const PRIORITY_CONFIG = {
   critical: { color: "#ffb4ab", bg: "bg-[#ffb4ab]/10", border: "border-[#ffb4ab]/20", icon: "keyboard_double_arrow_up", label: "Critical" },
@@ -2709,6 +2713,53 @@ function ImplementationPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun, runImplementation, mounted, stories.length]);
 
+  const applyMockImplementation = useCallback(() => {
+    const demoStories = createDemoImplementedStories();
+    const demoReasoning = createDemoReasoningContent();
+    const demoEval = createDemoEvalContent();
+    const demoChat = createDemoChatMessages();
+    const demoNoFrontend = createDemoNoFrontend();
+    const demoPokerSessions = createDemoPokerSessions();
+    const demoStoryAssignees = createDemoStoryAssignees();
+
+    autoRunFiredRef.current = true;
+    setStories(demoStories);
+    setSelectedStoryId(demoStories[0]?.id ?? "");
+    setReasoningContent(demoReasoning);
+    setEvalContent(demoEval);
+    setChatMessages(demoChat);
+    setNoFrontend(demoNoFrontend);
+    setShowEvaluator(Object.fromEntries(demoStories.map((story) => [story.id, true])));
+    setRunningStories({});
+    setRerunningVariants({});
+    setPokerSessions(demoPokerSessions);
+    setStoryAssignees(demoStoryAssignees);
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          "itfest_state",
+          JSON.stringify({
+            stories: demoStories,
+            reasoningContent: demoReasoning,
+            evalContent: demoEval,
+            chatMessages: demoChat,
+            noFrontend: demoNoFrontend,
+          })
+        );
+        localStorage.setItem(
+          "itfest_poker",
+          JSON.stringify({
+            pokerSessions: demoPokerSessions,
+            storyAssignees: demoStoryAssignees,
+          })
+        );
+      } catch {
+        // ignore local persistence issues in demo mode
+      }
+    }
+  }, []);
+
   const clearSession = useCallback(() => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("itfest_state");
@@ -2947,6 +2998,13 @@ function ImplementationPageInner() {
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Backlog
             </a>
+            <button
+              onClick={applyMockImplementation}
+              className="flex items-center gap-1.5 rounded-lg border border-[#4edea3]/30 bg-[#4edea3]/5 px-3 py-1.5 text-xs font-semibold text-[#4edea3] hover:bg-[#4edea3]/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Implementation
+            </button>
             <button
               onClick={clearSession}
               className="flex items-center gap-1 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"

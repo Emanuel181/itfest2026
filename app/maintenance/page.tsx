@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { callAgentStream } from "@/lib/agents/client"
+import { createDemoImplementedStories, DEMO_SECURITY_REPORT } from "@/lib/demo/mock-sdlc"
 import { cn } from "@/lib/utils"
 
 interface SecurityIssue {
@@ -118,6 +119,26 @@ export default function MaintenancePage() {
     }
   }
 
+  function applyMockAudit() {
+    setIsAuditing(false)
+    setStreamContent("")
+    setReport(DEMO_SECURITY_REPORT)
+    setStoriesCount((current) => (current > 0 ? current : createDemoImplementedStories().length))
+
+    try {
+      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      localStorage.setItem(
+        "itfest_state",
+        JSON.stringify({
+          ...existing,
+          stories: existing.stories ?? createDemoImplementedStories(),
+        })
+      )
+    } catch {
+      // ignore demo persistence issues
+    }
+  }
+
   const severityConfig = {
     critical: { color: "#ef4444", bg: "bg-red-500/10", border: "border-red-500/20", icon: "error" },
     high: { color: "#ffb4ab", bg: "bg-[#ffb4ab]/10", border: "border-[#ffb4ab]/20", icon: "warning" },
@@ -156,6 +177,13 @@ export default function MaintenancePage() {
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Testing
             </a>
+            <button
+              onClick={applyMockAudit}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Audit
+            </button>
             <button
               onClick={runSecurityAudit}
               disabled={isAuditing}

@@ -1,11 +1,18 @@
 "use client"
 
 import { useEffect, useState, useRef, Suspense } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { SDLCSidebar } from "@/components/sdlc-sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { callAgentStream } from "@/lib/agents/client"
+import {
+  createDemoImplementedStories,
+  createDemoPokerSessions,
+  createDemoStoryAssignees,
+  DEMO_MERGED_CODE,
+  DEMO_TESTING_SELECTIONS,
+} from "@/lib/demo/mock-sdlc"
 
 interface StorySelection {
   id: string
@@ -23,7 +30,6 @@ interface ActivityEntry {
 
 function TestingPageInner() {
   const searchParams = useSearchParams()
-  const router = useRouter()
 
   // Parse story selections from URL
   const [selections, setSelections] = useState<StorySelection[]>([])
@@ -135,6 +141,62 @@ function TestingPageInner() {
     }
   }
 
+  function applyMockMerge() {
+    const demoStories = createDemoImplementedStories()
+    const demoSelections = DEMO_TESTING_SELECTIONS
+    const demoActivity: ActivityEntry[] = [
+      {
+        id: "mock-merge-1",
+        agent: "Merge Agent",
+        color: "#4edea3",
+        message: "Collected selected variants and prepared the integration workspace.",
+        timestamp: "10:05:00",
+        done: true,
+      },
+      {
+        id: "mock-merge-2",
+        agent: "Build Agent",
+        color: "#ffd080",
+        message: "Bundled the merged preview app and validated the runtime structure.",
+        timestamp: "10:05:06",
+        done: true,
+      },
+      {
+        id: "mock-merge-3",
+        agent: "Security Auditor",
+        color: "#ffb4ab",
+        message: "Confirmed the selected variants are safe for demo handoff.",
+        timestamp: "10:05:12",
+        done: true,
+      },
+    ]
+
+    setSelections(demoSelections)
+    setActivityLog(demoActivity)
+    setMergedCode(DEMO_MERGED_CODE)
+    setMergePhase("done")
+
+    try {
+      const existing = JSON.parse(localStorage.getItem("itfest_state") || "{}")
+      localStorage.setItem(
+        "itfest_state",
+        JSON.stringify({
+          ...existing,
+          stories: demoStories,
+        })
+      )
+      localStorage.setItem(
+        "itfest_poker",
+        JSON.stringify({
+          pokerSessions: createDemoPokerSessions(),
+          storyAssignees: createDemoStoryAssignees(),
+        })
+      )
+    } catch {
+      // ignore demo persistence issues
+    }
+  }
+
   if (!isHydrated) {
     return <div className="flex h-screen items-center justify-center bg-background"><div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
   }
@@ -174,6 +236,13 @@ function TestingPageInner() {
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
               Implementation
             </a>
+            <button
+              onClick={applyMockMerge}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_fix_high</span>
+              Mock Merge
+            </button>
             {mergePhase === "done" && (
               <a
                 href="/maintenance"
